@@ -30,6 +30,8 @@ using salticidae::get_hash;
 using salticidae::get_hex;
 
 struct MsgTest: public salticidae::MsgBase<> {
+    using MsgBase::MsgBase;
+
     void gen_testhashes(int cnt) {
         DataStream s;
         set_opcode(0x01);
