@@ -31,6 +31,7 @@
 #include <arpa/inet.h>
 
 #include "salticidae/util.h"
+#include "salticidae/stream.h"
 
 namespace salticidae {
 
@@ -92,6 +93,10 @@ struct NetAddr {
     }
 
     bool is_null() const { return ip == 0 && port == 0; }
+
+    void serialize(DataStream &s) const { s << ip << port; }
+
+    void unserialize(DataStream &s) { s >> ip >> port; }
 };
 
 }
