@@ -79,6 +79,7 @@ template<typename T, typename R> class RcObjBase;
 
 template<typename T, typename R>
 class WeakObjBase {
+    T *obj;
     R *ctl;
     void release() { if (ctl) ctl->release_weak(); }
     public:
@@ -87,16 +88,19 @@ class WeakObjBase {
     WeakObjBase(): ctl(nullptr) {}
     WeakObjBase &operator=(const WeakObjBase &other) {
         release();
+        obj = other.obj;
         if ((ctl = other.ctl))
             ctl->add_weak();
         return *this;
     }
 
-    WeakObjBase(const WeakObjBase &other): ctl(other.ctl) {
+    WeakObjBase(const WeakObjBase &other):
+            obj(other.obj), ctl(other.ctl) {
         if (ctl) ctl->add_weak();
     }
 
-    WeakObjBase(WeakObjBase &&other): ctl(other.ctl) {
+    WeakObjBase(WeakObjBase &&other):
+            obj(other.obj), ctl(other.ctl) {
         other.ctl = nullptr;
     }
 
@@ -130,11 +134,6 @@ class RcObjBase {
         if ((ctl = other.ctl))
             ctl->add_ref();
         return *this;
-    }
-
-    RcObjBase(const RcObjBase &other):
-            obj(other.obj), ctl(other.ctl) {
-        if (ctl) ctl->add_ref();
     }
 
     template<typename T_>
@@ -178,7 +177,7 @@ RcObjBase<T, R> static_pointer_cast(const RcObjBase<T_, R> &other) {
 
 template<typename T, typename R>
 inline WeakObjBase<T, R>::WeakObjBase(const RcObjBase<T, R> &other):
-        ctl(other.ctl) {
+        obj(other.obj), ctl(other.ctl) {
     if (ctl) ctl->add_weak();
 }
 
