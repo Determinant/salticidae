@@ -136,6 +136,11 @@ class RcObjBase {
         return *this;
     }
 
+    RcObjBase(const RcObjBase &other):
+            obj(other.obj), ctl(other.ctl) {
+        if (ctl) ctl->add_ref();
+    }
+
     template<typename T_>
     RcObjBase(const RcObjBase<T_, R> &other):
             obj(other.obj), ctl(other.ctl) {
