@@ -66,7 +66,7 @@ struct NetAddr {
         long port;
         try {
             port = std::stol(port_str.c_str());
-        } catch (std::logic_error) {
+        } catch (std::logic_error &) {
             throw SalticidaeError("invalid port format");
         }
         if (port < 0)

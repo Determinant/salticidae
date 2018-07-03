@@ -61,7 +61,7 @@ const std::string get_current_datetime() {
 SalticidaeError::SalticidaeError() : msg("unknown") {}
 
 SalticidaeError::SalticidaeError(const std::string &fmt, ...) {
-    size_t guessed_size = 128;
+    int guessed_size = 128;
     std::string buff;
     va_list ap;
     for (;;)

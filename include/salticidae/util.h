@@ -161,7 +161,7 @@ class Config {
             size_t idx;
             try {
                 val = stoi(strval, &idx);
-            } catch (std::invalid_argument) {
+            } catch (std::invalid_argument &) {
                 throw SalticidaeError("invalid integer");
             }
         }
@@ -175,7 +175,7 @@ class Config {
             size_t idx;
             try {
                 val = stod(strval, &idx);
-            } catch (std::invalid_argument) {
+            } catch (std::invalid_argument &) {
                 throw SalticidaeError("invalid double");
             }
         }

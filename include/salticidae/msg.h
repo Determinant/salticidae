@@ -42,8 +42,8 @@ template<typename OpcodeType = uint8_t,
 class MsgBase {
     public:
     using opcode_t = OpcodeType;
-    static const opcode_t OPCODE_PING = PING;
-    static const opcode_t OPCODE_PONG = PONG;
+    static const opcode_t OPCODE_PING;
+    static const opcode_t OPCODE_PONG;
     static const size_t header_size;
 
     private:
@@ -248,6 +248,17 @@ const size_t MsgBase<OpcodeType, _, __>::header_size =
     sizeof(MsgBase<OpcodeType, _, __>) -
     sizeof(MsgBase<OpcodeType, _, __>::payload) -
     sizeof(MsgBase<OpcodeType, _, __>::no_payload);
+
+template<typename OpcodeType,
+        OpcodeType PING,
+        OpcodeType _>
+const OpcodeType MsgBase<OpcodeType, PING, _>::OPCODE_PING = PING;
+
+template<typename OpcodeType,
+        OpcodeType _,
+        OpcodeType PONG>
+const OpcodeType MsgBase<OpcodeType, _, PONG>::OPCODE_PONG = PONG;
+
 }
 
 #endif
