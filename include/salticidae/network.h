@@ -263,7 +263,8 @@ void MsgNetwork<MsgType>::Conn::on_read() {
             }
             auto it = mn->handler_map.find(msg.get_opcode());
             if (it == mn->handler_map.end())
-                SALTICIDAE_LOG_WARN("unknown command: %s", get_hex(msg.get_opcode()));
+                SALTICIDAE_LOG_WARN("unknown opcode: %s",
+                                    get_hex(msg.get_opcode()).c_str());
             else /* call the handler */
             {
                 SALTICIDAE_LOG_DEBUG("got message %s from %s",
@@ -497,6 +498,7 @@ void PeerNetwork<MsgType>::reset_conn_timeout(conn_t conn) {
     assert(conn->ev_timeout);
     conn->ev_timeout.del();
     conn->ev_timeout.add_with_timeout(conn_timeout);
+    SALTICIDAE_LOG_INFO("reset timeout %.2f", conn_timeout);
 }
 
 template<typename MsgType>

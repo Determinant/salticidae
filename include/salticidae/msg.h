@@ -153,16 +153,6 @@ class MsgBase {
           << "length=" << get_hex(length) << " "
           << "checksum=" << get_hex(checksum) << " "
           << "payload=" << get_hex(payload) << ">";
-
-        //std::string opcode_hex = get_hex(opcode);
-        //char *buff = new char[128 + opcode_hex.size()];
-        //size_t ret = sprintf(buff,
-        //        "<magic=%08x opcode=%s length=%08x checksum=%08x payload=",
-        //        magic, opcode_hex.c_str(), length, checksum);
-        //buff[ret] = 0;
-        //std::string res = std::string(buff) + bin2hexstr(payload.data(), length) + ">";
-        //delete [] buff;
-        //return std::move(res);
         return std::string(s);
     }
     
@@ -245,9 +235,10 @@ template<typename OpcodeType,
         OpcodeType _,
         OpcodeType __>
 const size_t MsgBase<OpcodeType, _, __>::header_size =
-    sizeof(MsgBase<OpcodeType, _, __>) -
-    sizeof(MsgBase<OpcodeType, _, __>::payload) -
-    sizeof(MsgBase<OpcodeType, _, __>::no_payload);
+    sizeof(MsgBase<OpcodeType, _, __>::magic) +
+    sizeof(MsgBase<OpcodeType, _, __>::opcode) +
+    sizeof(MsgBase<OpcodeType, _, __>::length) +
+    sizeof(MsgBase<OpcodeType, _, __>::checksum);
 
 template<typename OpcodeType,
         OpcodeType PING,
