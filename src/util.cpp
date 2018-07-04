@@ -85,7 +85,7 @@ SalticidaeError::operator std::string() const {
 }
 
 void Logger::write(const char *tag, const char *fmt, va_list ap) {
-    fprintf(output, "%s [%s] ", get_current_datetime().c_str(), tag);
+    fprintf(output, "%s [%s %s] ", get_current_datetime().c_str(), prefix, tag);
     vfprintf(output, fmt, ap);
     fprintf(output, "\n");
 }
@@ -100,24 +100,24 @@ void Logger::debug(const char *fmt, ...) {
 void Logger::info(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    write("salticidae info", fmt, ap);
+    write("info", fmt, ap);
     va_end(ap);
 }
 
 void Logger::warning(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    write("salticidae warn", fmt, ap);
+    write("warn", fmt, ap);
     va_end(ap);
 }
 void Logger::error(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    write("salticida error", fmt, ap);
+    write("error", fmt, ap);
     va_end(ap);
 }
 
-Logger logger;
+Logger logger("salticidae");
 
 void ElapsedTime::start() {
     struct timezone tz;

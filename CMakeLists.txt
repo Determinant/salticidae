@@ -41,9 +41,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_definitions(-DHOTSTUFF_DEBUG_LOG)
+    add_definitions(-DSALTICIDAE_DEBUG_LOG)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_definitions(-DHOTSTUFF_NORMAL_LOG)
+    add_definitions(-DSALTICIDAE_NORMAL_LOG)
 endif()
 
 #set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -no-pie -pg")

@@ -51,12 +51,16 @@ class Logger {
     protected:
     FILE *output;
     bool opened;
+    const char *prefix;
     void write(const char *tag, const char *fmt, va_list ap);
 
     public:
-    Logger() : output(stderr), opened(false) {}
-    Logger(FILE *f) : output(f) {}
-    Logger(const char *filename): opened(true) {
+    Logger(const char *prefix):
+        output(stderr), opened(false), prefix(prefix) {}
+    Logger(const char *prefix, FILE *f):
+        output(f), opened(false), prefix(prefix) {}
+    Logger(const char *prefix, const char *filename):
+        opened(true), prefix(prefix) {
         if ((output = fopen(filename, "w")) == nullptr)
             throw SalticidaeError("logger cannot open file");
     }
