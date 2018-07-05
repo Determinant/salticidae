@@ -219,8 +219,16 @@ class Blob {
     size_t cheap_hash() const { return *data; }
 
     void serialize(DataStream &s) const {
-        for (const _impl_type *ptr = data; ptr < data + _len; ptr++)
-            s << htole(*ptr);
+        if (loaded)
+        {
+            for (const _impl_type *ptr = data; ptr < data + _len; ptr++)
+                s << htole(*ptr);
+        }
+        else
+        {
+            for (const _impl_type *ptr = data; ptr < data + _len; ptr++)
+                s << htole((_impl_type)0);
+        }
     }
 
     void unserialize(DataStream &s) {
@@ -230,6 +238,7 @@ class Blob {
             s >> x;
             *ptr = letoh(x);
         }
+        loaded = true;
     }
 };
 
