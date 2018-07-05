@@ -138,11 +138,11 @@ class MsgBase {
 
     void set_payload(bytearray_t &&_payload) {
         payload = std::move(_payload);
-        length = payload.size();
-        checksum = get_checksum();
 #ifndef SALTICIDAE_NOCHECK
         no_payload = false;
 #endif
+        length = payload.size();
+        checksum = get_checksum();
     }
 
     operator std::string() const {
@@ -155,11 +155,15 @@ class MsgBase {
           << "payload=" << get_hex(payload) << ">";
         return std::string(s);
     }
-    
+
     uint32_t get_checksum() const {
         static class SHA256 sha256;
         uint32_t res;
         bytearray_t tmp;
+#ifndef SALTICIDAE_NOCHECK
+        if (no_payload)
+            throw std::runtime_error("payload not available");
+#endif
         sha256.reset();
         sha256.update(payload);
         sha256.digest(tmp);
@@ -169,11 +173,11 @@ class MsgBase {
         memmove(&res, &*tmp.begin(), 4);
         return res;
     }
-    
+
     bool verify_checksum() const {
         return checksum == get_checksum();
     }
-     
+
     bytearray_t serialize() const {
         DataStream s;
         s << htole(magic)
@@ -183,48 +187,48 @@ class MsgBase {
           << payload;
         return std::move(s);
     }
-    
+
     void gen_ping(uint16_t port) {
         DataStream s;
         set_opcode(OPCODE_PING);
         s << htole(port);
         set_payload(std::move(s));
     }
-    
+
     void parse_ping(uint16_t &port) const {
         DataStream s(get_payload());
         s >> port;
         port = letoh(port);
     }
-    
+
     void gen_pong(uint16_t port) {
         DataStream s;
         set_opcode(OPCODE_PONG);
         s << htole(port);
         set_payload(std::move(s));
     }
-    
+
     void parse_pong(uint16_t &port) const {
         DataStream s(get_payload());
         s >> port;
         port = letoh(port);
     }
-    
+
     void gen_hash_list(DataStream &s,
                         const std::vector<uint256_t> &hashes) {
         uint32_t size = htole((uint32_t)hashes.size());
         s << size;
         for (const auto &h: hashes) s << h;
     }
-    
+
     void parse_hash_list(DataStream &s,
                         std::vector<uint256_t> &hashes) const {
         uint32_t size;
         hashes.clear();
-        
+
         s >> size;
         size = letoh(size);
-    
+
         hashes.resize(size);
         for (auto &hash: hashes) s >> hash;
     }
