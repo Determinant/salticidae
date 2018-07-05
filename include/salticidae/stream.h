@@ -44,8 +44,8 @@ class DataStream {
     DataStream(const bytearray_t &data): buffer(data), offset(0) {}
 
     DataStream(DataStream &&other):
-        buffer(std::move(other.buffer)),
-        offset(other.offset) {}
+            buffer(std::move(other.buffer)),
+            offset(other.offset) {}
 
     DataStream(const DataStream &other):
         buffer(other.buffer),
@@ -59,7 +59,7 @@ class DataStream {
 
     DataStream &operator=(DataStream &&other) {
         buffer = std::move(other.buffer);
-        offset = std::move(other.offset);
+        offset = other.offset;
         return *this;
     }
 
