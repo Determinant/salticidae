@@ -89,10 +89,20 @@ class DataStream {
         return *this;
     }
 
-    void put_data(uint8_t *begin, uint8_t *end) {
+    void put_data(const uint8_t *begin, const uint8_t *end) {
         size_t len = end - begin;
         buffer.resize(buffer.size() + len);
         memmove(&*buffer.end() - len, begin, len);
+    }
+
+    const uint8_t *get_data_inplace(size_t len) {
+        auto res = (uint8_t *)&*(buffer.begin() + offset);
+#ifndef SALTICIDAE_NOCHECK
+        if (offset + len > buffer.size())
+            throw std::ios_base::failure("insufficient buffer");
+#endif
+        offset += len;
+        return res;
     }
 
     template<typename T>
@@ -112,7 +122,7 @@ class DataStream {
     typename std::enable_if<std::is_integral<T>::value, DataStream &>::type
     operator>>(T &d) {
 #ifndef SALTICIDAE_NOCHECK
-        if (offset >= buffer.size())
+        if (offset + sizeof(T) > buffer.size())
             throw std::ios_base::failure("insufficient buffer");
 #endif
         d = *(reinterpret_cast<T *>(&buffer[offset]));
@@ -144,14 +154,14 @@ class DataStream {
         uint8_t *bp;
         unsigned int tmp;
         if (len & 1)
-            throw std::runtime_error("not a valid hex string");
+            throw std::invalid_argument("not a valid hex string");
         buffer.resize(len >> 1);
         offset = 0;
         for (p = hexstr.data(), bp = &*buffer.begin();
             p < hexstr.data() + len; p += 2, bp++)
         {
             if (sscanf(p, "%02x", &tmp) != 1)
-                throw std::runtime_error("not a valid hex string");
+                throw std::invalid_argument("not a valid hex string");
             *bp = tmp;
         }
     }
@@ -185,7 +195,7 @@ class Blob {
     Blob(): loaded(false) {}
     Blob(const bytearray_t &arr) {
         if (arr.size() != N / 8)
-            throw std::runtime_error("incorrect Blob size");
+            throw std::invalid_argument("incorrect Blob size");
         load(&*arr.begin());
     }
 
