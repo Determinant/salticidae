@@ -170,7 +170,7 @@ class DataStream {
         return bytearray_t(buffer.begin() + offset, buffer.end());
     }
 
-    operator bytearray_t () const && {
+    operator bytearray_t () && {
         return std::move(buffer);
     }
 
@@ -223,7 +223,7 @@ class Blob {
     }
 
     bool operator!=(const Blob<N> &other) const {
-        return !(data == other);
+        return !(*this == other);
     }
 
     size_t cheap_hash() const { return *data; }
@@ -249,6 +249,12 @@ class Blob {
             *ptr = letoh(x);
         }
         loaded = true;
+    }
+
+    operator bytearray_t () const & {
+        DataStream s;
+        s << *this;
+        return std::move(s);
     }
 };
 

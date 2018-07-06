@@ -84,7 +84,11 @@ struct NetAddr {
     bool operator==(const NetAddr &other) const {
         return ip == other.ip && port == other.port;
     }
-    
+
+    bool operator!=(const NetAddr &other) const {
+        return ip != other.ip || port != other.port;
+    }
+   
     operator std::string() const {
         struct in_addr in;
         in.s_addr = ip;
