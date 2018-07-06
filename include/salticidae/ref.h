@@ -30,6 +30,49 @@
 
 namespace salticidae {
 
+template<typename T>
+class BoxObj {
+    T *obj;
+
+    void release() {
+        if (obj) delete obj;
+    }
+
+    public:
+    template<typename T__, typename T_>
+    friend BoxObj<T__> static_pointer_cast(const BoxObj<T_> &other);
+    operator T*() const { return obj; }
+    T *operator->() const { return obj; }
+    BoxObj(): obj(nullptr) {}
+    BoxObj(T *obj): obj(obj) {}
+    BoxObj &operator=(const BoxObj &other) = delete;
+    BoxObj &operator=(BoxObj &&other) {
+        release();
+        obj = other.obj;
+        other.obj = nullptr;
+        return *this;
+    }
+
+    BoxObj(const BoxObj &other) = delete;
+    BoxObj(BoxObj &&other): obj(other.obj) {
+        other.obj = nullptr;
+    }
+
+    template<typename T_>
+    BoxObj(BoxObj<T_> &&other): obj(other.obj) {
+        other.obj = nullptr;
+    }
+
+    ~BoxObj() { release(); }
+};
+
+template<typename T, typename T_>
+BoxObj<T> static_pointer_cast(BoxObj<T_> &&other) {
+    BoxObj<T> box{};
+    box.obj = static_cast<T *>(other.obj);
+    return std::move(box);
+}
+
 struct _RCCtl {
     size_t ref_cnt;
     size_t weak_cnt;
@@ -122,12 +165,18 @@ class RcObjBase {
     friend std::hash<RcObjBase<T, R>>;
     template<typename T__, typename T_, typename R_>
     friend RcObjBase<T__, R_> static_pointer_cast(const RcObjBase<T_, R_> &other);
+    template<typename T__, typename T_, typename R_>
+    friend RcObjBase<T__, R_> static_pointer_cast(RcObjBase<T_, R_> &&other);
     template<typename T_, typename R_> friend class RcObjBase;
 
     operator T*() const { return obj; }
     T *operator->() const { return obj; }
     RcObjBase(): obj(nullptr), ctl(nullptr) {}
     RcObjBase(T *obj): obj(obj), ctl(new R()) {}
+    RcObjBase(BoxObj<T> &&box_ref): obj(box_ref.obj), ctl(new R()) {
+        box_ref.obj = nullptr;
+    }
+
     RcObjBase &operator=(const RcObjBase &other) {
         release();
         obj = other.obj;
@@ -148,6 +197,12 @@ class RcObjBase {
     }
 
     RcObjBase(RcObjBase &&other):
+            obj(other.obj), ctl(other.ctl) {
+        other.ctl = nullptr;
+    }
+
+    template<typename T_>
+    RcObjBase(RcObjBase<T_, R> &&other):
             obj(other.obj), ctl(other.ctl) {
         other.ctl = nullptr;
     }
@@ -180,11 +235,21 @@ RcObjBase<T, R> static_pointer_cast(const RcObjBase<T_, R> &other) {
     return std::move(rc);
 }
 
+template<typename T, typename T_, typename R>
+RcObjBase<T, R> static_pointer_cast(RcObjBase<T_, R> &&other) {
+    RcObjBase<T, R> rc{};
+    rc.obj = static_cast<T *>(other.obj);
+    rc.ctl = other.ctl;
+    other.ctl = nullptr;
+    return std::move(rc);
+}
+
 template<typename T, typename R>
 inline WeakObjBase<T, R>::WeakObjBase(const RcObjBase<T, R> &other):
         obj(other.obj), ctl(other.ctl) {
     if (ctl) ctl->add_weak();
 }
+
 
 template<typename T> using RcObj = RcObjBase<T, _RCCtl>;
 template<typename T> using WeakObj = WeakObjBase<T, _RCCtl>;
