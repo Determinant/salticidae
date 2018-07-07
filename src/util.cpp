@@ -146,22 +146,13 @@ Config::Opt::Opt(const std::string &optname, OptVal *optval, Action action, int 
     opt.val = idx;
 }
 
-void Config::add_opt(const std::string &optname, OptVal *optval, Action action) {
+void Config::add_opt(const std::string &optname, OptVal &optval, Action action) {
     if (conf.count(optname))
         throw SalticidaeError("option name already exists");
     auto it = conf.insert(
         std::make_pair(optname,
-                        Opt(optname, optval, action, getopt_order.size()))).first;
+                        Opt(optname, &optval, action, getopt_order.size()))).first;
     getopt_order.push_back(&it->second);
-}
-
-std::string trim(const std::string &str,
-                const std::string &space = "\t\r\n ") {
-    const auto new_begin = str.find_first_not_of(space);
-    if (new_begin == std::string::npos)
-        return "";
-    const auto new_end = str.find_last_not_of(space);
-    return str.substr(new_begin, new_end - new_begin + 1);
 }
 
 void Config::update(Opt &p, const char *optval) {
@@ -239,6 +230,36 @@ size_t Config::parse(int argc, char **argv) {
         }
     }
     return optind;
+}
+
+std::vector<std::string> split(const std::string &s, const std::string &delim) {
+    std::vector<std::string> res;
+    size_t lastpos = 0;
+    for (;;)
+    {
+        size_t pos = s.find(delim, lastpos);
+        if (pos == std::string::npos)
+            break;
+        res.push_back(s.substr(lastpos, pos - lastpos));
+        lastpos = pos + delim.length();
+    }
+    res.push_back(s.substr(lastpos, s.length() - lastpos));
+    return res;
+}
+
+std::string trim(const std::string &s, const std::string &space) {
+    const auto new_begin = s.find_first_not_of(space);
+    if (new_begin == std::string::npos)
+        return "";
+    const auto new_end = s.find_last_not_of(space);
+    return s.substr(new_begin, new_end - new_begin + 1);
+}
+
+std::vector<std::string> trim_all(const std::vector<std::string> &ss) {
+    std::vector<std::string> res;
+    for (const auto &s: ss)
+        res.push_back(trim(s));
+    return res;
 }
 
 }

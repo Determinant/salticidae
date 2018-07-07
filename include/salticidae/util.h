@@ -38,6 +38,10 @@ namespace salticidae {
 
 void sec2tv(double t, struct timeval &tv);
 void event_add_with_timeout(struct event *ev, double timeout);
+std::string trim(const std::string &s,
+                const std::string &space = "\t\r\n ");
+std::vector<std::string> split(const std::string &s, const std::string &delim);
+std::vector<std::string> trim_all(const std::vector<std::string> &ss);
 
 class SalticidaeError: public std::exception {
     std::string msg;
@@ -142,25 +146,30 @@ class Config {
     };
 
     class OptValFlag: public OptVal {
-        bool &val;
+        bool val;
         public:
-        OptValFlag(bool &val): val(val) {}
+        OptValFlag() = default;
+        OptValFlag(bool val): val(val) {}
         void switch_on() override { val = true; }
+        bool &get() { return val; }
     };
 
     class OptValStr: public OptVal {
-        std::string &val;
+        std::string val;
         public:
-        OptValStr(std::string &val): val(val) {}
+        OptValStr() = default;
+        OptValStr(const std::string &val): val(val) {}
         void set_val(const std::string &strval) override {
             val = strval;
         }
+        std::string &get() { return val; }
     };
 
     class OptValInt: public OptVal {
-        int &val;
+        int val;
         public:
-        OptValInt(int &val): val(val) {}
+        OptValInt() = default;
+        OptValInt(int val): val(val) {}
         void set_val(const std::string &strval) override {
             size_t idx;
             try {
@@ -169,12 +178,14 @@ class Config {
                 throw SalticidaeError("invalid integer");
             }
         }
+        int &get() { return val; }
     };
 
     class OptValDouble: public OptVal {
-        double &val;
+        double val;
         public:
-        OptValDouble(double &val): val(val) {}
+        OptValDouble() = default;
+        OptValDouble(double val): val(val) {}
         void set_val(const std::string &strval) override {
             size_t idx;
             try {
@@ -183,15 +194,19 @@ class Config {
                 throw SalticidaeError("invalid double");
             }
         }
+        double &get() { return val; }
     };
 
     class OptValStrVec: public OptVal {
-        std::vector<std::string> &val;
+        using strvec_t = std::vector<std::string>;
+        strvec_t val;
         public:
-        OptValStrVec(std::vector<std::string> &val): val(val) {}
+        OptValStrVec() = default;
+        OptValStrVec(const strvec_t &val): val(val) {}
         void append(const std::string &strval) override {
             val.push_back(strval);
         }
+        strvec_t &get() { return val; }
     };
 
     private:
@@ -221,12 +236,12 @@ class Config {
             conf_fname(conf_fname),
             opt_val_conf(this->conf_fname) {
         conf_idx = getopt_order.size();
-        add_opt("conf", &opt_val_conf, SET_VAL);
+        add_opt("conf", opt_val_conf, SET_VAL);
     }
     
     ~Config() {}
 
-    void add_opt(const std::string &optname, OptVal *optval, Action action);
+    void add_opt(const std::string &optname, OptVal &optval, Action action);
     bool load(const std::string &fname);
     size_t parse(int argc, char **argv);
 };
