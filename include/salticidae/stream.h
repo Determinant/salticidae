@@ -148,8 +148,8 @@ class DataStream {
         return std::string(s.buffer.begin(), s.buffer.end());
     }
 
-    void load_hex(const std::string &hexstr) {
-        size_t len = hexstr.size();
+    void load_hex(const std::string &hex_str) {
+        size_t len = hex_str.size();
         const char *p;
         uint8_t *bp;
         unsigned int tmp;
@@ -157,8 +157,8 @@ class DataStream {
             throw std::invalid_argument("not a valid hex string");
         buffer.resize(len >> 1);
         offset = 0;
-        for (p = hexstr.data(), bp = &*buffer.begin();
-            p < hexstr.data() + len; p += 2, bp++)
+        for (p = hex_str.data(), bp = &*buffer.begin();
+            p < hex_str.data() + len; p += 2, bp++)
         {
             if (sscanf(p, "%02x", &tmp) != 1)
                 throw std::invalid_argument("not a valid hex string");
@@ -277,6 +277,44 @@ template<typename T> inline std::string get_hex(const T &x) {
     s << x;
     return s.get_hex();
 }
+
+inline bytearray_t from_hex(const std::string &hex_str) {
+    DataStream s;
+    s.load_hex(hex_str);
+    return std::move(s);
+}
+
+class Serializable {
+    public:
+    virtual ~Serializable() = default;
+    virtual void serialize(DataStream &s) const = 0;
+    virtual void unserialize(DataStream &s) = 0;
+
+    virtual void from_bytes(const bytearray_t &raw_bytes) {
+        DataStream s(raw_bytes);
+        s >> *this;
+    }
+
+    virtual void from_bytes(bytearray_t &&raw_bytes) {
+        DataStream s(std::move(raw_bytes));
+        s >> *this;
+    }
+
+
+    virtual void from_hex(const std::string &hex_str) {
+        DataStream s;
+        s.load_hex(hex_str);
+        s >> *this;
+    }
+
+    bytearray_t to_bytes() const {
+        DataStream s;
+        s << *this;
+        return std::move(s);
+    }
+
+    std::string to_hex() const { return get_hex(*this); }
+};
 
 }
 
