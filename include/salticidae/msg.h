@@ -147,13 +147,13 @@ class MsgBase {
 
     operator std::string() const {
         DataStream s;
-        s << "<"
+        s << "<msg "
           << "magic=" << get_hex(magic) << " "
           << "opcode=" << get_hex(opcode) << " "
-          << "length=" << get_hex(length) << " "
+          << "length=" << std::to_string(length) << " "
           << "checksum=" << get_hex(checksum) << " "
           << "payload=" << get_hex(payload) << ">";
-        return std::string(s);
+        return std::string(std::move(s));
     }
 
     uint32_t get_checksum() const {
