@@ -48,7 +48,9 @@ class SalticidaeError: public std::exception {
     public:
     SalticidaeError();
     SalticidaeError(const std::string &fmt, ...);
-    operator std::string() const;
+
+    operator std::string() const { return msg; }
+    const char *what() const throw() override { return msg.c_str(); }
 };
 
 class Logger {

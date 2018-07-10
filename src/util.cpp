@@ -80,10 +80,6 @@ SalticidaeError::SalticidaeError(const std::string &fmt, ...) {
     }
 }
 
-SalticidaeError::operator std::string() const {
-    return msg;
-}
-
 void Logger::write(const char *tag, const char *fmt, va_list ap) {
     fprintf(output, "%s [%s %s] ", get_current_datetime().c_str(), prefix, tag);
     vfprintf(output, fmt, ap);
@@ -223,10 +219,11 @@ size_t Config::parse(int argc, char **argv) {
         update(*getopt_order[id], optarg);
         if (id == conf_idx)
         {
-            if (load(conf_fname))
-                SALTICIDAE_LOG_INFO("load configuration from %s", conf_fname.c_str());
+            auto &fname = opt_val_conf.get();
+            if (load(fname))
+                SALTICIDAE_LOG_INFO("loading extra configuration from %s", fname.c_str());
             else
-                SALTICIDAE_LOG_INFO("configuration file %s not found", conf_fname.c_str());
+                SALTICIDAE_LOG_INFO("configuration file %s not found", fname.c_str());
         }
     }
     return optind;
