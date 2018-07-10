@@ -76,7 +76,7 @@ class MsgBase {
             payload(std::move(other.payload)),
             no_payload(other.no_payload) {}
 
-    MsgBase(const uint8_t *raw_header) {
+    MsgBase(const uint8_t *raw_header): no_payload(true) {
         uint32_t _magic;
         opcode_t _opcode;
         uint32_t _length;
