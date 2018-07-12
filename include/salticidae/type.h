@@ -54,13 +54,16 @@ template<> inline uint16_t letoh<uint16_t>(uint16_t x) { return le16toh(x); }
 template<> inline uint32_t letoh<uint32_t>(uint32_t x) { return le32toh(x); }
 template<> inline uint64_t letoh<uint64_t>(uint64_t x) { return le64toh(x); }
 
+template<typename... >
+using void_t = void;
+
 template <typename T, typename = void>
 struct is_ranged : std::false_type {};
 
 template <typename T>
 struct is_ranged<T,
-    std::void_t<decltype(std::declval<T>().begin()),
-                decltype(std::declval<T>().end())>> : std::true_type {};
+    void_t<decltype(std::declval<T>().begin()),
+            decltype(std::declval<T>().end())>> : std::true_type {};
 
 }
 

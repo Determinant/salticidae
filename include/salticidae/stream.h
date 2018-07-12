@@ -26,6 +26,7 @@
 #define _SALTICIDAE_STREAM_H
 
 #include "salticidae/type.h"
+#include "salticidae/ref.h"
 #include "salticidae/crypto.h"
 
 namespace salticidae {
@@ -257,6 +258,84 @@ class Blob {
         return std::move(s);
     }
 };
+
+template<typename T = uint64_t>
+class Bits {
+    using _impl_type = T;
+    static const size_t bit_per_datum = sizeof(_impl_type) * 8;
+    BoxObj<_impl_type[]> data;
+    size_t nbits;
+    size_t ndata;
+
+    public:
+
+    Bits(): data(nullptr) {}
+    Bits(const bytearray_t &arr) {
+        load(&*arr.begin(), arr.size());
+    }
+
+    Bits(const uint8_t *arr, size_t len) { load(arr, len); }
+    Bits(size_t nbits): nbits(nbits) {
+        ndata = (nbits + bit_per_datum - 1) / bit_per_datum;
+        data = new _impl_type[ndata];
+    }
+
+    ~Bits() {}
+
+    void load(const uint8_t *arr, size_t len) {
+        nbits = len * 8;
+        ndata = (len + sizeof(_impl_type) - 1) /
+                        sizeof(_impl_type);
+        data = new _impl_type[ndata];
+
+        uint8_t *end = arr + len;
+        for (_impl_type *ptr = data; ptr < data + ndata;)
+        {
+            _impl_type x = 0;
+            for (unsigned j = 0, k = 0; j < sizeof(_impl_type); j++, k += 8)
+                if (arr < end) x |= *(arr++) << k;
+            *(ptr++) = x;
+        }
+    }
+
+    bool is_null() const { return data == nullptr; }
+
+    size_t cheap_hash() const { return *data; }
+
+    void serialize(DataStream &s) const {
+        s << htole(nbits);
+        if (data)
+        {
+            for (const _impl_type *ptr = data; ptr < data + ndata; ptr++)
+                s << htole(*ptr);
+        }
+        else
+        {
+            for (const _impl_type *ptr = data; ptr < data + ndata; ptr++)
+                s << htole((_impl_type)0);
+        }
+    }
+
+    void unserialize(DataStream &s) {
+        _impl_type x;
+        s >> x;
+        nbits = letoh(x);
+        ndata = (nbits + bit_per_datum - 1) / bit_per_datum;
+        data = new _impl_type[ndata];
+        for (_impl_type *ptr = data; ptr < data + ndata; ptr++)
+        {
+            s >> x;
+            *ptr = letoh(x);
+        }
+    }
+
+    operator bytearray_t () const & {
+        DataStream s;
+        s << *this;
+        return std::move(s);
+    }
+};
+
 
 const size_t ENT_HASH_LENGTH = 256 / 8;
 
