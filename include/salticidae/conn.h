@@ -75,21 +75,45 @@ class RingBuffer {
 
         size_t length() const { return data.end() - offset; }
     };
+
     std::list<buffer_entry_t> ring;
     size_t _size;
 
     public:
     RingBuffer(): _size(0) {}
     ~RingBuffer() { clear(); }
-    RingBuffer &operator=(const RingBuffer &other) = delete;
-    RingBuffer(const RingBuffer &other) = delete;
-    RingBuffer &operator=(RingBuffer &&other) {
-        ring = std::move(other.ring);
-        _size = other._size;
+
+    void swap(RingBuffer &other) {
+        std::swap(ring, other.ring);
+        std::swap(_size, other._size);
+    }
+
+    RingBuffer(const RingBuffer &other):
+        ring(other.ring), _size(other._size) {}
+
+    RingBuffer(RingBuffer &&other):
+        ring(std::move(other.ring)), _size(other._size) {
         other._size = 0;
+    }
+
+    RingBuffer &operator=(RingBuffer &&other) {
+        if (this != &other)
+        {
+            RingBuffer tmp(std::move(other));
+            tmp.swap(*this);
+        }
         return *this;
     }
-    
+ 
+    RingBuffer &operator=(const RingBuffer &other) {
+        if (this != &other)
+        {
+            RingBuffer tmp(other);
+            tmp.swap(*this);
+        }
+        return *this;
+    }
+   
     void push(bytearray_t &&data) {
         _size += data.size();
         ring.push_back(buffer_entry_t(std::move(data)));
@@ -188,9 +212,9 @@ class ConnPool {
         protected:
         /** close the connection and free all on-going or planned events. */
         virtual void close() {
-            ev_read.clear();
-            ev_write.clear();
-            ev_connect.clear();
+            ev_read.del();
+            ev_write.del();
+            ev_connect.del();
             ::close(fd);
             fd = -1;
         }

@@ -165,7 +165,7 @@ void ConnPool::Conn::conn_server(evutil_socket_t fd, short events) {
                 std::bind(&Conn::send_data, this, _1, _2));
         ev_read.add();
         ev_write.add();
-        ev_connect.clear();
+        ev_connect.del();
         ready_send = false;
         SALTICIDAE_LOG_INFO("connected to peer %s", std::string(*this).c_str());
         on_setup();

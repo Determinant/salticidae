@@ -52,15 +52,26 @@ class DataStream {
         buffer(other.buffer),
         offset(other.offset) {}
 
+    void swap(DataStream &other) {
+        std::swap(buffer, other.buffer);
+        std::swap(offset, other.offset);
+    }
+
     DataStream &operator=(const DataStream &other) {
-        buffer = other.buffer;
-        offset = other.offset;
+        if (this != &other)
+        {
+            DataStream tmp(other);
+            tmp.swap(*this);
+        }
         return *this;
     }
 
     DataStream &operator=(DataStream &&other) {
-        buffer = std::move(other.buffer);
-        offset = other.offset;
+        if (this != &other)
+        {
+            DataStream tmp(std::move(other));
+            tmp.swap(*this);
+        }
         return *this;
     }
 

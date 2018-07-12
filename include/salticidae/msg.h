@@ -93,23 +93,30 @@ class MsgBase {
         checksum = letoh(_checksum);
     }
 
+    void swap(MsgBase &other) {
+        std::swap(magic, other.magic);
+        std::swap(opcode, other.opcode);
+        std::swap(length, other.length);
+        std::swap(checksum, other.checksum);
+        std::swap(payload, other.payload);
+        std::swap(no_payload, other.no_payload);
+    }
+
     MsgBase &operator=(const MsgBase &other) {
-        magic = other.magic;
-        opcode = other.opcode;
-        length = other.length;
-        checksum = other.checksum;
-        payload = other.payload;
-        no_payload = other.no_payload;
+        if (this != &other)
+        {
+            MsgBase tmp(other);
+            tmp.swap(*this);
+        }
         return *this;
     }
 
     MsgBase &operator=(MsgBase &&other) {
-        magic = other.magic;
-        opcode = std::move(other.opcode);
-        length = other.length;
-        checksum = other.checksum;
-        payload = std::move(other.payload);
-        no_payload = other.no_payload;
+        if (this != &other)
+        {
+            MsgBase tmp(std::move(other));
+            tmp.swap(*this);
+        }
         return *this;
     }
 

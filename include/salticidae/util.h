@@ -271,31 +271,47 @@ class Event {
             eb(eb), fd(fd), events(events),
             ev(event_new(eb, fd, events, Event::_then, this)),
             callback(callback) {}
+    Event(const Event &other):
+            eb(other.eb), fd(other.fd), events(other.events),
+            ev(event_new(eb, fd, events, Event::_then, this)),
+            callback(other.callback) {}
+
     Event(Event &&other):
             eb(other.eb), fd(other.fd), events(other.events),
-            callback(std::move(other.callback)) {
-        other.clear();
-        ev = event_new(eb, fd, events, Event::_then, this);
+            ev(event_new(eb, fd, events, Event::_then, this)),
+            callback(std::move(other.callback)) {}
+
+    void swap(Event &other) {
+        std::swap(eb, other.eb);
+        std::swap(fd, other.fd);
+        std::swap(events, other.events);
+        std::swap(ev, other.ev);
+        std::swap(callback, other.callback);
     }
+
     Event &operator=(Event &&other) {
-        clear();
-        other.clear();
-        eb = other.eb;
-        fd = other.fd;
-        events = other.events;
-        ev = event_new(eb, fd, events, Event::_then, this);
-        callback = std::move(other.callback);
+        if (this != &other)
+        {
+            Event tmp(std::move(other));
+            tmp.swap(*this);
+        }
         return *this;
     }
 
-    ~Event() { clear(); }
+    Event &operator=(const Event &other) {
+        if (this != &other)
+        {
+            Event tmp(other);
+            tmp.swap(*this);
+        }
+        return *this;
+    }
 
-    void clear() {
+    ~Event() {
         if (ev != nullptr)
         {
             event_del(ev);
             event_free(ev);
-            ev = nullptr;
         }
     }
 
