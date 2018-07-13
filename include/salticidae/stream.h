@@ -286,6 +286,11 @@ class _Bits {
         load(&*arr.begin(), arr.size());
     }
 
+    _Bits(const _Bits &other): nbits(other.nbits), ndata(other.ndata) {
+        data = new _impl_type[ndata];
+        memmove(data.get(), other.data.get(), ndata * sizeof(_impl_type));
+    }
+
     _Bits(const uint8_t *arr, uint32_t len) { load(arr, len); }
     _Bits(uint32_t nbits): nbits(nbits) {
         ndata = (nbits + bit_per_datum - 1) / bit_per_datum;

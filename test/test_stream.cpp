@@ -73,6 +73,8 @@ int main() {
     s << a;
     Bits b;
     s >> b;
+    Bits c(b);
+    Bits d(std::move(c));
     printf("%s\n", get_hex(b).c_str());
     print(b, b.size());
     return 0;
