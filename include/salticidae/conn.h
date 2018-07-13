@@ -212,9 +212,9 @@ class ConnPool {
         protected:
         /** close the connection and free all on-going or planned events. */
         virtual void close() {
-            ev_read.del();
-            ev_write.del();
-            ev_connect.del();
+            ev_read.clear();
+            ev_write.clear();
+            ev_connect.clear();
             ::close(fd);
             fd = -1;
         }

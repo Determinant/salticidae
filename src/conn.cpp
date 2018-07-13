@@ -136,7 +136,7 @@ void ConnPool::accept_client(evutil_socket_t fd, short) {
 
         NetAddr addr((struct sockaddr_in *)&client_addr);
         conn_t conn = create_conn();
-        Conn *conn_ptr = conn;
+        Conn *conn_ptr = conn.get();
         conn->fd = client_fd;
         conn->cpool = this;
         conn->mode = Conn::PASSIVE;
@@ -165,7 +165,7 @@ void ConnPool::Conn::conn_server(evutil_socket_t fd, short events) {
                 std::bind(&Conn::send_data, this, _1, _2));
         ev_read.add();
         ev_write.add();
-        ev_connect.del();
+        ev_connect.clear();
         ready_send = false;
         SALTICIDAE_LOG_INFO("connected to peer %s", std::string(*this).c_str());
         on_setup();
@@ -212,7 +212,7 @@ void ConnPool::Conn::terminate() {
     {
         /* temporarily pin the conn before it dies */
         auto conn = it->second;
-        assert(conn == this);
+        assert(conn.get() == this);
         pool.erase(it);
         close();
         /* inform the upper layer the connection will be destroyed */
@@ -252,7 +252,7 @@ ConnPool::conn_t ConnPool::create_conn(const NetAddr &addr) {
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
         throw ConnPoolError(std::string("unable to set nonblocking socket"));
     conn_t conn = create_conn();
-    Conn * conn_ptr = conn;
+    Conn * conn_ptr = conn.get();
     conn->fd = fd;
     conn->cpool = this;
     conn->mode = Conn::ACTIVE;

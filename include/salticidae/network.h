@@ -315,7 +315,7 @@ void PeerNetwork<MsgType>::Conn::on_teardown() {
     auto it = pn->id2peer.find(peer_id);
     if (it == pn->id2peer.end()) return;
     Peer *p = it->second;
-    if (this != p->conn) return;
+    if (this != p->conn.get()) return;
     p->ev_ping_timer.del();
     p->connected = false;
     p->conn = nullptr;
