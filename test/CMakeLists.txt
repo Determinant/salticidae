@@ -22,3 +22,6 @@
 
 add_executable(test_msg test_msg.cpp)
 target_link_libraries(test_msg salticidae)
+
+add_executable(test_stream test_stream.cpp)
+target_link_libraries(test_stream salticidae)

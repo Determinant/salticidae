@@ -131,6 +131,7 @@ class BoxObj<T[], D>: public _BoxObj<T, D> {
     BoxObj(BoxObj<T_[]> &&other): base_t(std::move(other)) {}
 
     T &operator[](size_t idx) { return base_t::obj[idx]; }
+    const T &operator[] (size_t idx) const { return base_t::obj[idx]; }
 };
 
 template<typename T, typename D = default_delete<T>, typename T_, typename D_>

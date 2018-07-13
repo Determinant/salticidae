@@ -65,6 +65,23 @@ struct is_ranged<T,
     void_t<decltype(std::declval<T>().begin()),
             decltype(std::declval<T>().end())>> : std::true_type {};
 
+template<size_t N>
+struct log2 {
+    enum {
+        value = 1 + log2<N / 2>::value
+    };
+};
+
+template<>
+struct log2<0> {
+   enum { value = 0 };
+};
+
+template<>
+struct log2<1> {
+   enum { value = 0 };
+};
+
 }
 
 #endif

@@ -14,3 +14,4 @@ src/*.swp
 *.so
 *.gch
 /Makefile
+core

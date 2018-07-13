@@ -271,36 +271,36 @@ class Blob {
 };
 
 template<typename T = uint64_t>
-class Bits {
+class _Bits {
     using _impl_type = T;
-    static const size_t bit_per_datum = sizeof(_impl_type) * 8;
+    static const uint32_t bit_per_datum = sizeof(_impl_type) * 8;
+    static const uint32_t shift_per_datum = log2<bit_per_datum>::value;
     BoxObj<_impl_type[]> data;
-    size_t nbits;
-    size_t ndata;
+    uint32_t nbits;
+    uint32_t ndata;
 
     public:
 
-    Bits(): data(nullptr) {}
-    Bits(const bytearray_t &arr) {
+    _Bits(): data(nullptr) {}
+    _Bits(const bytearray_t &arr) {
         load(&*arr.begin(), arr.size());
     }
 
-    Bits(const uint8_t *arr, size_t len) { load(arr, len); }
-    Bits(size_t nbits): nbits(nbits) {
+    _Bits(const uint8_t *arr, uint32_t len) { load(arr, len); }
+    _Bits(uint32_t nbits): nbits(nbits) {
         ndata = (nbits + bit_per_datum - 1) / bit_per_datum;
         data = new _impl_type[ndata];
     }
 
-    ~Bits() {}
+    ~_Bits() {}
 
-    void load(const uint8_t *arr, size_t len) {
+    void load(const uint8_t *arr, uint32_t len) {
         nbits = len * 8;
-        ndata = (len + sizeof(_impl_type) - 1) /
-                        sizeof(_impl_type);
+        ndata = (nbits + bit_per_datum - 1) / bit_per_datum;
         data = new _impl_type[ndata];
 
         uint8_t *end = arr + len;
-        for (_impl_type *ptr = data; ptr < data + ndata;)
+        for (_impl_type *ptr = data.get(); ptr < data.get() + ndata;)
         {
             _impl_type x = 0;
             for (unsigned j = 0, k = 0; j < sizeof(_impl_type); j++, k += 8)
@@ -317,24 +317,24 @@ class Bits {
         s << htole(nbits);
         if (data)
         {
-            for (const _impl_type *ptr = data; ptr < data + ndata; ptr++)
+            for (const _impl_type *ptr = data.get(); ptr < data.get() + ndata; ptr++)
                 s << htole(*ptr);
         }
         else
         {
-            for (const _impl_type *ptr = data; ptr < data + ndata; ptr++)
+            for (const _impl_type *ptr = data.get(); ptr < data.get() + ndata; ptr++)
                 s << htole((_impl_type)0);
         }
     }
 
     void unserialize(DataStream &s) {
-        _impl_type x;
-        s >> x;
-        nbits = letoh(x);
+        s >> nbits;
+        nbits = letoh(nbits);
         ndata = (nbits + bit_per_datum - 1) / bit_per_datum;
         data = new _impl_type[ndata];
-        for (_impl_type *ptr = data; ptr < data + ndata; ptr++)
+        for (_impl_type *ptr = data.get(); ptr < data.get() + ndata; ptr++)
         {
+            _impl_type x;
             s >> x;
             *ptr = letoh(x);
         }
@@ -345,8 +345,36 @@ class Bits {
         s << *this;
         return std::move(s);
     }
+
+    uint8_t get(uint32_t idx) const {
+        return (data[idx >> shift_per_datum] >>
+                    (idx & (bit_per_datum - 1))) & 1;
+    }
+
+    void set(uint32_t idx) {
+        auto i = idx >> shift_per_datum;
+        auto pos = idx & (bit_per_datum - 1);
+        data[i] ^= ((data[i] >> pos) ^ 1) << pos;
+    }
+
+    void unset(uint32_t idx) {
+        auto i = idx >> shift_per_datum;
+        auto pos = idx & (bit_per_datum - 1);
+        data[i] ^= (data[i] >> pos) << pos;
+    }
+
+    void flip(uint32_t idx) {
+        auto i = idx >> shift_per_datum;
+        auto pos = idx & (bit_per_datum - 1);
+        data[i] ^= ((_impl_type)1) << pos;
+    }
+   
+    uint8_t operator[](uint32_t idx) const { return get(idx); }
+
+    uint32_t size() const { return nbits; }
 };
 
+using Bits = _Bits<>;
 
 const size_t ENT_HASH_LENGTH = 256 / 8;
 
