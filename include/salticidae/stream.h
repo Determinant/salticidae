@@ -275,6 +275,7 @@ class _Bits {
     using _impl_type = T;
     static const uint32_t bit_per_datum = sizeof(_impl_type) * 8;
     static const uint32_t shift_per_datum = log2<bit_per_datum>::value;
+    static_assert(bit_per_datum == 1 << shift_per_datum);
     BoxObj<_impl_type[]> data;
     uint32_t nbits;
     uint32_t ndata;

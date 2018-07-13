@@ -52,32 +52,40 @@ struct default_delete<T[]> {
     }
 };
 
-template<typename T, typename D>
-class BoxObj;
+template<typename T, typename R, typename D> class _RcObjBase;
+template<typename T, typename D> class _BoxObj;
+template<typename T, typename D> class BoxObj;
 
 template<typename T, typename D>
 class _BoxObj {
     protected:
     using ptr_type = T *;
     ptr_type obj;
-    constexpr _BoxObj(ptr_type obj): obj(obj) {}
+
+    template<typename T_, typename R, typename D_>
+    friend class _RcObjBase;
+    template<typename T_, typename D_>
+    friend class _BoxObj;
 
     public:
 
     constexpr _BoxObj(): obj(nullptr) {}
+    constexpr _BoxObj(ptr_type obj): obj(obj) {}
     _BoxObj(const _BoxObj &other) = delete;
     _BoxObj(_BoxObj &&other): obj(other.obj) {
         other.obj = nullptr;
     }
 
+    template<typename T_, typename D_>
+    _BoxObj(_BoxObj<T_, D_> &&other): obj(other.obj) {
+        other.obj = nullptr;
+    }
 
     ~_BoxObj() {
         if (obj) D()(obj);
     }
 
-    void swap(_BoxObj &other) {
-        std::swap(obj, other.obj);
-    }
+    void swap(_BoxObj &other) { std::swap(obj, other.obj); }
 
     _BoxObj &operator=(const _BoxObj &other) = delete;
     _BoxObj &operator=(_BoxObj &&other) {
@@ -111,9 +119,9 @@ class BoxObj: public _BoxObj<T, D> {
     public:
     BoxObj() = default;
     BoxObj(T *obj): base_t(obj) {}
-    template<typename T_, typename =
-                typename std::enable_if<!std::is_array<T_>::value>::type>
-    BoxObj(BoxObj<T_> &&other): base_t(other) {}
+    template<typename T_, typename D_,
+            typename = typename std::enable_if<!std::is_array<T_>::value>::type>
+    BoxObj(BoxObj<T_, D_> &&other): base_t(std::move(other)) {}
 
     T *operator->() const { return base_t::obj; }
 };
@@ -127,11 +135,10 @@ class BoxObj<T[], D>: public _BoxObj<T, D> {
     public:
     BoxObj() = default;
     BoxObj(T obj[]): base_t(obj) {}
-    template<typename T_>
-    BoxObj(BoxObj<T_[]> &&other): base_t(std::move(other)) {}
+    template<typename T_, typename D_>
+    BoxObj(BoxObj<T_[], D_> &&other): base_t(std::move(other)) {}
 
-    T &operator[](size_t idx) { return base_t::obj[idx]; }
-    const T &operator[] (size_t idx) const { return base_t::obj[idx]; }
+    T &operator[](size_t idx) const { return base_t::obj[idx]; }
 };
 
 template<typename T, typename D = default_delete<T>, typename T_, typename D_>
@@ -186,7 +193,6 @@ struct _ARCCtl {
     ~_ARCCtl() {}
 };
 
-template<typename T, typename R, typename D> class _RcObjBase;
 template<typename T, typename R, typename D> class RcObjBase;
 
 template<typename T, typename R>
@@ -199,6 +205,16 @@ class _WeakObjBase {
 
     public:
     _WeakObjBase(): ctl(nullptr) {}
+
+    _WeakObjBase(const _WeakObjBase &other):
+            obj(other.obj), ctl(other.ctl) {
+        if (ctl) ctl->add_weak();
+    }
+
+    _WeakObjBase(_WeakObjBase &&other):
+            obj(other.obj), ctl(other.ctl) {
+        other.ctl = nullptr;
+    }
 
     void swap(_WeakObjBase &other) {
         std::swap(obj, other.obj);
@@ -223,16 +239,6 @@ class _WeakObjBase {
         return *this;
     }
 
-    _WeakObjBase(const _WeakObjBase &other):
-            obj(other.obj), ctl(other.ctl) {
-        if (ctl) ctl->add_weak();
-    }
-
-    _WeakObjBase(_WeakObjBase &&other):
-            obj(other.obj), ctl(other.ctl) {
-        other.ctl = nullptr;
-    }
-
     template<typename D>
     _WeakObjBase(const _RcObjBase<T, R, D> &other);
 
@@ -244,6 +250,7 @@ template<typename T, typename R>
 class WeakObjBase: public _WeakObjBase<T, R> {
     using base_t = _WeakObjBase<T, R>;
     friend std::hash<WeakObjBase>;
+
     public:
     WeakObjBase() = default;
     WeakObjBase(const WeakObjBase &other) = default;
@@ -258,6 +265,7 @@ template<typename T, typename R>
 class WeakObjBase<T[], R>: public _WeakObjBase<T, R> {
     using base_t = _WeakObjBase<T, R>;
     friend std::hash<WeakObjBase>;
+
     public:
     WeakObjBase() = default;
     WeakObjBase(const WeakObjBase &other) = default;
@@ -287,6 +295,28 @@ class _RcObjBase {
         box_ref.obj = nullptr;
     }
 
+    _RcObjBase(const _RcObjBase &other):
+            obj(other.obj), ctl(other.ctl) {
+        if (ctl) ctl->add_ref();
+    }
+
+    _RcObjBase(_RcObjBase &&other):
+            obj(other.obj), ctl(other.ctl) {
+        other.ctl = nullptr;
+    }
+
+    template<typename T_, typename D_>
+    _RcObjBase(const _RcObjBase<T_, R, D_> &other):
+            obj(other.obj), ctl(other.ctl) {
+        if (ctl) ctl->add_ref();
+    }
+
+    template<typename T_, typename D_>
+    _RcObjBase(_RcObjBase<T_, R, D_> &&other):
+            obj(other.obj), ctl(other.ctl) {
+        other.ctl = nullptr;
+    }
+
     void swap(_RcObjBase &other) {
         std::swap(obj, other.obj);
         std::swap(ctl, other.ctl);
@@ -308,28 +338,6 @@ class _RcObjBase {
             tmp.swap(*this);
         }
         return *this;
-    }
-
-    _RcObjBase(const _RcObjBase &other):
-            obj(other.obj), ctl(other.ctl) {
-        if (ctl) ctl->add_ref();
-    }
-
-    template<typename T_, typename D_>
-    _RcObjBase(const _RcObjBase<T_, R, D_> &other):
-            obj(other.obj), ctl(other.ctl) {
-        if (ctl) ctl->add_ref();
-    }
-
-    _RcObjBase(_RcObjBase &&other):
-            obj(other.obj), ctl(other.ctl) {
-        other.ctl = nullptr;
-    }
-
-    template<typename T_, typename D_>
-    _RcObjBase(_RcObjBase<T_, R, D_> &&other):
-            obj(other.obj), ctl(other.ctl) {
-        other.ctl = nullptr;
     }
 
     _RcObjBase(const _WeakObjBase<T, R> &other) {
@@ -465,6 +473,13 @@ namespace std {
     template<typename T, typename R, typename D>
     struct hash<salticidae::RcObjBase<T, R, D>> {
         size_t operator()(const salticidae::RcObjBase<T, R, D> &k) const {
+            return (size_t)k.obj;
+        }
+    };
+
+    template<typename T, typename D>
+    struct hash<salticidae::BoxObj<T, D>> {
+        size_t operator()(const salticidae::BoxObj<T, D> &k) const {
             return (size_t)k.obj;
         }
     };
