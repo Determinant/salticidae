@@ -45,12 +45,12 @@ ConnPool::Conn::operator std::string() const {
 void ConnPool::Conn::send_data(evutil_socket_t fd, short events) {
     if (!(events & EV_WRITE)) return;
     auto conn = self(); /* pin the connection */
-    ssize_t ret = BUFF_SEG_SIZE;
-    while (ret == BUFF_SEG_SIZE)
+    ssize_t ret = seg_buff_size;
+    while (ret == (ssize_t)seg_buff_size)
     {
         if (!send_buffer.size()) /* nothing to write */
             break;
-        bytearray_t buff_seg = send_buffer.pop(BUFF_SEG_SIZE);
+        bytearray_t buff_seg = send_buffer.pop(seg_buff_size);
         ssize_t size = buff_seg.size();
         ret = send(fd, buff_seg.data(), size, MSG_NOSIGNAL);
         SALTICIDAE_LOG_DEBUG("socket sent %d bytes", ret);
@@ -88,12 +88,12 @@ void ConnPool::Conn::send_data(evutil_socket_t fd, short events) {
 void ConnPool::Conn::recv_data(evutil_socket_t fd, short events) {
     if (!(events & EV_READ)) return;
     auto conn = self(); /* pin the connection */
-    ssize_t ret = BUFF_SEG_SIZE;
-    while (ret == BUFF_SEG_SIZE)
+    ssize_t ret = seg_buff_size;
+    while (ret == (ssize_t)seg_buff_size)
     {
         bytearray_t buff_seg;
-        buff_seg.resize(BUFF_SEG_SIZE);
-        ret = recv(fd, buff_seg.data(), BUFF_SEG_SIZE, 0);
+        buff_seg.resize(seg_buff_size);
+        ret = recv(fd, buff_seg.data(), seg_buff_size, 0);
         SALTICIDAE_LOG_DEBUG("socket read %d bytes", ret);
         if (ret <= 0)
         {
@@ -137,6 +137,7 @@ void ConnPool::accept_client(evutil_socket_t fd, short) {
         NetAddr addr((struct sockaddr_in *)&client_addr);
         conn_t conn = create_conn();
         Conn *conn_ptr = conn.get();
+        conn->seg_buff_size = seg_buff_size;
         conn->fd = client_fd;
         conn->cpool = this;
         conn->mode = Conn::PASSIVE;
@@ -197,7 +198,7 @@ void ConnPool::init(NetAddr listen_addr) {
 
     if (bind(listen_fd, (struct sockaddr *)&sockin, sizeof(sockin)) < 0)
         throw ConnPoolError(std::string("binding error"));
-    if (::listen(listen_fd, MAX_LISTEN_BACKLOG) < 0)
+    if (::listen(listen_fd, max_listen_backlog) < 0)
         throw ConnPoolError(std::string("listen error"));
     ev_listen = Event(eb, listen_fd, EV_READ,
             std::bind(&ConnPool::accept_client, this, _1, _2));
@@ -238,7 +239,7 @@ void ConnPool::Conn::try_conn(evutil_socket_t, short) {
     }
     ev_connect = Event(cpool->eb, fd, EV_WRITE,
                 std::bind(&Conn::conn_server, this, _1, _2));
-    ev_connect.add_with_timeout(CONN_SERVER_TIMEOUT);
+    ev_connect.add_with_timeout(cpool->conn_server_timeout);
 }
 
 ConnPool::conn_t ConnPool::create_conn(const NetAddr &addr) {
@@ -252,13 +253,14 @@ ConnPool::conn_t ConnPool::create_conn(const NetAddr &addr) {
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
         throw ConnPoolError(std::string("unable to set nonblocking socket"));
     conn_t conn = create_conn();
-    Conn * conn_ptr = conn.get();
+    Conn *conn_ptr = conn.get();
+    conn->seg_buff_size = seg_buff_size;
     conn->fd = fd;
     conn->cpool = this;
     conn->mode = Conn::ACTIVE;
     conn->addr = addr;
     conn->ev_connect = Event(eb, -1, 0, std::bind(&Conn::try_conn, conn_ptr, _1, _2));
-    conn->ev_connect.add_with_timeout(gen_rand_timeout(TRY_CONN_DELAY));
+    conn->ev_connect.add_with_timeout(gen_conn_timeout());
     add_conn(conn);
     SALTICIDAE_LOG_INFO("created connection %s", std::string(*conn).c_str());
     return conn;

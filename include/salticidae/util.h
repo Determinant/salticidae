@@ -40,6 +40,8 @@ namespace salticidae {
 
 void sec2tv(double t, struct timeval &tv);
 void event_add_with_timeout(struct event *ev, double timeout);
+double gen_rand_timeout(double base_timeout, double alpha = 0.5);
+
 std::string trim(const std::string &s,
                 const std::string &space = "\t\r\n ");
 std::vector<std::string> split(const std::string &s, const std::string &delim);

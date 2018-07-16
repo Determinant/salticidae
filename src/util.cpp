@@ -47,6 +47,10 @@ void event_add_with_timeout(struct event *ev, double timeout) {
     event_add(ev, &tv);
 }
 
+double gen_rand_timeout(double base_timeout, double alpha) {
+    return base_timeout + rand() / (double)RAND_MAX * alpha * base_timeout;
+}
+
 const std::string get_current_datetime() {
     /* credit: http://stackoverflow.com/a/41381479/544806 */
     char fmt[64], buf[64];

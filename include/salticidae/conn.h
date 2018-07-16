@@ -44,17 +44,7 @@
 #include "salticidae/netaddr.h"
 #include "salticidae/msg.h"
 
-const int MAX_LISTEN_BACKLOG = 10;
-const size_t BUFF_SEG_SIZE = 4096;
-const size_t MAX_MSG_HANDLER = 64;
-const double TRY_CONN_DELAY = 2;
-const double CONN_SERVER_TIMEOUT = 2;
-
 namespace salticidae {
-
-inline double gen_rand_timeout(double base_timeout) {
-    return base_timeout + rand() / (double)RAND_MAX * 0.5 * base_timeout;
-}
 
 class RingBuffer {
     struct buffer_entry_t {
@@ -163,6 +153,7 @@ class ConnPool {
         };
     
         private:
+        size_t seg_buff_size;
         conn_t self_ref;
         int fd;
         ConnPool *cpool;
@@ -197,6 +188,7 @@ class ConnPool {
         const NetAddr &get_addr() const { return addr; }
         ConnMode get_mode() const { return mode; }
         RingBuffer &read() { return recv_buffer; }
+        void set_seg_buff_size(size_t size) { seg_buff_size = size; }
 
         void write(bytearray_t &&data) {
             send_buffer.push(std::move(data));
@@ -226,6 +218,10 @@ class ConnPool {
     };
     
     private:
+    int max_listen_backlog;
+    double try_conn_delay;
+    double conn_server_timeout;
+    size_t seg_buff_size;
     std::unordered_map<int, conn_t> pool;
     int listen_fd;
     Event ev_listen;
@@ -236,10 +232,22 @@ class ConnPool {
     protected:
     EventContext eb;
     virtual conn_t create_conn() = 0;
+    virtual double gen_conn_timeout() {
+        return gen_rand_timeout(try_conn_delay);
+    }
 
     public:
     friend Conn;
-    ConnPool(const EventContext &eb): eb(eb) {}
+    ConnPool(const EventContext &eb,
+            int max_listen_backlog = 10,
+            double try_conn_delay = 2,
+            double conn_server_timeout = 2,
+            size_t seg_buff_size = 4096):
+        max_listen_backlog(max_listen_backlog),
+        try_conn_delay(try_conn_delay),
+        conn_server_timeout(conn_server_timeout),
+        seg_buff_size(seg_buff_size),
+        eb(eb) {}
 
     ~ConnPool() {
         for (auto it: pool)
@@ -248,6 +256,9 @@ class ConnPool {
             conn->close();
         }
     }
+
+    ConnPool(const ConnPool &) = delete;
+    ConnPool(ConnPool &&) = delete;
 
     /** create an active mode connection to addr */
     conn_t create_conn(const NetAddr &addr);

@@ -30,9 +30,20 @@ find_package(OpenSSL REQUIRED)
 
 include_directories(include)
 add_library(salticidae
+    OBJECT
     src/util.cpp
     src/conn.cpp)
-target_link_libraries(salticidae event crypto)
+
+option(BUILD_SHARED "build shared library." OFF)
+if(BUILD_SHARED)
+    set_property(TARGET salticidae PROPERTY POSITION_INDEPENDENT_CODE 1)
+    add_library(salticidae_shared SHARED $<TARGET_OBJECTS:salticidae>)
+    set_target_properties(salticidae_shared PROPERTIES OUTPUT_NAME "salticidae")
+    target_link_libraries(salticidae_shared event crypto)
+endif()
+add_library(salticidae_static STATIC $<TARGET_OBJECTS:salticidae>)
+set_target_properties(salticidae_static PROPERTIES OUTPUT_NAME "salticidae")
+target_link_libraries(salticidae_static event crypto)
 
 add_subdirectory(test)
 
@@ -46,11 +57,5 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_definitions(-DSALTICIDAE_NORMAL_LOG)
 endif()
 
-#set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -no-pie -pg")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -W -Wall -Wextra -pedantic")
-
-macro(remove_cxx_flag flag)
-  string(REPLACE "${flag}" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-endmacro()
-
-remove_cxx_flag("-DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -W -Wall -Wextra -pedantic -Wsuggest-override")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -W -Wall -Wextra -pedantic -Wsuggest-override")
