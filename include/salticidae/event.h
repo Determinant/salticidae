@@ -25,6 +25,11 @@
 #ifndef _SALTICIDAE_EVENT_H
 #define _SALTICIDAE_EVENT_H
 
+#include <event2/event.h>
+
+#include "salticidae/util.h"
+#include "salticidae/ref.h"
+
 namespace salticidae {
 
 struct _event_context_deleter {
