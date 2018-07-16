@@ -374,6 +374,10 @@ class _Bits {
         auto pos = idx & (bit_per_datum - 1);
         data[i] ^= ((_impl_type)1) << pos;
     }
+
+    void clear() {
+        memset(data.get(), 0, ndata * sizeof(_impl_type));
+    }
    
     uint8_t operator[](uint32_t idx) const { return get(idx); }
 

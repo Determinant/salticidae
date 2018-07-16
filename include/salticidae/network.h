@@ -25,6 +25,7 @@
 #ifndef _SALTICIDAE_NETWORK_H
 #define _SALTICIDAE_NETWORK_H
 
+#include "salticidae/event.h"
 #include "salticidae/netaddr.h"
 #include "salticidae/msg.h"
 #include "salticidae/conn.h"
@@ -87,7 +88,7 @@ class MsgNetwork: public ConnPool {
     ConnPool::conn_t create_conn() override { return (new Conn(this))->self(); }
 
     public:
-    MsgNetwork(struct event_base *eb): ConnPool(eb) {}
+    MsgNetwork(const EventContext &eb): ConnPool(eb) {}
     void reg_handler(typename MsgType::opcode_t opcode, msg_callback_t handler);
     void send_msg(const MsgType &msg, conn_t conn);
     void init(NetAddr listen_addr);
@@ -123,7 +124,7 @@ class ClientNetwork: public MsgNetwork<MsgType> {
     ConnPool::conn_t create_conn() override { return (new Conn(this))->self(); }
 
     public:
-    ClientNetwork(struct event_base *eb): MsgNet(eb) {}
+    ClientNetwork(const EventContext &eb): MsgNet(eb) {}
     void send_msg(const MsgType &msg, const NetAddr &addr);
 };
 
@@ -179,7 +180,7 @@ class PeerNetwork: public MsgNetwork<MsgType> {
         bool connected;
 
         Peer() = delete;
-        Peer(NetAddr addr, conn_t conn, PeerNetwork *pn, struct event_base *eb):
+        Peer(NetAddr addr, conn_t conn, PeerNetwork *pn, const EventContext &eb):
             addr(addr), conn(conn), pn(pn),
             ev_ping_timer(
                 Event(eb, -1, 0, std::bind(&Peer::ping_timer, this, _1, _2))),
@@ -215,7 +216,7 @@ class PeerNetwork: public MsgNetwork<MsgType> {
     ConnPool::conn_t create_conn() override { return (new Conn(this))->self(); }
 
     public:
-    PeerNetwork(struct event_base *eb,
+    PeerNetwork(const EventContext &eb,
                 double ping_period = 30,
                 double conn_timeout = 180,
                 IdentityMode id_mode = IP_PORT_BASED):

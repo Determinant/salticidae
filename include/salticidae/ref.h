@@ -461,10 +461,10 @@ inline _WeakObjBase<T, R>::_WeakObjBase(const _RcObjBase<T, R, D> &other):
     if (ctl) ctl->add_weak();
 }
 
-template<typename T> using RcObj = RcObjBase<T, _RCCtl>;
+template<typename T, typename D = default_delete<T>> using RcObj = RcObjBase<T, _RCCtl, D>;
 template<typename T> using WeakObj = WeakObjBase<T, _RCCtl>;
 
-template<typename T> using ArcObj = RcObjBase<T, _ARCCtl>;
+template<typename T, typename D = default_delete<T>> using ArcObj = RcObjBase<T, _ARCCtl, D>;
 template<typename T> using AweakObj = WeakObjBase<T, _ARCCtl>;
 
 }

@@ -297,68 +297,6 @@ class Config {
     void print_help(FILE *output = stderr);
 };
 
-class Event {
-    public:
-    using callback_t = std::function<void(evutil_socket_t fd, short events)>;
-
-    private:
-    struct event_base *eb;
-    evutil_socket_t fd;
-    short events;
-    struct event *ev;
-    callback_t callback;
-    static inline void _then(evutil_socket_t fd, short events, void *arg) {
-        (static_cast<Event *>(arg))->callback(fd, events);
-    }
-
-    public:
-    Event(): ev(nullptr) {}
-    Event(struct event_base *eb,
-        evutil_socket_t fd,
-        short events,
-        callback_t callback):
-            eb(eb), fd(fd), events(events),
-            ev(event_new(eb, fd, events, Event::_then, this)),
-            callback(callback) {}
-
-    Event(Event &&other):
-            eb(other.eb), fd(other.fd), events(other.events),
-            callback(std::move(other.callback)) {
-        other.clear();
-        ev = event_new(eb, fd, events, Event::_then, this);
-    }
-
-    Event &operator=(Event &&other) {
-        clear();
-        other.clear();
-        eb = other.eb;
-        fd = other.fd;
-        events = other.events;
-        ev = event_new(eb, fd, events, Event::_then, this);
-        callback = std::move(other.callback);
-        return *this;
-    }
-
-    ~Event() { clear(); }
-
-    void clear() {
-        if (ev != nullptr)
-        {
-            event_del(ev);
-            event_free(ev);
-            ev = nullptr;
-        }
-    }
-
-    void add() { event_add(ev, nullptr); }
-    void del() { event_del(ev); }
-    void add_with_timeout(double timeout) {
-        event_add_with_timeout(ev, timeout);
-    }
-
-    operator bool() const { return ev != nullptr; }
-};
-
 }
 
 #endif

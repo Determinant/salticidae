@@ -39,6 +39,7 @@
 
 #include "salticidae/type.h"
 #include "salticidae/ref.h"
+#include "salticidae/event.h"
 #include "salticidae/util.h"
 #include "salticidae/netaddr.h"
 #include "salticidae/msg.h"
@@ -233,12 +234,12 @@ class ConnPool {
     conn_t add_conn(conn_t conn);
 
     protected:
-    struct event_base *eb;
+    EventContext eb;
     virtual conn_t create_conn() = 0;
 
     public:
     friend Conn;
-    ConnPool(struct event_base *eb): eb(eb) {}
+    ConnPool(const EventContext &eb): eb(eb) {}
 
     ~ConnPool() {
         for (auto it: pool)
