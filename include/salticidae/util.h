@@ -34,6 +34,8 @@
 #include <getopt.h>
 #include <event2/event.h>
 
+#include "salticidae/ref.h"
+
 namespace salticidae {
 
 void sec2tv(double t, struct timeval &tv);
@@ -144,12 +146,19 @@ class Config {
         virtual void append(const std::string &) {
             throw SalticidaeError("undefined OptVal behavior: append");
         }
+
         virtual ~OptVal() = default;
     };
+
+    using optval_t = RcObj<OptVal>;
 
     class OptValFlag: public OptVal {
         bool val;
         public:
+        template<typename... Args>
+        static RcObj<OptValFlag> create(Args... args) {
+            return new OptValFlag(args...);
+        }
         OptValFlag() = default;
         OptValFlag(bool val): val(val) {}
         void switch_on() override { val = true; }
@@ -159,6 +168,10 @@ class Config {
     class OptValStr: public OptVal {
         std::string val;
         public:
+        template<typename... Args>
+        static RcObj<OptValStr> create(Args... args) {
+            return new OptValStr(args...);
+        }
         OptValStr() = default;
         OptValStr(const std::string &val): val(val) {}
         void set_val(const std::string &strval) override {
@@ -170,6 +183,10 @@ class Config {
     class OptValInt: public OptVal {
         int val;
         public:
+        template<typename... Args>
+        static RcObj<OptValInt> create(Args... args) {
+            return new OptValInt(args...);
+        }
         OptValInt() = default;
         OptValInt(int val): val(val) {}
         void set_val(const std::string &strval) override {
@@ -186,6 +203,10 @@ class Config {
     class OptValDouble: public OptVal {
         double val;
         public:
+        template<typename... Args>
+        static RcObj<OptValDouble> create(Args... args) {
+            return new OptValDouble(args...);
+        }
         OptValDouble() = default;
         OptValDouble(double val): val(val) {}
         void set_val(const std::string &strval) override {
@@ -203,6 +224,10 @@ class Config {
         using strvec_t = std::vector<std::string>;
         strvec_t val;
         public:
+        template<typename... Args>
+        static RcObj<OptValStrVec> create(Args... args) {
+            return new OptValStrVec(args...);
+        }
         OptValStrVec() = default;
         OptValStrVec(const strvec_t &val): val(val) {}
         void append(const std::string &strval) override {
@@ -214,13 +239,16 @@ class Config {
     private:
     struct Opt {
         std::string optname;
-        OptVal *optval;
+        std::string optdoc;
+        optval_t optval;
         Action action;
         struct option opt;
-        Opt(const std::string &optname, OptVal *optval, Action action, int idx);
+        Opt(const std::string &optname, const std::string &optdoc,
+            const optval_t &optval, Action action, int idx);
         Opt(Opt &&other):
                 optname(std::move(other.optname)),
-                optval(other.optval),
+                optdoc(std::move(other.optdoc)),
+                optval(std::move(other.optval)),
                 action(other.action),
                 opt(other.opt) { opt.name = this->optname.c_str(); }
     };
@@ -228,24 +256,27 @@ class Config {
     std::unordered_map<std::string, Opt> conf;
     std::vector<Opt *> getopt_order;
     std::string conf_fname;
-    OptValStr opt_val_conf;
+    RcObj<OptValStr> opt_val_conf;
     int conf_idx;
+
     void update(const std::string &optname, const char *optval);
     void update(Opt &opt, const char *optval);
 
     public:
     Config(const std::string &conf_fname):
             conf_fname(conf_fname),
-            opt_val_conf(this->conf_fname) {
+            opt_val_conf(new OptValStr(this->conf_fname)) {
         conf_idx = getopt_order.size();
-        add_opt("conf", opt_val_conf, SET_VAL);
+        add_opt("conf", opt_val_conf, SET_VAL, "load options from a file");
     }
     
     ~Config() {}
 
-    void add_opt(const std::string &optname, OptVal &optval, Action action);
+    void add_opt(const std::string &optname, const optval_t &optval, Action action,
+                const std::string &optdoc = "");
     bool load(const std::string &fname);
     size_t parse(int argc, char **argv);
+    void print_help(FILE *output = stderr);
 };
 
 class Event {

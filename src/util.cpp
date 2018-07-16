@@ -134,20 +134,23 @@ void ElapsedTime::stop(bool show_info) {
                     elapsed_sec, cpu_elapsed_sec);
 }
 
-Config::Opt::Opt(const std::string &optname, OptVal *optval, Action action, int idx): \
-    optname(optname), optval(optval), action(action) {
+Config::Opt::Opt(const std::string &optname, const std::string &optdoc,
+                const optval_t &optval, Action action, int idx):
+    optname(optname), optdoc(optdoc), optval(optval), action(action) {
     opt.name = this->optname.c_str();
     opt.has_arg = action == SWITCH_ON ? no_argument : required_argument;
     opt.flag = nullptr;
     opt.val = idx;
 }
 
-void Config::add_opt(const std::string &optname, OptVal &optval, Action action) {
+void Config::add_opt(const std::string &optname, const optval_t &optval, Action action,
+                    const std::string &optdoc) {
     if (conf.count(optname))
         throw SalticidaeError("option name already exists");
     auto it = conf.insert(
         std::make_pair(optname,
-                        Opt(optname, &optval, action, getopt_order.size()))).first;
+                        Opt(optname, optdoc,
+                            optval, action, getopt_order.size()))).first;
     getopt_order.push_back(&it->second);
 }
 
@@ -219,7 +222,7 @@ size_t Config::parse(int argc, char **argv) {
         update(*getopt_order[id], optarg);
         if (id == conf_idx)
         {
-            auto &fname = opt_val_conf.get();
+            auto &fname = opt_val_conf->get();
             if (load(fname))
                 SALTICIDAE_LOG_INFO("loading extra configuration from %s", fname.c_str());
             else
@@ -227,6 +230,15 @@ size_t Config::parse(int argc, char **argv) {
         }
     }
     return optind;
+}
+
+void Config::print_help(FILE *output) {
+    for (auto opt: getopt_order)
+    {
+        fprintf(output, "--%s\t\t%s\n",
+                opt->optname.c_str(),
+                opt->optdoc.c_str());
+    }
 }
 
 std::vector<std::string> split(const std::string &s, const std::string &delim) {
