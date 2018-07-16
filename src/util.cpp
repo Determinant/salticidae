@@ -135,23 +135,30 @@ void ElapsedTime::stop(bool show_info) {
 }
 
 Config::Opt::Opt(const std::string &optname, const std::string &optdoc,
-                const optval_t &optval, Action action, int idx):
-    optname(optname), optdoc(optdoc), optval(optval), action(action) {
+                const optval_t &optval, Action action,
+                char short_opt,
+                int idx):
+    optname(optname), optdoc(optdoc),
+    optval(optval), action(action),
+    short_opt(short_opt) {
     opt.name = this->optname.c_str();
     opt.has_arg = action == SWITCH_ON ? no_argument : required_argument;
     opt.flag = nullptr;
-    opt.val = idx;
+    opt.val = 0x100 + idx;
 }
 
 void Config::add_opt(const std::string &optname, const optval_t &optval, Action action,
+                    char short_opt,
                     const std::string &optdoc) {
     if (conf.count(optname))
         throw SalticidaeError("option name already exists");
-    auto it = conf.insert(
-        std::make_pair(optname,
-                        Opt(optname, optdoc,
-                            optval, action, getopt_order.size()))).first;
-    getopt_order.push_back(&it->second);
+    opts.push_back(new Opt(optname, optdoc,
+                            optval, action, short_opt,
+                            opts.size()));
+    auto opt = opts.back().get();
+    conf.insert(std::make_pair(optname, opt));
+    if (short_opt != -1)
+        conf.insert(std::make_pair(std::string(1, short_opt), opt));
 }
 
 void Config::update(Opt &p, const char *optval) {
@@ -167,7 +174,7 @@ void Config::update(Opt &p, const char *optval) {
 
 void Config::update(const std::string &optname, const char *optval) {
     assert(conf.count(optname));
-    update(conf.find(optname)->second, optval);
+    update(*(conf.find(optname)->second), optval);
 }
 
 bool Config::load(const std::string &fname) {
@@ -208,36 +215,47 @@ size_t Config::parse(int argc, char **argv) {
     if (load(conf_fname))
         SALTICIDAE_LOG_INFO("loaded configuration from %s", conf_fname.c_str());
 
-    size_t nopts = getopt_order.size();
+    size_t nopts = opts.size();
     struct option *longopts = (struct option *)malloc(
                                 sizeof(struct option) * (nopts + 1));
     int ind;
+    std::string shortopts;
     for (size_t i = 0; i < nopts; i++)
-        longopts[i] = getopt_order[i]->opt;
+    {
+        const auto &opt = opts[i];
+        longopts[i] = opt->opt;
+        if (opt->short_opt != -1)
+        {
+            shortopts += opt->short_opt;
+            if (longopts[i].has_arg == required_argument)
+                shortopts += ":";
+        }
+    }
     longopts[nopts] = {0, 0, 0, 0};
     for (;;)
     {
-        int id = getopt_long(argc, argv, "", longopts, &ind);
-        if (id == -1 || id == '?') break;
-        update(*getopt_order[id], optarg);
-        if (id == conf_idx)
-        {
-            auto &fname = opt_val_conf->get();
-            if (load(fname))
-                SALTICIDAE_LOG_INFO("loading extra configuration from %s", fname.c_str());
-            else
-                SALTICIDAE_LOG_INFO("configuration file %s not found", fname.c_str());
-        }
+        int id = getopt_long(argc, argv, shortopts.c_str(), longopts, &ind);
+        if (id == -1)
+            break;
+        if (id == '?')
+            throw SalticidaeError("invalid option format");
+        if (id >= 0x100)
+            update(*(opts[id - 0x100]), optarg);
+        else
+            update(std::string(1, (char)id), optarg);
     }
     return optind;
 }
 
 void Config::print_help(FILE *output) {
-    for (auto opt: getopt_order)
+    for (const auto &opt: opts)
     {
-        fprintf(output, "--%s\t\t%s\n",
-                opt->optname.c_str(),
-                opt->optdoc.c_str());
+        fprintf(output, "--%s\t\t", opt->optname.c_str());
+        if (opt->short_opt != -1)
+            fprintf(output, "-%c\t", opt->short_opt);
+        else
+            fprintf(output, "\t\t");
+        fprintf(output, "%s\n", opt->optdoc.c_str());
     }
 }
 

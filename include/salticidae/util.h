@@ -63,19 +63,15 @@ class Logger {
     void write(const char *tag, const char *fmt, va_list ap);
 
     public:
-    Logger(const char *prefix):
-        output(stderr), opened(false), prefix(prefix) {}
-    Logger(const char *prefix, FILE *f):
-        output(f), opened(false), prefix(prefix) {}
+    Logger(const char *prefix, FILE *file = stderr):
+        output(file), opened(false), prefix(prefix) {}
     Logger(const char *prefix, const char *filename):
         opened(true), prefix(prefix) {
         if ((output = fopen(filename, "w")) == nullptr)
-            throw SalticidaeError("logger cannot open file");
+            throw SalticidaeError("logger cannot open file %s", filename);
     }
 
-    ~Logger() {
-        if (opened) fclose(output);
-    }
+    ~Logger() { if (opened) fclose(output); }
 
     void debug(const char *fmt, ...);
     void info(const char *fmt, ...);
@@ -237,27 +233,49 @@ class Config {
     };
 
     private:
+    class OptValConf: public OptVal {
+        Config *config;
+        public:
+        template<typename... Args>
+        static RcObj<OptValConf> create(Args... args) {
+            return new OptValConf(args...);
+        }
+        OptValConf(Config *config): config(config) {}
+        void set_val(const std::string &fname) override {
+            if (config->load(fname))
+                SALTICIDAE_LOG_INFO("loading extra configuration from %s", fname.c_str());
+            else
+                SALTICIDAE_LOG_INFO("configuration file %s not found", fname.c_str());
+        }
+        std::string &get() = delete;
+    };
+
     struct Opt {
         std::string optname;
         std::string optdoc;
         optval_t optval;
         Action action;
         struct option opt;
+        char short_opt;
         Opt(const std::string &optname, const std::string &optdoc,
-            const optval_t &optval, Action action, int idx);
+            const optval_t &optval, Action action,
+            char short_opt,
+            int idx);
         Opt(Opt &&other):
                 optname(std::move(other.optname)),
                 optdoc(std::move(other.optdoc)),
                 optval(std::move(other.optval)),
                 action(other.action),
-                opt(other.opt) { opt.name = this->optname.c_str(); }
+                opt(other.opt),
+                short_opt(other.short_opt) {
+            opt.name = this->optname.c_str();
+        }
     };
 
-    std::unordered_map<std::string, Opt> conf;
-    std::vector<Opt *> getopt_order;
+    std::unordered_map<std::string, Opt *> conf;
+    std::vector<BoxObj<Opt>> opts;
     std::string conf_fname;
-    RcObj<OptValStr> opt_val_conf;
-    int conf_idx;
+    RcObj<OptValConf> opt_val_conf;
 
     void update(const std::string &optname, const char *optval);
     void update(Opt &opt, const char *optval);
@@ -265,14 +283,14 @@ class Config {
     public:
     Config(const std::string &conf_fname):
             conf_fname(conf_fname),
-            opt_val_conf(new OptValStr(this->conf_fname)) {
-        conf_idx = getopt_order.size();
-        add_opt("conf", opt_val_conf, SET_VAL, "load options from a file");
+            opt_val_conf(OptValConf::create(this)) {
+        add_opt("conf", opt_val_conf, SET_VAL, 'c', "load options from a file");
     }
     
     ~Config() {}
 
     void add_opt(const std::string &optname, const optval_t &optval, Action action,
+                char short_opt = -1,
                 const std::string &optdoc = "");
     bool load(const std::string &fname);
     size_t parse(int argc, char **argv);
