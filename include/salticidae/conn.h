@@ -263,7 +263,7 @@ class ConnPool {
     /** create an active mode connection to addr */
     conn_t create_conn(const NetAddr &addr);
     /** setup and start listening */
-    void init(NetAddr listen_addr);
+    void listen(NetAddr listen_addr);
 };
 
 }

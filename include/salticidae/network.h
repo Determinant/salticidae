@@ -83,20 +83,31 @@ class MsgNetwork: public ConnPool {
     protected:
     mutable msg_stat_by_opcode_t sent_by_opcode;
     mutable msg_stat_by_opcode_t recv_by_opcode;
-    uint16_t listen_port;
 
     ConnPool::conn_t create_conn() override { return (new Conn(this))->self(); }
 
     public:
-    MsgNetwork(const EventContext &eb): ConnPool(eb) {}
+    MsgNetwork(const EventContext &eb,
+            int max_listen_backlog,
+            double try_conn_delay,
+            double conn_server_timeout,
+            size_t seg_buff_size):
+        ConnPool(eb, max_listen_backlog,
+                    try_conn_delay,
+                    conn_server_timeout,
+                    seg_buff_size) {}
+
     void reg_handler(typename MsgType::opcode_t opcode, msg_callback_t handler);
     void send_msg(const MsgType &msg, conn_t conn);
-    void init(NetAddr listen_addr);
+    using ConnPool::listen;
     msg_stat_by_opcode_t &get_sent_by_opcode() const {
         return sent_by_opcode;
     }
     msg_stat_by_opcode_t &get_recv_by_opcode() const {
         return recv_by_opcode;
+    }
+    conn_t create_conn(const NetAddr &addr) {
+        return static_pointer_cast<Conn>(ConnPool::create_conn(addr));
     }
 };
 
@@ -120,12 +131,24 @@ class ClientNetwork: public MsgNetwork<MsgType> {
         void on_teardown() override;
     };
 
+    using conn_t = RcObj<Conn>;
+
     protected:
     ConnPool::conn_t create_conn() override { return (new Conn(this))->self(); }
 
     public:
-    ClientNetwork(const EventContext &eb): MsgNet(eb) {}
+    ClientNetwork(const EventContext &eb,
+                int max_listen_backlog = 10,
+                double try_conn_delay = 0,
+                double conn_server_timeout = 0,
+                size_t seg_buff_size = 4096):
+        MsgNet(eb, max_listen_backlog,
+                try_conn_delay,
+                conn_server_timeout,
+                seg_buff_size) {}
+
     void send_msg(const MsgType &msg, const NetAddr &addr);
+    conn_t create_conn(const NetAddr &addr) = delete;
 };
 
 class PeerNetworkError: public SalticidaeError {
@@ -205,6 +228,7 @@ class PeerNetwork: public MsgNetwork<MsgType> {
     IdentityMode id_mode;
     double ping_period;
     double conn_timeout;
+    uint16_t listen_port;
 
     void msg_ping(const MsgType &msg, ConnPool::conn_t conn);
     void msg_pong(const MsgType &msg, ConnPool::conn_t conn);
@@ -217,10 +241,17 @@ class PeerNetwork: public MsgNetwork<MsgType> {
 
     public:
     PeerNetwork(const EventContext &eb,
+                int max_listen_backlog = 10,
+                double try_conn_delay = 2,
+                double conn_server_timeout = 2,
+                size_t seg_buff_size = 4096,
                 double ping_period = 30,
                 double conn_timeout = 180,
                 IdentityMode id_mode = IP_PORT_BASED):
-        MsgNet(eb),
+        MsgNet(eb, max_listen_backlog,
+                    try_conn_delay,
+                    conn_server_timeout,
+                    seg_buff_size),
         id_mode(id_mode),
         ping_period(ping_period),
         conn_timeout(conn_timeout) {}
@@ -229,10 +260,12 @@ class PeerNetwork: public MsgNetwork<MsgType> {
     const conn_t get_peer_conn(const NetAddr &paddr) const;
     void send_msg(const MsgType &msg, const Peer *peer);
     void send_msg(const MsgType &msg, const NetAddr &paddr);
-    void init(NetAddr listen_addr);
+    void listen(NetAddr listen_addr);
     bool has_peer(const NetAddr &paddr) const;
     const std::vector<NetAddr> &all_peers() const;
-    using ConnPool::create_conn;
+    conn_t create_conn(const NetAddr &addr) {
+        return static_pointer_cast<Conn>(ConnPool::create_conn(addr));
+    }
 };
 
 template<typename MsgType>
@@ -390,14 +423,9 @@ void PeerNetwork<MsgType>::msg_pong(const MsgType &msg, ConnPool::conn_t conn_) 
 }
 
 template<typename MsgType>
-void MsgNetwork<MsgType>::init(NetAddr listen_addr) {
+void PeerNetwork<MsgType>::listen(NetAddr listen_addr) {
+    MsgNet::listen(listen_addr);
     listen_port = listen_addr.port;
-    ConnPool::init(listen_addr);
-}
-
-template<typename MsgType>
-void PeerNetwork<MsgType>::init(NetAddr listen_addr) {
-    MsgNet::init(listen_addr);
     this->reg_handler(MsgType::OPCODE_PING,
                         std::bind(&PeerNetwork::msg_ping, this, _1, _2));
     this->reg_handler(MsgType::OPCODE_PONG,

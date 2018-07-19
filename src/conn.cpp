@@ -180,7 +180,7 @@ void ConnPool::Conn::conn_server(evutil_socket_t fd, short events) {
     }
 }
 
-void ConnPool::init(NetAddr listen_addr) {
+void ConnPool::listen(NetAddr listen_addr) {
     int one = 1;
     if ((listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         throw ConnPoolError(std::string("cannot create socket for listening"));
