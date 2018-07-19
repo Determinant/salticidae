@@ -150,7 +150,6 @@ void ConnPool::accept_client(evutil_socket_t fd, short) {
                                 std::bind(&Conn::send_data, conn_ptr, _1, _2));
         conn->ev_read.add();
         conn->ev_write.add();
-        conn->ready_send = false;
         add_conn(conn);
         SALTICIDAE_LOG_INFO("created %s", std::string(*conn).c_str());
         conn->on_setup();
@@ -169,7 +168,6 @@ void ConnPool::Conn::conn_server(evutil_socket_t fd, short events) {
         ev_read.add();
         ev_write.add();
         ev_connect.clear();
-        ready_send = false;
         SALTICIDAE_LOG_INFO("connected to peer %s", std::string(*this).c_str());
         on_setup();
     }
@@ -220,28 +218,7 @@ void ConnPool::Conn::terminate() {
         close();
         /* inform the upper layer the connection will be destroyed */
         on_teardown();
-        conn->self_ref = nullptr; /* remove the self-cycle */
     }
-}
-
-void ConnPool::Conn::try_conn() {
-    auto conn = self(); /* pin the connection */
-    struct sockaddr_in sockin;
-    memset(&sockin, 0, sizeof(struct sockaddr_in));
-    sockin.sin_family = AF_INET;
-    sockin.sin_addr.s_addr = addr.ip;
-    sockin.sin_port = addr.port;
-
-    if (::connect(fd, (struct sockaddr *)&sockin,
-                sizeof(struct sockaddr_in)) < 0 && errno != EINPROGRESS)
-    {
-            SALTICIDAE_LOG_INFO("cannot connect to %s", std::string(addr).c_str());
-            terminate();
-            return;
-    }
-    ev_connect = Event(cpool->eb, fd, EV_WRITE,
-                std::bind(&Conn::conn_server, this, _1, _2));
-    ev_connect.add_with_timeout(cpool->conn_server_timeout);
 }
 
 ConnPool::conn_t ConnPool::connect(const NetAddr &addr) {
@@ -260,9 +237,28 @@ ConnPool::conn_t ConnPool::connect(const NetAddr &addr) {
     conn->cpool = this;
     conn->mode = Conn::ACTIVE;
     conn->addr = addr;
-    conn->try_conn();
-    add_conn(conn);
-    SALTICIDAE_LOG_INFO("created %s", std::string(*conn).c_str());
+
+    struct sockaddr_in sockin;
+    memset(&sockin, 0, sizeof(struct sockaddr_in));
+    sockin.sin_family = AF_INET;
+    sockin.sin_addr.s_addr = addr.ip;
+    sockin.sin_port = addr.port;
+
+    if (::connect(fd, (struct sockaddr *)&sockin,
+                sizeof(struct sockaddr_in)) < 0 && errno != EINPROGRESS)
+    {
+            SALTICIDAE_LOG_INFO("cannot connect to %s", std::string(addr).c_str());
+            conn->terminate();
+    }
+    else
+    {
+        conn->ev_connect = Event(eb, fd, EV_WRITE,
+                    std::bind(&Conn::conn_server, conn.get(), _1, _2));
+        conn->ev_connect.add_with_timeout(conn_server_timeout);
+
+        add_conn(conn);
+        SALTICIDAE_LOG_INFO("created %s", std::string(*conn).c_str());
+    }
     return conn;
 }
 

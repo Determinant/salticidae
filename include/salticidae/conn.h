@@ -174,10 +174,9 @@ class ConnPool {
         void recv_data(evutil_socket_t, short);
         void send_data(evutil_socket_t, short);
         void conn_server(evutil_socket_t, short);
-        void try_conn();
 
         public:
-        Conn(): self_ref(this) {}
+        Conn(): self_ref(this), ready_send(false) {}
         Conn(const Conn &) = delete;
         Conn(Conn &&other) = delete;
     
@@ -219,6 +218,7 @@ class ConnPool {
             ev_connect.clear();
             ::close(fd);
             fd = -1;
+            self_ref = nullptr; /* remove the self-cycle */
         }
 
         /** Called when new data is available. */
