@@ -92,8 +92,10 @@ struct NetAddr {
     operator std::string() const {
         struct in_addr in;
         in.s_addr = ip;
-        return "<NetAddr " + std::string(inet_ntoa(in)) +
-                ":" + std::to_string(ntohs(port)) + ">";
+        DataStream s;
+        s << "<NetAddr " << std::string(inet_ntoa(in))
+          << ":" << std::to_string(ntohs(port)) << ">";
+        return std::move(s);
     }
 
     bool is_null() const { return ip == 0 && port == 0; }

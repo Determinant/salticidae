@@ -160,7 +160,7 @@ class MsgBase {
           << "length=" << std::to_string(length) << " "
           << "checksum=" << get_hex(checksum) << " "
           << "payload=" << get_hex(payload) << ">";
-        return std::string(std::move(s));
+        return std::move(s);
     }
 
     uint32_t get_checksum() const {

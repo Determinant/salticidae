@@ -139,13 +139,15 @@ class ConnPoolError: public SalticidaeError {
     using SalticidaeError::SalticidaeError;
 };
 
-/** The connection pool. */
+/** Abstraction for connection management. */
 class ConnPool {
     public:
     class Conn;
+    /** The handle to a bi-directional connection. */
     using conn_t = RcObj<Conn>;
-    /** The abstraction for a bi-directional connection. */
+    /** Abstraction for a bi-directional connection. */
     class Conn {
+        friend ConnPool;
         public:
         enum ConnMode {
             ACTIVE, /**< the connection is established by connect() */
@@ -172,38 +174,45 @@ class ConnPool {
         void recv_data(evutil_socket_t, short);
         void send_data(evutil_socket_t, short);
         void conn_server(evutil_socket_t, short);
-        void try_conn(evutil_socket_t, short);
+        void try_conn();
 
         public:
-        friend ConnPool;
         Conn(): self_ref(this) {}
+        Conn(const Conn &) = delete;
+        Conn(Conn &&other) = delete;
     
         virtual ~Conn() {
-            SALTICIDAE_LOG_INFO("destroyed connection %s", std::string(*this).c_str());
+            SALTICIDAE_LOG_INFO("destroyed %s", std::string(*this).c_str());
         }
 
+        /** Get the handle to itself. */
         conn_t self() { return self_ref; }
         operator std::string() const;
         int get_fd() const { return fd; }
         const NetAddr &get_addr() const { return addr; }
         ConnMode get_mode() const { return mode; }
         RingBuffer &read() { return recv_buffer; }
+        /** Set the buffer size used for send/receive data. */
         void set_seg_buff_size(size_t size) { seg_buff_size = size; }
 
+        /** Write data to the connection (non-blocking). The data will be sent
+         * whenever I/O is available. */
         void write(bytearray_t &&data) {
             send_buffer.push(std::move(data));
             if (ready_send)
                 send_data(fd, EV_WRITE);
         }
 
+        /** Move the send buffer from the other (old) connection. */
         void move_send_buffer(conn_t other) {
             send_buffer = std::move(other->send_buffer);
         }
 
+        /** Terminate the connection. */
         void terminate();
 
         protected:
-        /** close the connection and free all on-going or planned events. */
+        /** Close the IO and clear all on-going or planned events. */
         virtual void close() {
             ev_read.clear();
             ev_write.clear();
@@ -212,16 +221,19 @@ class ConnPool {
             fd = -1;
         }
 
+        /** Called when new data is available. */
         virtual void on_read() = 0;
+        /** Called when the underlying connection is established. */
         virtual void on_setup() = 0;
+        /** Called when the underlying connection breaks. */
         virtual void on_teardown() = 0;
     };
     
     private:
     int max_listen_backlog;
-    double try_conn_delay;
     double conn_server_timeout;
     size_t seg_buff_size;
+
     std::unordered_map<int, conn_t> pool;
     int listen_fd;
     Event ev_listen;
@@ -231,20 +243,15 @@ class ConnPool {
 
     protected:
     EventContext eb;
+    /** Should be implemented by derived class to return a new Conn object. */
     virtual conn_t create_conn() = 0;
-    virtual double gen_conn_timeout() {
-        return gen_rand_timeout(try_conn_delay);
-    }
 
     public:
-    friend Conn;
     ConnPool(const EventContext &eb,
             int max_listen_backlog = 10,
-            double try_conn_delay = 2,
             double conn_server_timeout = 2,
             size_t seg_buff_size = 4096):
         max_listen_backlog(max_listen_backlog),
-        try_conn_delay(try_conn_delay),
         conn_server_timeout(conn_server_timeout),
         seg_buff_size(seg_buff_size),
         eb(eb) {}
@@ -260,9 +267,11 @@ class ConnPool {
     ConnPool(const ConnPool &) = delete;
     ConnPool(ConnPool &&) = delete;
 
-    /** create an active mode connection to addr */
-    conn_t create_conn(const NetAddr &addr);
-    /** setup and start listening */
+    /** Actively connect to remote addr. */
+    conn_t connect(const NetAddr &addr);
+    /** Listen for passive connections (connection initiated from remote).
+     * Does not need to be called if do not want to accept any passive
+     * connections. */
     void listen(NetAddr listen_addr);
 };
 

@@ -220,8 +220,7 @@ size_t Config::parse(int argc, char **argv) {
         SALTICIDAE_LOG_INFO("loaded configuration from %s", conf_fname.c_str());
 
     size_t nopts = opts.size();
-    struct option *longopts = (struct option *)malloc(
-                                sizeof(struct option) * (nopts + 1));
+    auto longopts = BoxObj<struct option[]>(new struct option[nopts + 1]);
     int ind;
     std::string shortopts;
     for (size_t i = 0; i < nopts; i++)
@@ -238,7 +237,7 @@ size_t Config::parse(int argc, char **argv) {
     longopts[nopts] = {0, 0, 0, 0};
     for (;;)
     {
-        int id = getopt_long(argc, argv, shortopts.c_str(), longopts, &ind);
+        int id = getopt_long(argc, argv, shortopts.c_str(), longopts.get(), &ind);
         if (id == -1)
             break;
         if (id == '?')

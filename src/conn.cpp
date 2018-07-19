@@ -36,10 +36,12 @@
 namespace salticidae {
 
 ConnPool::Conn::operator std::string() const {
-    return "<Conn fd=" + std::to_string(fd) + " " +
-                "addr=" + std::string(addr).c_str() + " " +
-                "mode=" + ((mode == Conn::ACTIVE) ? "active" : "passive") +
-            ">";
+    DataStream s;
+    s << "<Conn "
+      << "fd=" << std::to_string(fd) << " "
+      << "addr=" << std::string(addr) << " "
+      << "mode=" << ((mode == Conn::ACTIVE) ? "active" : "passive") << ">";
+    return std::move(s);
 }
 
 void ConnPool::Conn::send_data(evutil_socket_t fd, short events) {
@@ -150,7 +152,7 @@ void ConnPool::accept_client(evutil_socket_t fd, short) {
         conn->ev_write.add();
         conn->ready_send = false;
         add_conn(conn);
-        SALTICIDAE_LOG_INFO("created connection %s", std::string(*conn).c_str());
+        SALTICIDAE_LOG_INFO("created %s", std::string(*conn).c_str());
         conn->on_setup();
     }
     ev_listen.add();
@@ -222,7 +224,7 @@ void ConnPool::Conn::terminate() {
     }
 }
 
-void ConnPool::Conn::try_conn(evutil_socket_t, short) {
+void ConnPool::Conn::try_conn() {
     auto conn = self(); /* pin the connection */
     struct sockaddr_in sockin;
     memset(&sockin, 0, sizeof(struct sockaddr_in));
@@ -230,7 +232,7 @@ void ConnPool::Conn::try_conn(evutil_socket_t, short) {
     sockin.sin_addr.s_addr = addr.ip;
     sockin.sin_port = addr.port;
 
-    if (connect(fd, (struct sockaddr *)&sockin,
+    if (::connect(fd, (struct sockaddr *)&sockin,
                 sizeof(struct sockaddr_in)) < 0 && errno != EINPROGRESS)
     {
             SALTICIDAE_LOG_INFO("cannot connect to %s", std::string(addr).c_str());
@@ -242,7 +244,7 @@ void ConnPool::Conn::try_conn(evutil_socket_t, short) {
     ev_connect.add_with_timeout(cpool->conn_server_timeout);
 }
 
-ConnPool::conn_t ConnPool::create_conn(const NetAddr &addr) {
+ConnPool::conn_t ConnPool::connect(const NetAddr &addr) {
     int fd;
     int one = 1;
     if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
@@ -253,16 +255,14 @@ ConnPool::conn_t ConnPool::create_conn(const NetAddr &addr) {
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
         throw ConnPoolError(std::string("unable to set nonblocking socket"));
     conn_t conn = create_conn();
-    Conn *conn_ptr = conn.get();
     conn->seg_buff_size = seg_buff_size;
     conn->fd = fd;
     conn->cpool = this;
     conn->mode = Conn::ACTIVE;
     conn->addr = addr;
-    conn->ev_connect = Event(eb, -1, 0, std::bind(&Conn::try_conn, conn_ptr, _1, _2));
-    conn->ev_connect.add_with_timeout(gen_conn_timeout());
+    conn->try_conn();
     add_conn(conn);
-    SALTICIDAE_LOG_INFO("created connection %s", std::string(*conn).c_str());
+    SALTICIDAE_LOG_INFO("created %s", std::string(*conn).c_str());
     return conn;
 }
 
