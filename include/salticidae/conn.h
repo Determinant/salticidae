@@ -46,7 +46,7 @@
 
 namespace salticidae {
 
-class RingBuffer {
+class SegBuffer {
     struct buffer_entry_t {
         bytearray_t data;
         bytearray_t::iterator offset;
@@ -67,39 +67,39 @@ class RingBuffer {
         size_t length() const { return data.end() - offset; }
     };
 
-    std::list<buffer_entry_t> ring;
+    std::list<buffer_entry_t> buffer;
     size_t _size;
 
     public:
-    RingBuffer(): _size(0) {}
-    ~RingBuffer() { clear(); }
+    SegBuffer(): _size(0) {}
+    ~SegBuffer() { clear(); }
 
-    void swap(RingBuffer &other) {
-        std::swap(ring, other.ring);
+    void swap(SegBuffer &other) {
+        std::swap(buffer, other.buffer);
         std::swap(_size, other._size);
     }
 
-    RingBuffer(const RingBuffer &other):
-        ring(other.ring), _size(other._size) {}
+    SegBuffer(const SegBuffer &other):
+        buffer(other.buffer), _size(other._size) {}
 
-    RingBuffer(RingBuffer &&other):
-        ring(std::move(other.ring)), _size(other._size) {
+    SegBuffer(SegBuffer &&other):
+        buffer(std::move(other.buffer)), _size(other._size) {
         other._size = 0;
     }
 
-    RingBuffer &operator=(RingBuffer &&other) {
+    SegBuffer &operator=(SegBuffer &&other) {
         if (this != &other)
         {
-            RingBuffer tmp(std::move(other));
+            SegBuffer tmp(std::move(other));
             tmp.swap(*this);
         }
         return *this;
     }
  
-    RingBuffer &operator=(const RingBuffer &other) {
+    SegBuffer &operator=(const SegBuffer &other) {
         if (this != &other)
         {
-            RingBuffer tmp(other);
+            SegBuffer tmp(other);
             tmp.swap(*this);
         }
         return *this;
@@ -107,13 +107,13 @@ class RingBuffer {
    
     void push(bytearray_t &&data) {
         _size += data.size();
-        ring.push_back(buffer_entry_t(std::move(data)));
+        buffer.push_back(buffer_entry_t(std::move(data)));
     }
     
     bytearray_t pop(size_t len) {
         bytearray_t res;
-        auto i = ring.begin();
-        while (len && i != ring.end())
+        auto i = buffer.begin();
+        while (len && i != buffer.end())
         {
             size_t copy_len = std::min(i->length(), len);
             res.insert(res.end(), i->offset, i->offset + copy_len);
@@ -122,15 +122,16 @@ class RingBuffer {
             if (i->offset == i->data.end())
                 i++;
         }
-        ring.erase(ring.begin(), i);
+        buffer.erase(buffer.begin(), i);
         _size -= res.size();
         return std::move(res);
     }
     
     size_t size() const { return _size; }
+    bool empty() const { return buffer.empty(); }
     
     void clear() {
-        ring.clear();
+        buffer.clear();
         _size = 0;
     }
 };
@@ -162,8 +163,8 @@ class ConnPool {
         ConnMode mode;
         NetAddr addr;
 
-        RingBuffer send_buffer;
-        RingBuffer recv_buffer;
+        SegBuffer send_buffer;
+        SegBuffer recv_buffer;
 
         Event ev_read;
         Event ev_write;
@@ -190,7 +191,7 @@ class ConnPool {
         int get_fd() const { return fd; }
         const NetAddr &get_addr() const { return addr; }
         ConnMode get_mode() const { return mode; }
-        RingBuffer &read() { return recv_buffer; }
+        SegBuffer &read() { return recv_buffer; }
         /** Set the buffer size used for send/receive data. */
         void set_seg_buff_size(size_t size) { seg_buff_size = size; }
 
@@ -212,7 +213,7 @@ class ConnPool {
 
         protected:
         /** Close the IO and clear all on-going or planned events. */
-        virtual void close() {
+        virtual void on_close() {
             ev_read.clear();
             ev_write.clear();
             ev_connect.clear();
@@ -260,7 +261,7 @@ class ConnPool {
         for (auto it: pool)
         {
             conn_t conn = it.second;
-            conn->close();
+            conn->on_close();
         }
     }
 

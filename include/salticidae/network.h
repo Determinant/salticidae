@@ -191,9 +191,9 @@ class PeerNetwork: public MsgNetwork<MsgType> {
             pn(pn) {}
 
         protected:
-        void close() override {
+        void on_close() override {
             ev_timeout.clear();
-            MsgNet::Conn::close();
+            MsgNet::Conn::on_close();
         }
 
         void on_setup() override;

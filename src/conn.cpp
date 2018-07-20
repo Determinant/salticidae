@@ -48,21 +48,20 @@ void ConnPool::Conn::send_data(evutil_socket_t fd, short events) {
     if (!(events & EV_WRITE)) return;
     auto conn = self(); /* pin the connection */
     ssize_t ret = seg_buff_size;
-    while (ret == (ssize_t)seg_buff_size)
+    while (!send_buffer.empty() && ret == (ssize_t)seg_buff_size)
     {
-        if (!send_buffer.size()) /* nothing to write */
-            break;
         bytearray_t buff_seg = send_buffer.pop(seg_buff_size);
         ssize_t size = buff_seg.size();
         ret = send(fd, buff_seg.data(), size, MSG_NOSIGNAL);
-        SALTICIDAE_LOG_DEBUG("socket sent %d bytes", ret);
-        if (ret < size)
+        SALTICIDAE_LOG_DEBUG("socket sent %zd bytes", ret);
+        size -= ret;
+        if (size > 0)
         {
-            if (ret < 0) /* nothing is sent */
+            if (ret < 1) /* nothing is sent */
             {
                 /* rewind the whole buff_seg */
                 send_buffer.push(std::move(buff_seg));
-                if (errno != EWOULDBLOCK)
+                if (ret < 0 && errno != EWOULDBLOCK)
                 {
                     SALTICIDAE_LOG_INFO("reason: %s", strerror(errno));
                     terminate();
@@ -73,8 +72,8 @@ void ConnPool::Conn::send_data(evutil_socket_t fd, short events) {
             {
                 /* rewind the leftover */
                 bytearray_t left_over;
-                left_over.resize(size - ret);
-                memmove(left_over.data(), buff_seg.data() + ret, size - ret);
+                left_over.resize(size);
+                memmove(left_over.data(), buff_seg.data() + ret, size);
                 send_buffer.push(std::move(left_over));
             }
             /* wait for the next write callback */
@@ -96,24 +95,18 @@ void ConnPool::Conn::recv_data(evutil_socket_t fd, short events) {
         bytearray_t buff_seg;
         buff_seg.resize(seg_buff_size);
         ret = recv(fd, buff_seg.data(), seg_buff_size, 0);
-        SALTICIDAE_LOG_DEBUG("socket read %d bytes", ret);
-        if (ret <= 0)
+        SALTICIDAE_LOG_DEBUG("socket read %zd bytes", ret);
+        if (ret < 0 && errno != EWOULDBLOCK)
         {
-            if (ret < 0 && errno != EWOULDBLOCK)
-            {
-                SALTICIDAE_LOG_INFO("reason: %s", strerror(errno));
-                /* connection err or half-opened connection */
-                terminate();
-                return;
-            }
-            if (ret == 0)
-            {
-                terminate();
-                return;
-            }
-
-            /* EWOULDBLOCK */
-            break;
+            SALTICIDAE_LOG_INFO("reason: %s", strerror(errno));
+            /* connection err or half-opened connection */
+            terminate();
+            return;
+        }
+        if (ret == 0)
+        {
+            terminate();
+            return;
         }
         buff_seg.resize(ret);
         recv_buffer.push(std::move(buff_seg));
@@ -215,7 +208,7 @@ void ConnPool::Conn::terminate() {
         auto conn = it->second;
         assert(conn.get() == this);
         pool.erase(it);
-        close();
+        on_close();
         /* inform the upper layer the connection will be destroyed */
         on_teardown();
     }
