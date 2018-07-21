@@ -191,6 +191,7 @@ class ConnPool {
         int get_fd() const { return fd; }
         const NetAddr &get_addr() const { return addr; }
         ConnMode get_mode() const { return mode; }
+        ConnPool *get_pool() const { return cpool; }
         SegBuffer &read() { return recv_buffer; }
         /** Set the buffer size used for send/receive data. */
         void set_seg_buff_size(size_t size) { seg_buff_size = size; }

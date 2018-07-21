@@ -56,6 +56,15 @@ class MsgBase {
     public:
     MsgBase(): magic(0x0), no_payload(true) {}
 
+    template<typename MsgType,
+            typename = typename std::enable_if<
+                !std::is_same<MsgType, MsgBase>::value &&
+                !std::is_same<MsgType, uint8_t *>::value>::type>
+    MsgBase(const MsgType &msg): magic(0x0) {
+        set_opcode(MsgType::opcode);
+        set_payload(std::move(msg.serialized));
+    }
+
     MsgBase(const MsgBase &other):
             magic(other.magic),
             opcode(other.opcode),

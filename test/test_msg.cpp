@@ -29,27 +29,28 @@ using salticidae::uint256_t;
 using salticidae::DataStream;
 using salticidae::get_hash;
 using salticidae::get_hex;
-/*
-struct MsgTest: public salticidae::MsgBase<> {
-    using MsgBase::MsgBase;
+using salticidae::htole;
+using salticidae::letoh;
 
-    void gen_testhashes(int cnt) {
-        DataStream s;
-        set_opcode(0x01);
-        s << (uint32_t)cnt;
+using opcode_t = uint8_t;
+
+struct MsgTest {
+    static const opcode_t opcode = 0x0;
+    DataStream serialized;
+    MsgTest(int cnt) {
+        serialized << htole((uint32_t)cnt);
         for (int i = 0; i < cnt; i++)
         {
             uint256_t hash = get_hash(i);
             printf("adding hash %s\n", get_hex(hash).c_str());
-            s << hash;
+            serialized << hash;
         }
-        set_payload(std::move(s));
     }
 
-    void parse_testhashes() {
-        DataStream s(get_payload());
+    MsgTest(DataStream &&s) {
         uint32_t cnt;
         s >> cnt;
+        cnt = letoh(cnt);
         printf("got %d hashes\n", cnt);
         for (int i = 0; i < cnt; i++)
         {
@@ -59,23 +60,10 @@ struct MsgTest: public salticidae::MsgBase<> {
         }
     }
 };
-*/
 
 int main() {
-    /*
-    MsgTest msg;
-    msg.gen_ping(1234);
+    salticidae::MsgBase<opcode_t> msg(MsgTest(10));
     printf("%s\n", std::string(msg).c_str());
-    msg.gen_testhashes(5);
-    printf("%s\n", std::string(msg).c_str());
-    msg.parse_testhashes();
-    try
-    {
-        msg.parse_testhashes();
-    } catch (std::runtime_error &e) {
-        printf("caught: %s\n", e.what());
-    }
-    */
-    salticidae::PeerNetwork<> pn(salticidae::EventContext());
+    MsgTest parse(msg.get_payload());
     return 0;
 }
