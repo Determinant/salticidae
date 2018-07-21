@@ -36,14 +36,10 @@
 
 namespace salticidae {
 
-template<typename OpcodeType = uint8_t,
-        const OpcodeType PING = 0xf0,
-        const OpcodeType PONG = 0xf1>
+template<typename OpcodeType>
 class MsgBase {
     public:
     using opcode_t = OpcodeType;
-    static const opcode_t OPCODE_PING;
-    static const opcode_t OPCODE_PONG;
     static const size_t header_size;
 
     private:
@@ -195,32 +191,6 @@ class MsgBase {
         return std::move(s);
     }
 
-    void gen_ping(uint16_t port) {
-        DataStream s;
-        set_opcode(OPCODE_PING);
-        s << htole(port);
-        set_payload(std::move(s));
-    }
-
-    void parse_ping(uint16_t &port) const {
-        DataStream s(get_payload());
-        s >> port;
-        port = letoh(port);
-    }
-
-    void gen_pong(uint16_t port) {
-        DataStream s;
-        set_opcode(OPCODE_PONG);
-        s << htole(port);
-        set_payload(std::move(s));
-    }
-
-    void parse_pong(uint16_t &port) const {
-        DataStream s(get_payload());
-        s >> port;
-        port = letoh(port);
-    }
-
     void gen_hash_list(DataStream &s,
                         const std::vector<uint256_t> &hashes) {
         uint32_t size = htole((uint32_t)hashes.size());
@@ -242,24 +212,12 @@ class MsgBase {
 
 };
 
-template<typename OpcodeType,
-        OpcodeType _,
-        OpcodeType __>
-const size_t MsgBase<OpcodeType, _, __>::header_size =
-    sizeof(MsgBase<OpcodeType, _, __>::magic) +
-    sizeof(MsgBase<OpcodeType, _, __>::opcode) +
-    sizeof(MsgBase<OpcodeType, _, __>::length) +
-    sizeof(MsgBase<OpcodeType, _, __>::checksum);
-
-template<typename OpcodeType,
-        OpcodeType PING,
-        OpcodeType _>
-const OpcodeType MsgBase<OpcodeType, PING, _>::OPCODE_PING = PING;
-
-template<typename OpcodeType,
-        OpcodeType _,
-        OpcodeType PONG>
-const OpcodeType MsgBase<OpcodeType, _, PONG>::OPCODE_PONG = PONG;
+template<typename OpcodeType>
+const size_t MsgBase<OpcodeType>::header_size =
+    sizeof(MsgBase<OpcodeType>::magic) +
+    sizeof(MsgBase<OpcodeType>::opcode) +
+    sizeof(MsgBase<OpcodeType>::length) +
+    sizeof(MsgBase<OpcodeType>::checksum);
 
 }
 

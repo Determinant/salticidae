@@ -59,8 +59,7 @@ template<typename T, typename D> class BoxObj;
 template<typename T, typename D>
 class _BoxObj {
     protected:
-    using ptr_type = T *;
-    ptr_type obj;
+    T *obj;
 
     template<typename T_, typename R, typename D_>
     friend class _RcObjBase;
@@ -68,9 +67,9 @@ class _BoxObj {
     friend class _BoxObj;
 
     public:
-
+    using type = T;
     constexpr _BoxObj(): obj(nullptr) {}
-    constexpr _BoxObj(ptr_type obj): obj(obj) {}
+    constexpr _BoxObj(T *obj): obj(obj) {}
     _BoxObj(const _BoxObj &other) = delete;
     _BoxObj(_BoxObj &&other): obj(other.obj) {
         other.obj = nullptr;
@@ -144,7 +143,7 @@ class BoxObj<T[], D>: public _BoxObj<T, D> {
 template<typename T, typename D = default_delete<T>, typename T_, typename D_>
 BoxObj<T, D> static_pointer_cast(BoxObj<T_, D_> &&other) {
     BoxObj<T, D> box{};
-    box.obj = static_cast<typename BoxObj<T, D>::ptr_type>(other.obj);
+    box.obj = static_cast<typename BoxObj<T, D>::type *>(other.obj);
     return std::move(box);
 }
 
@@ -280,8 +279,7 @@ class WeakObjBase<T[], R>: public _WeakObjBase<T, R> {
 template<typename T, typename R, typename D>
 class _RcObjBase {
     protected:
-    using ptr_type = T *;
-    ptr_type obj;
+    T *obj;
     R *ctl;
 
     friend _WeakObjBase<T, R>;
@@ -289,8 +287,9 @@ class _RcObjBase {
     friend class _RcObjBase;
 
     public:
+    using type = T;
     _RcObjBase(): obj(nullptr), ctl(nullptr) {}
-    _RcObjBase(ptr_type obj): obj(obj), ctl(new R()) {}
+    _RcObjBase(T *obj): obj(obj), ctl(new R()) {}
     _RcObjBase(BoxObj<T> &&box_ref): obj(box_ref.obj), ctl(new R()) {
         box_ref.obj = nullptr;
     }
@@ -438,7 +437,7 @@ template<typename T, typename D = default_delete<T>,
         typename T_, typename R_, typename D_>
 RcObjBase<T, R_, D> static_pointer_cast(const RcObjBase<T_, R_, D_> &other) {
     RcObjBase<T, R_, D> rc{};
-    rc.obj = static_cast<typename RcObjBase<T, R_, D>::ptr_type>(other.obj);
+    rc.obj = static_cast<typename RcObjBase<T, R_, D>::type *>(other.obj);
     if ((rc.ctl = other.ctl))
         rc.ctl->add_ref();
     return std::move(rc);
@@ -448,7 +447,7 @@ template<typename T, typename D = default_delete<T>,
         typename T_, typename R_, typename D_>
 RcObjBase<T, R_, D> static_pointer_cast(RcObjBase<T_, R_, D_> &&other) {
     RcObjBase<T, R_, D> rc{};
-    rc.obj = static_cast<typename RcObjBase<T, R_, D>::ptr_type>(other.obj);
+    rc.obj = static_cast<typename RcObjBase<T, R_, D>::type *>(other.obj);
     rc.ctl = other.ctl;
     other.ctl = nullptr;
     return std::move(rc);

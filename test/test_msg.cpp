@@ -23,12 +23,13 @@
  */
 
 #include "salticidae/msg.h"
+#include "salticidae/network.h"
 
 using salticidae::uint256_t;
 using salticidae::DataStream;
 using salticidae::get_hash;
 using salticidae::get_hex;
-
+/*
 struct MsgTest: public salticidae::MsgBase<> {
     using MsgBase::MsgBase;
 
@@ -58,8 +59,10 @@ struct MsgTest: public salticidae::MsgBase<> {
         }
     }
 };
+*/
 
 int main() {
+    /*
     MsgTest msg;
     msg.gen_ping(1234);
     printf("%s\n", std::string(msg).c_str());
@@ -72,5 +75,7 @@ int main() {
     } catch (std::runtime_error &e) {
         printf("caught: %s\n", e.what());
     }
+    */
+    salticidae::PeerNetwork<> pn(salticidae::EventContext());
     return 0;
 }
