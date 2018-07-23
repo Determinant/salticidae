@@ -134,14 +134,14 @@ class MsgNetwork: public ConnPool {
     mutable msg_stat_by_opcode_t recv_by_opcode;
 #endif
 
-    ConnPool::conn_t create_conn() override { return (new Conn())->self(); }
+    ConnPool::Conn *create_conn() override { return new Conn(); }
 
     public:
-    MsgNetwork(const EventContext &eb,
+    MsgNetwork(const EventContext &ec,
             int max_listen_backlog,
             double conn_server_timeout,
             size_t seg_buff_size):
-        ConnPool(eb, max_listen_backlog,
+        ConnPool(ec, max_listen_backlog,
                     conn_server_timeout,
                     seg_buff_size) {}
 
@@ -197,14 +197,14 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
     using conn_t = RcObj<Conn>;
 
     protected:
-    ConnPool::conn_t create_conn() override { return (new Conn())->self(); }
+    ConnPool::Conn *create_conn() override { return new Conn(); }
 
     public:
-    ClientNetwork(const EventContext &eb,
+    ClientNetwork(const EventContext &ec,
                 int max_listen_backlog = 10,
                 double conn_server_timeout = 0,
                 size_t seg_buff_size = 4096):
-        MsgNet(eb, max_listen_backlog,
+        MsgNet(ec, max_listen_backlog,
                 conn_server_timeout,
                 seg_buff_size) {}
 
@@ -268,10 +268,10 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         bool connected;
 
         Peer() = delete;
-        Peer(NetAddr addr, conn_t conn, const EventContext &eb):
+        Peer(NetAddr addr, conn_t conn, const EventContext &ec):
             addr(addr), conn(conn),
             ev_ping_timer(
-                Event(eb, -1, 0, std::bind(&Peer::ping_timer, this, _1, _2))),
+                Event(ec, -1, 0, std::bind(&Peer::ping_timer, this, _1, _2))),
             connected(false) {}
         ~Peer() {}
         Peer &operator=(const Peer &) = delete;
@@ -329,13 +329,13 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     void start_active_conn(const NetAddr &paddr);
 
     protected:
-    ConnPool::conn_t create_conn() override { return (new Conn())->self(); }
+    ConnPool::Conn *create_conn() override { return new Conn(); }
     virtual double gen_conn_timeout() {
         return gen_rand_timeout(retry_conn_delay);
     }
 
     public:
-    PeerNetwork(const EventContext &eb,
+    PeerNetwork(const EventContext &ec,
                 int max_listen_backlog = 10,
                 double retry_conn_delay = 2,
                 double conn_server_timeout = 2,
@@ -343,7 +343,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
                 double ping_period = 30,
                 double conn_timeout = 180,
                 IdentityMode id_mode = IP_PORT_BASED):
-        MsgNet(eb, max_listen_backlog,
+        MsgNet(ec, max_listen_backlog,
                     conn_server_timeout,
                     seg_buff_size),
         id_mode(id_mode),
@@ -432,7 +432,7 @@ template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::Conn::on_setup() {
     auto pn = get_net();
     assert(!ev_timeout);
-    ev_timeout = Event(pn->eb, -1, 0, [this](evutil_socket_t, short) {
+    ev_timeout = Event(pn->ec, -1, 0, [this](evutil_socket_t, short) {
         SALTICIDAE_LOG_INFO("peer ping-pong timeout");
         this->terminate();
     });
@@ -455,7 +455,7 @@ void PeerNetwork<O, _, __>::Conn::on_teardown() {
     SALTICIDAE_LOG_INFO("connection lost %s for %s",
             std::string(*this).c_str(),
             std::string(peer_id).c_str());
-    p->ev_retry_timer = Event(pn->eb, -1, 0,
+    p->ev_retry_timer = Event(pn->ec, -1, 0,
             [pn, peer_id = this->peer_id](evutil_socket_t, short) {
         pn->start_active_conn(peer_id);
     });
@@ -546,7 +546,7 @@ void PeerNetwork<O, _, __>::add_peer(const NetAddr &addr) {
     auto it = id2peer.find(addr);
     if (it != id2peer.end())
         throw PeerNetworkError("peer already exists");
-    id2peer.insert(std::make_pair(addr, new Peer(addr, nullptr, this->eb)));
+    id2peer.insert(std::make_pair(addr, new Peer(addr, nullptr, this->ec)));
     peer_list.push_back(addr);
     start_active_conn(addr);
 }

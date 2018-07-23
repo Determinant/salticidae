@@ -131,15 +131,17 @@ void ConnPool::accept_client(evutil_socket_t fd, short) {
 
         NetAddr addr((struct sockaddr_in *)&client_addr);
         conn_t conn = create_conn();
-        Conn *conn_ptr = conn.get();
+        conn->self_ref = conn;
         conn->seg_buff_size = seg_buff_size;
         conn->fd = client_fd;
         conn->cpool = this;
         conn->mode = Conn::PASSIVE;
         conn->addr = addr;
-        conn->ev_read = Event(eb, client_fd, EV_READ,
+
+        Conn *conn_ptr = conn.get();
+        conn->ev_read = Event(ec, client_fd, EV_READ,
                                 std::bind(&Conn::recv_data, conn_ptr, _1, _2));
-        conn->ev_write = Event(eb, client_fd, EV_WRITE,
+        conn->ev_write = Event(ec, client_fd, EV_WRITE,
                                 std::bind(&Conn::send_data, conn_ptr, _1, _2));
         conn->ev_read.add();
         conn->ev_write.add();
@@ -154,9 +156,9 @@ void ConnPool::Conn::conn_server(evutil_socket_t fd, short events) {
     auto conn = self(); /* pin the connection */
     if (send(fd, "", 0, MSG_NOSIGNAL) == 0)
     {
-        ev_read = Event(cpool->eb, fd, EV_READ,
+        ev_read = Event(cpool->ec, fd, EV_READ,
                 std::bind(&Conn::recv_data, this, _1, _2));
-        ev_write = Event(cpool->eb, fd, EV_WRITE,
+        ev_write = Event(cpool->ec, fd, EV_WRITE,
                 std::bind(&Conn::send_data, this, _1, _2));
         ev_read.add();
         ev_write.add();
@@ -193,7 +195,7 @@ void ConnPool::listen(NetAddr listen_addr) {
         throw ConnPoolError(std::string("binding error"));
     if (::listen(listen_fd, max_listen_backlog) < 0)
         throw ConnPoolError(std::string("listen error"));
-    ev_listen = Event(eb, listen_fd, EV_READ,
+    ev_listen = Event(ec, listen_fd, EV_READ,
             std::bind(&ConnPool::accept_client, this, _1, _2));
     ev_listen.add();
     SALTICIDAE_LOG_INFO("listening to %u", ntohs(listen_addr.port));
@@ -225,6 +227,7 @@ ConnPool::conn_t ConnPool::connect(const NetAddr &addr) {
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
         throw ConnPoolError(std::string("unable to set nonblocking socket"));
     conn_t conn = create_conn();
+    conn->self_ref = conn;
     conn->seg_buff_size = seg_buff_size;
     conn->fd = fd;
     conn->cpool = this;
@@ -245,7 +248,7 @@ ConnPool::conn_t ConnPool::connect(const NetAddr &addr) {
     }
     else
     {
-        conn->ev_connect = Event(eb, fd, EV_WRITE,
+        conn->ev_connect = Event(ec, fd, EV_WRITE,
                     std::bind(&Conn::conn_server, conn.get(), _1, _2));
         conn->ev_connect.add_with_timeout(conn_server_timeout);
 

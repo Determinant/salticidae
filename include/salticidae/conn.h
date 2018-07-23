@@ -177,7 +177,7 @@ class ConnPool {
         void conn_server(evutil_socket_t, short);
 
         public:
-        Conn(): self_ref(this), ready_send(false) {}
+        Conn(): ready_send(false) {}
         Conn(const Conn &) = delete;
         Conn(Conn &&other) = delete;
     
@@ -244,19 +244,19 @@ class ConnPool {
     conn_t add_conn(conn_t conn);
 
     protected:
-    EventContext eb;
+    EventContext ec;
     /** Should be implemented by derived class to return a new Conn object. */
-    virtual conn_t create_conn() = 0;
+    virtual Conn *create_conn() = 0;
 
     public:
-    ConnPool(const EventContext &eb,
+    ConnPool(const EventContext &ec,
             int max_listen_backlog = 10,
             double conn_server_timeout = 2,
             size_t seg_buff_size = 4096):
         max_listen_backlog(max_listen_backlog),
         conn_server_timeout(conn_server_timeout),
         seg_buff_size(seg_buff_size),
-        eb(eb) {}
+        ec(ec) {}
 
     ~ConnPool() {
         for (auto it: pool)

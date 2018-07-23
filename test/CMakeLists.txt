@@ -25,3 +25,6 @@ target_link_libraries(test_msg salticidae_static)
 
 add_executable(test_stream test_stream.cpp)
 target_link_libraries(test_stream salticidae_static)
+
+add_executable(test_network test_network.cpp)
+target_link_libraries(test_network salticidae_static)
