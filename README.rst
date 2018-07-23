@@ -12,16 +12,16 @@ Features
   relies on libevent and libcrypo (OpenSSL, for SHA256 purpose).
 
 - Clarity. With moderate use of C++ template and new features, the vast
-  majority of the code is self-documented.
+  majority of the code is self-documenting.
 
 - Layered design. You can use network abstraction from the lowest socket
   connection level to the highest P2P network level.
 
-- Performance. The implementation strives to incur very little in processing
+- Performance. The implementation strives to incur very little overhead in processing
   network I/O, and avoid unnecessary memory copies thanks to the move semantics.
 
-- Utilities. The libray also provies with some useful gadgets, such as command
-  line parser, libevent abstraction, etc.
+- Utilities. The library also provides with some useful gadgets, such as
+  command-line parser, libevent abstraction, etc.
 
 Dependencies
 ------------
@@ -31,8 +31,8 @@ Dependencies
 - libevent
 - libcrypto
 
-Example
--------
+Example (MsgNetwork layer)
+--------------------------
 
 .. code-block:: cpp
 
