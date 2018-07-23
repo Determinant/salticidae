@@ -1,8 +1,8 @@
 Salticidae: a Minimal C++ asynchronous network library.
 =======================================================
 
-.. image:: https://img.shields.io/github/license/Determinant/salticidae.svg
-   :target: https://github.com/Determinant/salticidae
+.. image:: https://img.shields.io/badge/License-MIT-yellow.svg
+   :target: https://opensource.org/licenses/MIT
 
 
 Features
