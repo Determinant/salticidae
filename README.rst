@@ -5,8 +5,8 @@ Salticidae: a Minimal C++ asynchronous network library.
    :target: https://github.com/Determinant/salticidae
 
 
-Feaures
--------
+Features
+--------
 
 - Simplicity. The library is self-contained, small in code base, and only
   relies on libevent and libcrypo (OpenSSL, for SHA256 purpose).
