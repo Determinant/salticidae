@@ -31,14 +31,13 @@
 namespace salticidae {
 
 class SHA256 {
-    SHA256_CTX *ctx;
+    SHA256_CTX ctx;
 
     public:
-    SHA256(): ctx(new SHA256_CTX()) { reset(); }
-    ~SHA256() { delete ctx; }
+    SHA256() { reset(); }
 
     void reset() {
-        if (!SHA256_Init(ctx))
+        if (!SHA256_Init(&ctx))
             throw std::runtime_error("openssl SHA256 init error");
     }
 
@@ -52,12 +51,12 @@ class SHA256 {
     }
 
     void update(const uint8_t *ptr, size_t length) {
-        if (!SHA256_Update(ctx, ptr, length))
+        if (!SHA256_Update(&ctx, ptr, length))
             throw std::runtime_error("openssl SHA256 update error");
     }
 
     void _digest(bytearray_t &md) {
-        if (!SHA256_Final(&*md.begin(), ctx))
+        if (!SHA256_Final(&*md.begin(), &ctx))
             throw std::runtime_error("openssl SHA256 error");
     }
 

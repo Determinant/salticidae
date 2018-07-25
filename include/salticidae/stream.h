@@ -109,11 +109,11 @@ class DataStream {
 
     const uint8_t *get_data_inplace(size_t len) {
         auto res = (uint8_t *)&*(buffer.begin() + offset);
+        offset += len;
 #ifndef SALTICIDAE_NOCHECK
-        if (offset + len > buffer.size())
+        if (offset > buffer.size())
             throw std::ios_base::failure("insufficient buffer");
 #endif
-        offset += len;
         return res;
     }
 
