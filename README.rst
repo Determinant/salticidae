@@ -84,7 +84,10 @@ Example (MsgNetwork layer)
       MsgAck() {}
       MsgAck(DataStream &&s) {}
   };
-  
+
+  const opcode_t MsgHello::opcode;
+  const opcode_t MsgAck::opcode;
+
   using MsgNetworkByteOp = MsgNetwork<opcode_t>;
   
   struct MyNet: public MsgNetworkByteOp {

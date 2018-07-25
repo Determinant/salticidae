@@ -61,6 +61,8 @@ struct MsgTest {
     }
 };
 
+const opcode_t MsgTest::opcode;
+
 int main() {
     salticidae::MsgBase<opcode_t> msg(MsgTest(10));
     printf("%s\n", std::string(msg).c_str());
