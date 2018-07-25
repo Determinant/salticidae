@@ -1,4 +1,5 @@
 test_msg
 test_stream
 test_network
+bench_network
 Makefile

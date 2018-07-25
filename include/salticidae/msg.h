@@ -48,7 +48,9 @@ class MsgBase {
     uint32_t magic;
     opcode_t opcode;
     uint32_t length;
+#ifndef SALTICIDAE_NOCHECKSUM
     uint32_t checksum;
+#endif
 
     mutable bytearray_t payload;
     mutable bool no_payload;
@@ -69,7 +71,9 @@ class MsgBase {
             magic(other.magic),
             opcode(other.opcode),
             length(other.length),
+#ifndef SALTICIDAE_NOCHECKSUM
             checksum(other.checksum),
+#endif
             payload(other.payload),
             no_payload(other.no_payload) {}
 
@@ -77,7 +81,9 @@ class MsgBase {
             magic(other.magic),
             opcode(std::move(other.opcode)),
             length(other.length),
+#ifndef SALTICIDAE_NOCHECKSUM
             checksum(other.checksum),
+#endif
             payload(std::move(other.payload)),
             no_payload(other.no_payload) {}
 
@@ -85,24 +91,33 @@ class MsgBase {
         uint32_t _magic;
         opcode_t _opcode;
         uint32_t _length;
+#ifndef SALTICIDAE_NOCHECKSUM
         uint32_t _checksum;
+#endif
         DataStream s(raw_header, raw_header + MsgBase::header_size);
 
         s >> _magic
           >> _opcode
           >> _length
-          >> _checksum;
+#ifndef SALTICIDAE_NOCHECKSUM
+          >> _checksum
+#endif
+          ;
         magic = letoh(_magic);
         opcode = _opcode;
         length = letoh(_length);
+#ifndef SALTICIDAE_NOCHECKSUM
         checksum = letoh(_checksum);
+#endif
     }
 
     void swap(MsgBase &other) {
         std::swap(magic, other.magic);
         std::swap(opcode, other.opcode);
         std::swap(length, other.length);
+#ifndef SALTICIDAE_NOCHECKSUM
         std::swap(checksum, other.checksum);
+#endif
         std::swap(payload, other.payload);
         std::swap(no_payload, other.no_payload);
     }
@@ -154,7 +169,9 @@ class MsgBase {
         no_payload = false;
 #endif
         length = payload.size();
+#ifndef SALTICIDAE_NOCHECKSUM
         checksum = get_checksum();
+#endif
     }
 
     operator std::string() const {
@@ -163,11 +180,14 @@ class MsgBase {
           << "magic=" << get_hex(magic) << " "
           << "opcode=" << get_hex(opcode) << " "
           << "length=" << std::to_string(length) << " "
+#ifndef SALTICIDAE_NOCHECKSUM
           << "checksum=" << get_hex(checksum) << " "
+#endif
           << "payload=" << get_hex(payload) << ">";
         return std::move(s);
     }
 
+#ifndef SALTICIDAE_NOCHECKSUM
     uint32_t get_checksum() const {
         static class SHA256 sha256;
         uint32_t res;
@@ -189,13 +209,16 @@ class MsgBase {
     bool verify_checksum() const {
         return checksum == get_checksum();
     }
+#endif
 
     bytearray_t serialize() const {
         DataStream s;
         s << htole(magic)
           << opcode
           << htole(length)
+#ifndef SALTICIDAE_NOCHECKSUM
           << htole(checksum)
+#endif
           << payload;
         return std::move(s);
     }
@@ -226,8 +249,10 @@ const size_t MsgBase<OpcodeType>::header_size =
     sizeof(MsgBase<OpcodeType>::magic) +
     sizeof(MsgBase<OpcodeType>::opcode) +
     sizeof(MsgBase<OpcodeType>::length) +
-    sizeof(MsgBase<OpcodeType>::checksum);
-
+#ifndef SALTICIDAE_NOCHECKSUM
+    sizeof(MsgBase<OpcodeType>::checksum) +
+#endif
+    0;
 }
 
 #endif

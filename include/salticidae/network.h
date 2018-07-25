@@ -210,7 +210,6 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
 
     template<typename MsgType>
     void send_msg(const MsgType &msg, const NetAddr &addr);
-    conn_t connect(const NetAddr &addr) = delete;
 };
 
 class PeerNetworkError: public SalticidaeError {
@@ -387,11 +386,13 @@ void MsgNetwork<OpcodeType>::Conn::on_read() {
             bytearray_t data = recv_buffer.pop(len);
             msg.set_payload(std::move(data));
             msg_state = Conn::HEADER;
+#ifndef SALTICIDAE_NOCHECKSUM
             if (!msg.verify_checksum())
             {
                 SALTICIDAE_LOG_WARN("checksums do not match, dropping the message");
                 return;
             }
+#endif
             auto it = mn->handler_map.find(msg.get_opcode());
             if (it == mn->handler_map.end())
                 SALTICIDAE_LOG_WARN("unknown opcode: %s",

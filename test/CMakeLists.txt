@@ -28,3 +28,6 @@ target_link_libraries(test_stream salticidae_static)
 
 add_executable(test_network test_network.cpp)
 target_link_libraries(test_network salticidae_static)
+
+add_executable(bench_network bench_network.cpp)
+target_link_libraries(bench_network salticidae_static pthread)
