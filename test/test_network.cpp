@@ -24,6 +24,7 @@
 
 #include <cstdio>
 #include <string>
+#include <functional>
 
 #include "salticidae/msg.h"
 #include "salticidae/event.h"
@@ -35,6 +36,8 @@ using salticidae::DataStream;
 using salticidae::MsgNetwork;
 using salticidae::htole;
 using salticidae::letoh;
+using std::placeholders::_1;
+using std::placeholders::_2;
 using opcode_t = uint8_t;
 
 /** Hello Message. */
@@ -77,9 +80,13 @@ struct MyNet: public MsgNetworkByteOp {
     MyNet(const salticidae::EventContext &ec,
             const std::string name,
             const NetAddr &peer):
-        MsgNetwork<opcode_t>(ec, 10, 1.0, 4096),
-        name(name),
-        peer(peer) {}
+            MsgNetwork<opcode_t>(ec, 10, 1.0, 4096),
+            name(name),
+            peer(peer) {
+        /* message handler could be a bound method */
+        reg_handler(salticidae::handler_bind(
+            &MyNet::on_receive_hello, this, _1, _2));
+    }
 
     struct Conn: public MsgNetworkByteOp::Conn {
         MyNet *get_net() { return static_cast<MyNet *>(get_pool()); }
@@ -113,18 +120,17 @@ struct MyNet: public MsgNetworkByteOp {
     salticidae::ConnPool::Conn *create_conn() override {
         return new Conn();
     }
+
+    void on_receive_hello(MsgHello &&msg, conn_t conn) {
+        printf("[%s] %s says %s\n",
+                name.c_str(),
+                msg.name.c_str(), msg.text.c_str());
+        /* send acknowledgement */
+        send_msg(MsgAck(), conn);
+    }
 };
 
-
-void on_receive_hello(MsgHello &&msg, MyNet::conn_t conn) {
-    auto net = conn->get_net();
-    printf("[%s] %s says %s\n",
-            net->name.c_str(),
-            msg.name.c_str(), msg.text.c_str());
-    /* send acknowledgement */
-    net->send_msg(MsgAck(), conn);
-}
-
+    
 void on_receive_ack(MsgAck &&msg, MyNet::conn_t conn) {
     auto net = conn->get_net();
     printf("[%s] the peer knows\n", net->name.c_str());
@@ -139,10 +145,8 @@ int main() {
     MyNet alice(ec, "Alice", bob_addr);
     MyNet bob(ec, "Bob", alice_addr);
 
-    /* register the message handler */
-    alice.reg_handler(on_receive_hello);
+    /* message handler could be a normal function */
     alice.reg_handler(on_receive_ack);
-    bob.reg_handler(on_receive_hello);
     bob.reg_handler(on_receive_ack);
 
     alice.listen(alice_addr);
