@@ -26,26 +26,33 @@ Features
 Functionalities
 ---------------
 
-- `ConnPool`: A byte level connection pool implementation, the `ConnPool::Conn`
-  (or `ConnPool::conn_t`) objects represent a connection to which one can
-  send/receive a binary stream of data asynchronously.
+- ``ConnPool``: byte level connection pool implementation, ``ConnPool::Conn`` (or
+  ``ConnPool::conn_t``) objects represent connections to which one can
+  send/receive a stream of binary data asynchronously.
 
-- `MsgNetwork<OpcodeType>`: A message level network pool implementation, the
-  `MsgNetwork::Conn` (or `MsgNetwork::cont_t`) objects represent a channel to
-  which one can send/receive a predefined message. Message handler functions
-  are registered by `reg_handler()` and invoked upon receiving a new message.
-  `OpcodeType` is the type used for identifying message types. A vald message
-  type must have `opcode` value as its static member and `serialized` as a
-  member typed `DataStream` which contains the serialized data of the message.
+- ``MsgNetwork<OpcodeType>``: message level network pool implementation,
+  ``MsgNetwork::Conn`` (or ``MsgNetwork::cont_t``) objects represent channels to
+  which one can send/receive predefined messages asynchronously. Message
+  handler functions are registered by ``reg_handler()`` and invoked upon
+  receiving a new message.  ``OpcodeType`` is the type used for identifying
+  message types. A valid message class must have:
+  
+  - a static member ``opcode`` typed ``OpcodeType`` as the message type identifier
+  - a member ``serialized`` typed ``DataStream`` which contains the serialized data
+    of the message.
 
-- `PeerNetwork<OpcodeType>`: A simple P2P network pool implementation. It will
+  - a constructor ``MsgType(DataStream &&)`` that parse the message from stream.
+
+Based on ``MsgNetwork``, salticidae provides the following higher level abstractions:
+
+- ``PeerNetwork<OpcodeType>``: simple P2P network pool implementation. It will
   ensure exactly one underlying bi-directional connection is established per
   added peer, and retry the connection when it is broken. Ping-pong messages
-  are utilized to test the connectivity at the application layer.
+  are utilized to test the connectivity periodically.
 
-- `ClientNetwork<OpcodeType>`: A simple client-server network pool
-  implementation. A server who initialy calls `listen()` will accept the
-  incoming client messages, while a client simply calls `connect()` to connect
+- ``ClientNetwork<OpcodeType>``: simple client-server network pool
+  implementation. A server who initially calls ``listen()`` will accept the
+  incoming client messages, while a client simply calls ``connect()`` to connect
   to a known server.
 
 Dependencies
