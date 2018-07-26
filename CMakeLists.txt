@@ -53,11 +53,8 @@ endif()
 
 option(SALTICIDAE_ENABLE_DEBUG_LOG "enable debug log" OFF)
 option(SALTICIDAE_ENABLE_NORMAL_LOG "enable regular log" ON)
-if (SALTICIDAE_ENABLE_DEBUG_LOG)
-    add_definitions(-DSALTICIDAE_DEBUG_LOG)
-elseif(SALTICIDAE_ENABLE_NORMAL_LOG)
-    add_definitions(-DSALTICIDAE_NORMAL_LOG)
-endif()
+
+configure_file(src/config.h.in include/salticidae/config.h @ONLY)
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -W -Wall -Wextra -pedantic -Wsuggest-override")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -W -Wall -Wextra -pedantic -Wsuggest-override")

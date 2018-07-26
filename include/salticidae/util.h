@@ -34,6 +34,7 @@
 #include <getopt.h>
 #include <event2/event.h>
 
+#include "salticidae/config.h"
 #include "salticidae/ref.h"
 
 namespace salticidae {
@@ -83,12 +84,12 @@ class Logger {
 
 extern Logger logger;
 
-#ifdef SALTICIDAE_DEBUG_LOG
+#ifdef SALTICIDAE_ENABLE_DEBUG_LOG
 #define SALTICIDAE_NORMAL_LOG
 #define SALTICIDAE_ENABLE_LOG_DEBUG
 #endif
 
-#ifdef SALTICIDAE_NORMAL_LOG
+#ifdef SALTICIDAE_ENABLE_NORMAL_LOG
 #define SALTICIDAE_ENABLE_LOG_INFO
 #define SALTICIDAE_ENABLE_LOG_WARN
 #endif
