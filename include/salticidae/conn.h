@@ -146,6 +146,9 @@ class ConnPool {
     class Conn;
     /** The handle to a bi-directional connection. */
     using conn_t = RcObj<Conn>;
+    /** The type of callback invoked when connection status is changed. */
+    using conn_callback_t = std::function<void(const conn_t &)>;
+
     /** Abstraction for a bi-directional connection. */
     class Conn {
         friend ConnPool;
@@ -224,17 +227,25 @@ class ConnPool {
         }
 
         /** Called when new data is available. */
-        virtual void on_read() = 0;
+        virtual void on_read() {
+            if (cpool->read_cb) cpool->read_cb(self());
+        }
         /** Called when the underlying connection is established. */
-        virtual void on_setup() = 0;
+        virtual void on_setup() {
+            if (cpool->conn_cb) cpool->conn_cb(self());
+        }
         /** Called when the underlying connection breaks. */
-        virtual void on_teardown() = 0;
+        virtual void on_teardown() {
+            if (cpool->conn_cb) cpool->conn_cb(self());
+        }
     };
     
     private:
     int max_listen_backlog;
     double conn_server_timeout;
     size_t seg_buff_size;
+    conn_callback_t read_cb;
+    conn_callback_t conn_cb;
 
     std::unordered_map<int, conn_t> pool;
     int listen_fd;
@@ -275,6 +286,9 @@ class ConnPool {
      * Does not need to be called if do not want to accept any passive
      * connections. */
     void listen(NetAddr listen_addr);
+
+    template<typename Func>
+    void reg_conn_handler(Func cb) { conn_cb = cb; }
 };
 
 }

@@ -79,9 +79,6 @@ class MsgNetwork: public ConnPool {
 
         Msg msg;
         MsgState msg_state;
-        MsgNetwork *get_net() {
-            return static_cast<MsgNetwork *>(get_pool());
-        }
 
         protected:
 #ifdef SALTICIDAE_MSG_STAT
@@ -96,6 +93,10 @@ class MsgNetwork: public ConnPool {
 #endif
         {}
 
+        MsgNetwork *get_net() {
+            return static_cast<MsgNetwork *>(get_pool());
+        }
+
 #ifdef SALTICIDAE_MSG_STAT
         size_t get_nsent() const { return nsent; }
         size_t get_nrecv() const { return nrecv; }
@@ -105,8 +106,6 @@ class MsgNetwork: public ConnPool {
 
         protected:
         void on_read() override;
-        void on_setup() override {}
-        void on_teardown() override {}
     };
 
     using conn_t = RcObj<Conn>;
@@ -182,12 +181,13 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
     public:
     class Conn: public MsgNet::Conn {
         friend ClientNetwork;
-        ClientNetwork *get_net() {
-            return static_cast<ClientNetwork *>(ConnPool::Conn::get_pool());
-        }
 
         public:
         Conn() = default;
+
+        ClientNetwork *get_net() {
+            return static_cast<ClientNetwork *>(ConnPool::Conn::get_pool());
+        }
 
         protected:
         void on_setup() override;
@@ -234,12 +234,14 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         friend PeerNetwork;
         NetAddr peer_id;
         Event ev_timeout;
+
+        public:
+        Conn() = default;
+
         PeerNetwork *get_net() {
             return static_cast<PeerNetwork *>(ConnPool::Conn::get_pool());
         }
 
-        public:
-        Conn() = default;
         const NetAddr &get_peer() { return peer_id; }
 
         protected:
@@ -366,6 +368,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
 
 template<typename OpcodeType>
 void MsgNetwork<OpcodeType>::Conn::on_read() {
+    ConnPool::Conn::on_read();
     auto &recv_buffer = read();
     auto mn = get_net();
     while (get_fd() != -1)
@@ -431,6 +434,7 @@ void PeerNetwork<O, _, __>::Peer::reset_conn(conn_t new_conn) {
 
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::Conn::on_setup() {
+    MsgNet::Conn::on_setup();
     auto pn = get_net();
     assert(!ev_timeout);
     ev_timeout = Event(pn->ec, -1, 0, [this](evutil_socket_t, short) {
@@ -445,6 +449,7 @@ void PeerNetwork<O, _, __>::Conn::on_setup() {
 
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::Conn::on_teardown() {
+    MsgNet::Conn::on_teardown();
     auto pn = get_net();
     auto it = pn->id2peer.find(peer_id);
     if (it == pn->id2peer.end()) return;
@@ -645,6 +650,7 @@ const std::vector<NetAddr> &PeerNetwork<O, _, __>::all_peers() const {
 
 template<typename OpcodeType>
 void ClientNetwork<OpcodeType>::Conn::on_setup() {
+    MsgNet::Conn::on_setup();
     assert(this->get_mode() == Conn::PASSIVE);
     const auto &addr = this->get_addr();
     auto cn = get_net();
@@ -656,6 +662,7 @@ void ClientNetwork<OpcodeType>::Conn::on_setup() {
 
 template<typename OpcodeType>
 void ClientNetwork<OpcodeType>::Conn::on_teardown() {
+    MsgNet::Conn::on_teardown();
     assert(this->get_mode() == Conn::PASSIVE);
     get_net()->addr2conn.erase(this->get_addr());
 }

@@ -84,11 +84,10 @@ Example (MsgNetwork layer)
   using salticidae::letoh;
   using std::placeholders::_1;
   using std::placeholders::_2;
-  using opcode_t = uint8_t;
   
   /** Hello Message. */
   struct MsgHello {
-      static const opcode_t opcode = 0x0;
+      static const uint8_t opcode = 0x0;
       DataStream serialized;
       std::string name;
       std::string text;
@@ -111,66 +110,60 @@ Example (MsgNetwork layer)
   
   /** Acknowledgement Message. */
   struct MsgAck {
-      static const opcode_t opcode = 0x1;
+      static const uint8_t opcode = 0x1;
       DataStream serialized;
       MsgAck() {}
       MsgAck(DataStream &&s) {}
   };
-
-  const opcode_t MsgHello::opcode;
-  const opcode_t MsgAck::opcode;
-
-  using MsgNetworkByteOp = MsgNetwork<opcode_t>;
+  
+  const uint8_t MsgHello::opcode;
+  const uint8_t MsgAck::opcode;
+  
+  using MsgNetworkByteOp = MsgNetwork<uint8_t>;
   
   struct MyNet: public MsgNetworkByteOp {
       const std::string name;
       const NetAddr peer;
-  
+
       MyNet(const salticidae::EventContext &ec,
               const std::string name,
               const NetAddr &peer):
-              MsgNetwork<opcode_t>(ec, 10, 1.0, 4096),
+              MsgNetwork<uint8_t>(ec, 10, 1.0, 4096),
               name(name),
               peer(peer) {
           /* message handler could be a bound method */
           reg_handler(salticidae::handler_bind(
               &MyNet::on_receive_hello, this, _1, _2));
-      }
   
-      struct Conn: public MsgNetworkByteOp::Conn {
-          MyNet *get_net() { return static_cast<MyNet *>(get_pool()); }
-          salticidae::RcObj<Conn> self() {
-              return salticidae::static_pointer_cast<Conn>(
-                  MsgNetworkByteOp::Conn::self());
-          }
-  
-          void on_setup() override {
-              auto net = get_net();
-              if (get_mode() == ACTIVE)
+          reg_conn_handler([this](const ConnPool::conn_t &conn) {
+              if (conn->get_fd() != -1)
               {
-                  printf("[%s] Connected, sending hello.\n",
-                          net->name.c_str());
-                  /* send the first message through this connection */
-                  net->send_msg(MsgHello(net->name, "Hello there!"), self());
+                  if (conn->get_mode() == ConnPool::Conn::ACTIVE)
+                  {
+                      printf("[%s] Connected, sending hello.\n",
+                              this->name.c_str());
+                      /* send the first message through this connection */
+                      send_msg(MsgHello(this->name, "Hello there!"),
+                              salticidae::static_pointer_cast<Conn>(conn));
+                  }
+                  else
+                      printf("[%s] Accepted, waiting for greetings.\n",
+                              this->name.c_str());
               }
               else
-                  printf("[%s] Passively connected, waiting for greetings.\n",
-                          net->name.c_str());
-          }
-          void on_teardown() override {
-              auto net = get_net();
-              printf("[%s] Disconnected, retrying.\n", net->name.c_str());
-              /* try to reconnect to the same address */
-              net->connect(get_addr());
-          }
-      };
-      using conn_t = salticidae::RcObj<Conn>;
+              {
+                  printf("[%s] Disconnected, retrying.\n", this->name.c_str());
+                  /* try to reconnect to the same address */
+                  connect(conn->get_addr());
+              }
+          });
+      }
   
       salticidae::ConnPool::Conn *create_conn() override {
           return new Conn();
       }
   
-      void on_receive_hello(MsgHello &&msg, conn_t conn) {
+      void on_receive_hello(MsgHello &&msg, MyNet::conn_t conn) {
           printf("[%s] %s says %s\n",
                   name.c_str(),
                   msg.name.c_str(), msg.text.c_str());
@@ -181,7 +174,7 @@ Example (MsgNetwork layer)
   
       
   void on_receive_ack(MsgAck &&msg, MyNet::conn_t conn) {
-      auto net = conn->get_net();
+      auto net = static_cast<MyNet *>(conn->get_net());
       printf("[%s] the peer knows\n", net->name.c_str());
   }
   
