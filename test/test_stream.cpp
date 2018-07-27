@@ -77,5 +77,9 @@ int main() {
     Bits d(std::move(c));
     printf("%s\n", get_hex(b).c_str());
     print(b, b.size());
+    Bits e(4);
+    e.set(0);
+    e.set(1);
+    print(e, e.size());
     return 0;
 }

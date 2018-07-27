@@ -360,13 +360,13 @@ class _Bits {
     void set(uint32_t idx) {
         auto i = idx >> shift_per_datum;
         auto pos = idx & (bit_per_datum - 1);
-        data[i] ^= ((data[i] >> pos) ^ 1) << pos;
+        data[i] ^= (((data[i] >> pos) & 1) ^ 1) << pos;
     }
 
     void unset(uint32_t idx) {
         auto i = idx >> shift_per_datum;
         auto pos = idx & (bit_per_datum - 1);
-        data[i] ^= (data[i] >> pos) << pos;
+        data[i] ^= ((data[i] >> pos) & 1) << pos;
     }
 
     void flip(uint32_t idx) {
