@@ -1,5 +1,5 @@
 test_msg
-test_stream
+test_bits
 test_network
 bench_network
 Makefile

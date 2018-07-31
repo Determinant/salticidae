@@ -51,8 +51,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-option(SALTICIDAE_ENABLE_DEBUG_LOG "enable debug log" OFF)
-option(SALTICIDAE_ENABLE_NORMAL_LOG "enable regular log" ON)
+option(SALTICIDAE_DEBUG_LOG "enable debug log" OFF)
+option(SALTICIDAE_NORMAL_LOG "enable regular log" ON)
+option(SALTICIDAE_MSG_STAT "enable message statistics" ON)
+option(SALTICIDAE_NOCHECK "disable the sanity check" OFF)
+option(SALTICIDAE_NOCHECKSUM " disable checksum in messages" OFF)
 
 configure_file(src/config.h.in include/salticidae/config.h @ONLY)
 
