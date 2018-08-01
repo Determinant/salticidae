@@ -159,10 +159,6 @@ Example (MsgNetwork layer)
           });
       }
   
-      salticidae::ConnPool::Conn *create_conn() override {
-          return new Conn();
-      }
-  
       void on_receive_hello(MsgHello &&msg, MyNet::Conn &conn) {
           printf("[%s] %s says %s\n",
                   name.c_str(),
