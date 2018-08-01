@@ -61,7 +61,8 @@ class MsgBase {
     template<typename MsgType,
             typename = typename std::enable_if<
                 !std::is_same<MsgType, MsgBase>::value &&
-                !std::is_same<MsgType, uint8_t *>::value>::type>
+                !std::is_same<MsgType, bytearray_t>::value &&
+                !std::is_same<MsgType, DataStream>::value>::type>
     MsgBase(const MsgType &msg): magic(0x0) {
         set_opcode(MsgType::opcode);
         set_payload(std::move(msg.serialized));
@@ -87,15 +88,13 @@ class MsgBase {
             payload(std::move(other.payload)),
             no_payload(other.no_payload) {}
 
-    MsgBase(const uint8_t *raw_header): no_payload(true) {
+    MsgBase(DataStream &&s): no_payload(true) {
         uint32_t _magic;
         opcode_t _opcode;
         uint32_t _length;
 #ifndef SALTICIDAE_NOCHECKSUM
         uint32_t _checksum;
 #endif
-        DataStream s(raw_header, raw_header + MsgBase::header_size);
-
         s >> _magic
           >> _opcode
           >> _length

@@ -377,8 +377,7 @@ void MsgNetwork<OpcodeType>::Conn::on_read() {
         {
             if (recv_buffer.size() < Msg::header_size) break;
             /* new header available */
-            bytearray_t data = recv_buffer.pop(Msg::header_size);
-            msg = Msg(data.data());
+            msg = Msg(recv_buffer.pop(Msg::header_size));
             msg_state = Conn::PAYLOAD;
         }
         if (msg_state == Conn::PAYLOAD)
@@ -386,8 +385,7 @@ void MsgNetwork<OpcodeType>::Conn::on_read() {
             size_t len = msg.get_length();
             if (recv_buffer.size() < len) break;
             /* new payload available */
-            bytearray_t data = recv_buffer.pop(len);
-            msg.set_payload(std::move(data));
+            msg.set_payload(recv_buffer.pop(len));
             msg_state = Conn::HEADER;
 #ifndef SALTICIDAE_NOCHECKSUM
             if (!msg.verify_checksum())

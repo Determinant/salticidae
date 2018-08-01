@@ -26,6 +26,7 @@
 #include <string>
 #include <functional>
 #include <thread>
+#include <signal.h>
 
 /* disable SHA256 checksum */
 #define SALTICIDAE_NOCHECKSUM
@@ -142,6 +143,10 @@ salticidae::EventContext ec;
 NetAddr alice_addr("127.0.0.1:1234");
 NetAddr bob_addr("127.0.0.1:1235");
 
+void signal_handler(int) {
+    throw salticidae::SalticidaeError("got terminal signal");
+}
+
 int main() {
     /* test two nodes */
     MyNet alice(ec, "Alice", bob_addr, 10);
@@ -150,9 +155,18 @@ int main() {
         salticidae::EventContext ec;
         MyNet bob(ec, "Bob", alice_addr);
         bob.connect(alice_addr);
-        ec.dispatch();
+        try {
+            ec.dispatch();
+        } catch (std::exception &) {}
     });
-
-    ec.dispatch();
+    signal(SIGTERM, signal_handler);
+    signal(SIGINT, signal_handler);
+    try {
+        ec.dispatch();
+    } catch (std::exception &e) {
+        pthread_kill(bob_thread.native_handle(), SIGINT);
+        bob_thread.join();
+        SALTICIDAE_LOG_INFO("exception: %s", e.what());
+    }
     return 0;
 }
