@@ -125,7 +125,7 @@ class MsgNetwork: public ConnPool {
     private:
     std::unordered_map<
         typename Msg::opcode_t,
-        std::function<void(const Msg &msg, Conn *)>> handler_map;
+        std::function<void(const Msg &msg, Conn &)>> handler_map;
 
     protected:
 #ifdef SALTICIDAE_MSG_STAT
@@ -149,14 +149,14 @@ class MsgNetwork: public ConnPool {
         typename callback_traits<Func>::msg_type, DataStream &&>::value>::type
     reg_handler(Func handler) {
         using callback_t = callback_traits<Func>;
-        handler_map[callback_t::msg_type::opcode] = [handler](const Msg &msg, Conn *conn) {
+        handler_map[callback_t::msg_type::opcode] = [handler](const Msg &msg, Conn &conn) {
             handler(typename callback_t::msg_type(msg.get_payload()),
                     static_cast<typename callback_t::conn_type>(conn));
         };
     }
 
     template<typename MsgType>
-    void send_msg(const MsgType &msg, Conn *conn);
+    void send_msg(const MsgType &msg, Conn &conn);
     using ConnPool::listen;
 #ifdef SALTICIDAE_MSG_STAT
     msg_stat_by_opcode_t &get_sent_by_opcode() const {
@@ -323,10 +323,10 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         }
     };
 
-    void msg_ping(MsgPing &&msg, const Conn *conn);
-    void msg_pong(MsgPong &&msg, const Conn *conn);
-    void reset_conn_timeout(conn_t conn);
-    bool check_new_conn(conn_t conn, uint16_t port);
+    void msg_ping(MsgPing &&msg, Conn &conn);
+    void msg_pong(MsgPong &&msg, Conn &conn);
+    void reset_conn_timeout(Conn &conn);
+    bool check_new_conn(Conn &conn, uint16_t port);
     void start_active_conn(const NetAddr &paddr);
 
     protected:
@@ -405,7 +405,7 @@ void MsgNetwork<OpcodeType>::Conn::on_read() {
                 SALTICIDAE_LOG_DEBUG("got message %s from %s",
                         std::string(msg).c_str(),
                         std::string(*this).c_str());
-                it->second(msg, this);
+                it->second(msg, *this);
 #ifdef SALTICIDAE_MSG_STAT
                 nrecv++;
                 mn->recv_by_opcode.add(msg);
@@ -442,7 +442,7 @@ void PeerNetwork<O, _, __>::Conn::on_setup() {
         this->terminate();
     });
     /* the initial ping-pong to set up the connection */
-    auto conn = static_pointer_cast<Conn>(this->self());
+    auto &conn = static_cast<Conn &>(*this);
     pn->reset_conn_timeout(conn);
     pn->MsgNet::send_msg(MsgPing(pn->listen_port), conn);
 }
@@ -469,46 +469,46 @@ void PeerNetwork<O, _, __>::Conn::on_teardown() {
 }
 
 template<typename O, O _, O __>
-bool PeerNetwork<O, _, __>::check_new_conn(conn_t conn, uint16_t port) {
-    if (conn->peer_id.is_null())
+bool PeerNetwork<O, _, __>::check_new_conn(Conn &conn, uint16_t port) {
+    if (conn.peer_id.is_null())
     {   /* passive connections can eventually have ids after getting the port
            number in IP_BASED_PORT mode */
         assert(id_mode == IP_PORT_BASED);
-        conn->peer_id.ip = conn->get_addr().ip;
-        conn->peer_id.port = port;
+        conn.peer_id.ip = conn.get_addr().ip;
+        conn.peer_id.port = port;
     }
-    auto p = id2peer.find(conn->peer_id)->second.get();
+    auto p = id2peer.find(conn.peer_id)->second.get();
     if (p->connected)
     {
-        if (conn != p->conn)
+        if (conn.self() != p->conn)
         {
-            conn->terminate();
+            conn.terminate();
             return true;
         }
         return false;
     }
-    p->reset_conn(conn);
+    p->reset_conn(static_pointer_cast<Conn>(conn.self()));
     p->connected = true;
     p->reset_ping_timer();
     p->send_ping();
     if (p->connected)
         SALTICIDAE_LOG_INFO("PeerNetwork: established connection with %s via %s",
-            std::string(conn->peer_id).c_str(), std::string(*conn).c_str());
+            std::string(conn.peer_id).c_str(), std::string(conn).c_str());
     return false;
 }
 
 template<typename O, O _, O __>
-void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, const Conn *conn) {
+void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, Conn &conn) {
     uint16_t port = msg.port;
-    SALTICIDAE_LOG_INFO("ping from %s, port %u", std::string(*conn).c_str(), ntohs(port));
+    SALTICIDAE_LOG_INFO("ping from %s, port %u", std::string(conn).c_str(), ntohs(port));
     if (check_new_conn(conn, port)) return;
-    auto p = id2peer.find(conn->peer_id)->second.get();
+    auto p = id2peer.find(conn.peer_id)->second.get();
     send_msg(MsgPong(this->listen_port), p);
 }
 
 template<typename O, O _, O __>
-void PeerNetwork<O, _, __>::msg_pong(MsgPong &&msg, const Conn *conn) {
-    auto it = id2peer.find(conn->peer_id);
+void PeerNetwork<O, _, __>::msg_pong(MsgPong &&msg, Conn &conn) {
+    auto it = id2peer.find(conn.peer_id);
     if (it == id2peer.end())
     {
         SALTICIDAE_LOG_WARN("pong message discarded");
@@ -571,15 +571,15 @@ bool PeerNetwork<O, _, __>::has_peer(const NetAddr &paddr) const {
 
 template<typename OpcodeType>
 template<typename MsgType>
-void MsgNetwork<OpcodeType>::send_msg(const MsgType &_msg, Conn *conn) {
+void MsgNetwork<OpcodeType>::send_msg(const MsgType &_msg, Conn &conn) {
     Msg msg(_msg);
     bytearray_t msg_data = msg.serialize();
     SALTICIDAE_LOG_DEBUG("wrote message %s to %s",
                 std::string(msg).c_str(),
                 std::string(*conn).c_str());
-    conn->write(std::move(msg_data));
+    conn.write(std::move(msg_data));
 #ifdef SALTICIDAE_MSG_STAT
-    conn->nsent++;
+    conn.nsent++;
     sent_by_opcode.add(msg);
 #endif
 }
@@ -588,7 +588,7 @@ template<typename O, O _, O __>
 template<typename MsgType>
 void PeerNetwork<O, _, __>::send_msg(const MsgType &msg, const Peer *peer) {
     if (peer->connected)
-        MsgNet::send_msg(msg, peer->conn);
+        MsgNet::send_msg(msg, *(peer->conn));
     else
         SALTICIDAE_LOG_DEBUG("dropped");
 }
@@ -615,10 +615,10 @@ void PeerNetwork<O, _, __>::Peer::reset_ping_timer() {
 }
 
 template<typename O, O _, O __>
-void PeerNetwork<O, _, __>::reset_conn_timeout(conn_t conn) {
-    assert(conn->ev_timeout);
-    conn->ev_timeout.del();
-    conn->ev_timeout.add_with_timeout(conn_timeout);
+void PeerNetwork<O, _, __>::reset_conn_timeout(Conn &conn) {
+    assert(conn.ev_timeout);
+    conn.ev_timeout.del();
+    conn.ev_timeout.add_with_timeout(conn_timeout);
     SALTICIDAE_LOG_INFO("reset timeout %.2f", conn_timeout);
 }
 
@@ -627,7 +627,7 @@ void PeerNetwork<O, _, __>::Peer::send_ping() {
     auto pn = conn->get_net();
     ping_timer_ok = false;
     pong_msg_ok = false;
-    pn->reset_conn_timeout(conn);
+    pn->reset_conn_timeout(*conn);
     pn->send_msg(MsgPing(pn->listen_port), this);
 }
 
@@ -670,7 +670,7 @@ template<typename MsgType>
 void ClientNetwork<OpcodeType>::send_msg(const MsgType &msg, const NetAddr &addr) {
     auto it = addr2conn.find(addr);
     if (it == addr2conn.end()) return;
-    MsgNet::send_msg(msg, it->second);
+    MsgNet::send_msg(msg, *(it->second));
 }
 
 template<typename O, O OPCODE_PING, O _>

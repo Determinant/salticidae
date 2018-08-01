@@ -147,7 +147,7 @@ class ConnPool {
     /** The handle to a bi-directional connection. */
     using conn_t = RcObj<Conn>;
     /** The type of callback invoked when connection status is changed. */
-    using conn_callback_t = std::function<void(Conn *)>;
+    using conn_callback_t = std::function<void(Conn &)>;
 
     /** Abstraction for a bi-directional connection. */
     class Conn {
@@ -228,15 +228,15 @@ class ConnPool {
 
         /** Called when new data is available. */
         virtual void on_read() {
-            if (cpool->read_cb) cpool->read_cb(this);
+            if (cpool->read_cb) cpool->read_cb(*this);
         }
         /** Called when the underlying connection is established. */
         virtual void on_setup() {
-            if (cpool->conn_cb) cpool->conn_cb(this);
+            if (cpool->conn_cb) cpool->conn_cb(*this);
         }
         /** Called when the underlying connection breaks. */
         virtual void on_teardown() {
-            if (cpool->conn_cb) cpool->conn_cb(this);
+            if (cpool->conn_cb) cpool->conn_cb(*this);
         }
     };
     

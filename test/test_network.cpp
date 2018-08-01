@@ -89,16 +89,16 @@ struct MyNet: public MsgNetworkByteOp {
         reg_handler(salticidae::handler_bind(
             &MyNet::on_receive_hello, this, _1, _2));
 
-        reg_conn_handler([this](ConnPool::Conn *conn) {
-            if (conn->get_fd() != -1)
+        reg_conn_handler([this](ConnPool::Conn &conn) {
+            if (conn.get_fd() != -1)
             {
-                if (conn->get_mode() == ConnPool::Conn::ACTIVE)
+                if (conn.get_mode() == ConnPool::Conn::ACTIVE)
                 {
                     printf("[%s] Connected, sending hello.\n",
                             this->name.c_str());
                     /* send the first message through this connection */
                     send_msg(MsgHello(this->name, "Hello there!"),
-                            static_cast<Conn *>(conn));
+                            static_cast<Conn &>(conn));
                 }
                 else
                     printf("[%s] Accepted, waiting for greetings.\n",
@@ -108,7 +108,7 @@ struct MyNet: public MsgNetworkByteOp {
             {
                 printf("[%s] Disconnected, retrying.\n", this->name.c_str());
                 /* try to reconnect to the same address */
-                connect(conn->get_addr());
+                connect(conn.get_addr());
             }
         });
     }
@@ -117,7 +117,7 @@ struct MyNet: public MsgNetworkByteOp {
         return new Conn();
     }
 
-    void on_receive_hello(MsgHello &&msg, MyNet::Conn *conn) {
+    void on_receive_hello(MsgHello &&msg, MyNet::Conn &conn) {
         printf("[%s] %s says %s\n",
                 name.c_str(),
                 msg.name.c_str(), msg.text.c_str());
@@ -127,8 +127,8 @@ struct MyNet: public MsgNetworkByteOp {
 };
 
 
-void on_receive_ack(MsgAck &&msg, MyNet::Conn *conn) {
-    auto net = static_cast<MyNet *>(conn->get_net());
+void on_receive_ack(MsgAck &&msg, MyNet::Conn &conn) {
+    auto net = static_cast<MyNet *>(conn.get_net());
     printf("[%s] the peer knows\n", net->name.c_str());
 }
 
