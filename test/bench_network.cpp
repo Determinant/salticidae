@@ -109,8 +109,8 @@ struct MyNet: public MsgNetworkByteOp {
                         net->name.c_str());
                 /* send the first message through this connection */
                 net->ev_period_send = Event(net->ec, -1, 0,
-                                            [net, conn = self()](int, short) {
-                    net->send_msg(MsgBytes(256), conn);
+                                            [net, this](int, short) {
+                    net->send_msg(MsgBytes(256), this);
                     net->ev_period_send.add_with_timeout(0);
                 });
                 net->ev_period_send.add_with_timeout(0);
@@ -122,18 +122,18 @@ struct MyNet: public MsgNetworkByteOp {
         }
         void on_teardown() override {
             auto net = get_net();
+            net->ev_period_send = Event();
             printf("[%s] Disconnected, retrying.\n", net->name.c_str());
             /* try to reconnect to the same address */
             net->connect(get_addr());
         }
     };
-    using conn_t = salticidae::RcObj<Conn>;
 
     salticidae::ConnPool::Conn *create_conn() override {
         return new Conn();
     }
 
-    void on_receive_bytes(MsgBytes &&msg, conn_t conn) {
+    void on_receive_bytes(MsgBytes &&msg, const Conn *conn) {
         nrecv++;
     }
 };
