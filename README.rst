@@ -71,12 +71,12 @@ Example (MsgNetwork layer)
   #include <cstdio>
   #include <string>
   #include <functional>
-
+  
   #include "salticidae/msg.h"
   #include "salticidae/event.h"
   #include "salticidae/network.h"
   #include "salticidae/stream.h"
-
+  
   using salticidae::NetAddr;
   using salticidae::DataStream;
   using salticidae::MsgNetwork;
@@ -84,7 +84,7 @@ Example (MsgNetwork layer)
   using salticidae::letoh;
   using std::placeholders::_1;
   using std::placeholders::_2;
-
+  
   /** Hello Message. */
   struct MsgHello {
       static const uint8_t opcode = 0x0;
@@ -107,7 +107,7 @@ Example (MsgNetwork layer)
           text = std::string((const char *)s.get_data_inplace(len), len);
       }
   };
-
+  
   /** Acknowledgement Message. */
   struct MsgAck {
       static const uint8_t opcode = 0x1;
@@ -115,16 +115,16 @@ Example (MsgNetwork layer)
       MsgAck() {}
       MsgAck(DataStream &&s) {}
   };
-
+  
   const uint8_t MsgHello::opcode;
   const uint8_t MsgAck::opcode;
-
+  
   using MsgNetworkByteOp = MsgNetwork<uint8_t>;
-
+  
   struct MyNet: public MsgNetworkByteOp {
       const std::string name;
       const NetAddr peer;
-
+  
       MyNet(const salticidae::EventContext &ec,
               const std::string name,
               const NetAddr &peer):
@@ -134,17 +134,17 @@ Example (MsgNetwork layer)
           /* message handler could be a bound method */
           reg_handler(salticidae::handler_bind(
               &MyNet::on_receive_hello, this, _1, _2));
-
-          reg_conn_handler([this](ConnPool::Conn *conn) {
-              if (conn->get_fd() != -1)
+  
+          reg_conn_handler([this](ConnPool::Conn &conn) {
+              if (conn.get_fd() != -1)
               {
-                  if (conn->get_mode() == ConnPool::Conn::ACTIVE)
+                  if (conn.get_mode() == ConnPool::Conn::ACTIVE)
                   {
                       printf("[%s] Connected, sending hello.\n",
                               this->name.c_str());
                       /* send the first message through this connection */
                       send_msg(MsgHello(this->name, "Hello there!"),
-                              static_cast<Conn *>(conn));
+                              static_cast<Conn &>(conn));
                   }
                   else
                       printf("[%s] Accepted, waiting for greetings.\n",
@@ -154,16 +154,16 @@ Example (MsgNetwork layer)
               {
                   printf("[%s] Disconnected, retrying.\n", this->name.c_str());
                   /* try to reconnect to the same address */
-                  connect(conn->get_addr());
+                  connect(conn.get_addr());
               }
           });
       }
-
+  
       salticidae::ConnPool::Conn *create_conn() override {
           return new Conn();
       }
-
-      void on_receive_hello(MsgHello &&msg, MyNet::Conn *conn) {
+  
+      void on_receive_hello(MsgHello &&msg, MyNet::Conn &conn) {
           printf("[%s] %s says %s\n",
                   name.c_str(),
                   msg.name.c_str(), msg.text.c_str());
@@ -171,33 +171,33 @@ Example (MsgNetwork layer)
           send_msg(MsgAck(), conn);
       }
   };
-
-
-  void on_receive_ack(MsgAck &&msg, MyNet::Conn *conn) {
-      auto net = static_cast<MyNet *>(conn->get_net());
+  
+  
+  void on_receive_ack(MsgAck &&msg, MyNet::Conn &conn) {
+      auto net = static_cast<MyNet *>(conn.get_net());
       printf("[%s] the peer knows\n", net->name.c_str());
   }
-
+  
   salticidae::EventContext ec;
   NetAddr alice_addr("127.0.0.1:1234");
   NetAddr bob_addr("127.0.0.1:1235");
-
+  
   int main() {
       /* test two nodes */
       MyNet alice(ec, "Alice", bob_addr);
       MyNet bob(ec, "Bob", alice_addr);
-
+  
       /* message handler could be a normal function */
       alice.reg_handler(on_receive_ack);
       bob.reg_handler(on_receive_ack);
-
+  
       alice.listen(alice_addr);
       bob.listen(bob_addr);
-
+  
       /* first attempt */
       alice.connect(bob_addr);
       bob.connect(alice_addr);
-
+  
       ec.dispatch();
       return 0;
   }
