@@ -89,7 +89,7 @@ struct MyNet: public MsgNetworkByteOp {
             }),
             nrecv(0) {
         /* message handler could be a bound method */
-        reg_handler(salticidae::handler_bind(
+        reg_handler(salticidae::generic_bind(
             &MyNet::on_receive_bytes, this, _1, _2));
         if (stat_timeout > 0)
             ev_period_stat.add_with_timeout(0);
@@ -123,7 +123,7 @@ struct MyNet: public MsgNetworkByteOp {
         }
         void on_teardown() override {
             auto net = get_net();
-            net->ev_period_send = Event();
+            net->ev_period_send.clear();
             printf("[%s] Disconnected, retrying.\n", net->name.c_str());
             /* try to reconnect to the same address */
             net->connect(get_addr());

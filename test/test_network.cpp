@@ -86,7 +86,7 @@ struct MyNet: public MsgNetworkByteOp {
             name(name),
             peer(peer) {
         /* message handler could be a bound method */
-        reg_handler(salticidae::handler_bind(
+        reg_handler(salticidae::generic_bind(
             &MyNet::on_receive_hello, this, _1, _2));
 
         reg_conn_handler([this](ConnPool::Conn &conn) {

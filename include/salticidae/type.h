@@ -79,6 +79,11 @@ struct log2<1> {
    enum { value = 0 };
 };
 
+template<typename ClassType, typename ReturnType, typename... Args, typename... FArgs>
+inline auto generic_bind(ReturnType(ClassType::* f)(Args...), FArgs&&... fargs) {
+    return std::function<ReturnType(Args...)>(std::bind(f, std::forward<FArgs>(fargs)...));
+}
+
 }
 
 #endif

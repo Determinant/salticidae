@@ -32,11 +32,6 @@
 
 namespace salticidae {
 
-template<typename ClassType, typename ReturnType, typename... Args, typename... FArgs>
-inline auto handler_bind(ReturnType(ClassType::* f)(Args...), FArgs&&... fargs) {
-    return std::function<ReturnType(Args...)>(std::bind(f, std::forward<FArgs>(fargs)...));
-}
-
 /** Network of nodes who can send async messages.  */
 template<typename OpcodeType>
 class MsgNetwork: public ConnPool {
@@ -527,8 +522,8 @@ template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::listen(NetAddr listen_addr) {
     MsgNet::listen(listen_addr);
     listen_port = listen_addr.port;
-    this->reg_handler(handler_bind(&PeerNetwork::msg_ping, this, _1, _2));
-    this->reg_handler(handler_bind(&PeerNetwork::msg_pong, this, _1, _2));
+    this->reg_handler(generic_bind(&PeerNetwork::msg_ping, this, _1, _2));
+    this->reg_handler(generic_bind(&PeerNetwork::msg_pong, this, _1, _2));
 }
 
 template<typename O, O _, O __>
