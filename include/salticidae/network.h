@@ -569,7 +569,7 @@ void MsgNetwork<OpcodeType>::send_msg(const MsgType &_msg, Conn &conn) {
     bytearray_t msg_data = msg.serialize();
     SALTICIDAE_LOG_DEBUG("wrote message %s to %s",
                 std::string(msg).c_str(),
-                std::string(*conn).c_str());
+                std::string(conn).c_str());
     conn.write(std::move(msg_data));
 #ifdef SALTICIDAE_MSG_STAT
     conn.nsent++;
