@@ -96,8 +96,9 @@ void ConnPool::Conn::recv_data(evutil_socket_t fd, short events) {
         buff_seg.resize(seg_buff_size);
         ret = recv(fd, buff_seg.data(), seg_buff_size, 0);
         SALTICIDAE_LOG_DEBUG("socket read %zd bytes", ret);
-        if (ret < 0 && errno != EWOULDBLOCK)
+        if (ret < 0)
         {
+            if (errno == EWOULDBLOCK) break;
             SALTICIDAE_LOG_INFO("reason: %s", strerror(errno));
             /* connection err or half-opened connection */
             terminate();
