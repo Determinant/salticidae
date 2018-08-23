@@ -251,9 +251,13 @@ size_t Config::parse(int argc, char **argv) {
 }
 
 void Config::print_help(FILE *output) {
+    int width = 0;
+    for (const auto &opt: opts)
+        width = std::max(width, (int)opt->optname.length());
     for (const auto &opt: opts)
     {
-        fprintf(output, "--%s\t\t", opt->optname.c_str());
+        fprintf(output, "  --%s%*c", opt->optname.c_str(),
+                width - (int)opt->optname.length() + 4, ' ');
         if (opt->short_opt != -1)
             fprintf(output, "-%c\t", opt->short_opt);
         else
