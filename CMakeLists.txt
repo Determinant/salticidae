@@ -45,7 +45,10 @@ add_library(salticidae_static STATIC $<TARGET_OBJECTS:salticidae>)
 set_target_properties(salticidae_static PROPERTIES OUTPUT_NAME "salticidae")
 target_link_libraries(salticidae_static event crypto)
 
-add_subdirectory(test)
+option(BUILD_TEST "build test binaries." OFF)
+if(BUILD_TEST)
+    add_subdirectory(test)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "Release")
