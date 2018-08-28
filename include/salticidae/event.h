@@ -35,7 +35,7 @@ namespace salticidae {
 struct _event_context_deleter {
     constexpr _event_context_deleter() = default;
     void operator()(struct event_base *ptr) {
-        event_base_free(ptr);
+        if (ptr != nullptr) event_base_free(ptr);
     }
 };
 
@@ -44,6 +44,7 @@ using _event_context_ot = RcObj<struct event_base, _event_context_deleter>;
 class EventContext: public _event_context_ot {
     public:
     EventContext(): _event_context_ot(event_base_new()) {}
+    EventContext(struct event_base *eb): _event_context_ot(eb) {}
     EventContext(const EventContext &) = default;
     EventContext(EventContext &&) = default;
     EventContext &operator=(const EventContext &) = default;
@@ -66,7 +67,7 @@ class Event {
     }
 
     public:
-    Event(): ev(nullptr) {}
+    Event(): eb(nullptr), ev(nullptr) {}
     Event(const EventContext &eb,
         evutil_socket_t fd,
         short events,
