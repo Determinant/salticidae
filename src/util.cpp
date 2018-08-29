@@ -64,26 +64,6 @@ const std::string get_current_datetime() {
 
 SalticidaeError::SalticidaeError() : msg("unknown") {}
 
-SalticidaeError::SalticidaeError(const std::string &fmt, ...) {
-    int guessed_size = 128;
-    std::string buff;
-    va_list ap;
-    for (;;)
-    {
-        buff.resize(guessed_size);
-        va_start(ap, fmt);
-        int nwrote = vsnprintf((char *)buff.data(), guessed_size, fmt.c_str(), ap);
-        if (nwrote < 0 || nwrote == guessed_size)
-        {
-            guessed_size <<= 1;
-            continue;
-        }
-        buff.resize(nwrote);
-        msg = std::move(buff);
-        break;
-    }
-}
-
 void Logger::write(const char *tag, const char *fmt, va_list ap) {
     fprintf(output, "%s [%s %s] ", get_current_datetime().c_str(), prefix, tag);
     vfprintf(output, fmt, ap);

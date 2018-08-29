@@ -136,7 +136,7 @@ class SegBuffer {
     }
 };
 
-class ConnPoolError: public SalticidaeError {
+struct ConnPoolError: public SalticidaeError {
     using SalticidaeError::SalticidaeError;
 };
 

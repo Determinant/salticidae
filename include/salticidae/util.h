@@ -52,7 +52,25 @@ class SalticidaeError: public std::exception {
     std::string msg;
     public:
     SalticidaeError();
-    SalticidaeError(const std::string &fmt, ...);
+
+    template<typename... Args>
+    SalticidaeError(const std::string &fmt, Args... args) {
+        int guessed_size = 128;
+        std::string buff;
+        for (;;)
+        {
+            buff.resize(guessed_size);
+            int nwrote = snprintf((char *)buff.data(), guessed_size, fmt.c_str(), args...);
+            if (nwrote < 0 || nwrote == guessed_size)
+            {
+                guessed_size <<= 1;
+                continue;
+            }
+            buff.resize(nwrote);
+            msg = std::move(buff);
+            break;
+        }
+    }
 
     operator std::string() const { return msg; }
     const char *what() const throw() override { return msg.c_str(); }

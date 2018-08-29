@@ -207,8 +207,8 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
     void send_msg(const MsgType &msg, const NetAddr &addr);
 };
 
-class PeerNetworkError: public SalticidaeError {
-    using SalticidaeError::SalticidaeError;
+class PeerNetworkError: public ConnPoolError {
+    using ConnPoolError::ConnPoolError;
 };
 
 /** Peer-to-peer network where any two nodes could hold a bi-diretional message

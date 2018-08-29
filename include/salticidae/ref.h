@@ -171,7 +171,7 @@ struct _RCCtl {
 struct _ARCCtl {
     std::atomic_size_t ref_cnt;
     std::atomic_size_t weak_cnt;
-    std::atomic_uint8_t dcnt;
+    std::atomic<std::uint8_t> dcnt;
     void add_ref() { ref_cnt++; }
     void add_weak() { weak_cnt++; }
     bool release_ref() {
