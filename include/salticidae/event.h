@@ -108,7 +108,8 @@ class Event {
     void add() { if (ev) event_add(ev, nullptr); }
     void del() { if (ev) event_del(ev); }
     void add_with_timeout(double timeout) {
-        event_add_with_timeout(ev, timeout);
+        if (ev)
+            event_add_with_timeout(ev, timeout);
     }
 
     operator bool() const { return ev != nullptr; }
