@@ -149,7 +149,7 @@ class MsgBase {
         opcode = _opcode;
     }
 
-    DataStream &&get_payload() const {
+    DataStream get_payload() const {
 #ifndef SALTICIDAE_NOCHECK
         if (no_payload)
             throw std::runtime_error("payload not available");
