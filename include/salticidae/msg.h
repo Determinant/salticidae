@@ -66,6 +66,7 @@ class MsgBase {
     MsgBase(const MsgType &msg): magic(0x0) {
         set_opcode(MsgType::opcode);
         set_payload(std::move(msg.serialized));
+        set_checksum();
     }
 
     MsgBase(const MsgBase &other):
@@ -168,6 +169,9 @@ class MsgBase {
         no_payload = false;
 #endif
         length = payload.size();
+    }
+
+    void set_checksum() {
 #ifndef SALTICIDAE_NOCHECKSUM
         checksum = get_checksum();
 #endif
