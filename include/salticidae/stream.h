@@ -43,6 +43,9 @@ class DataStream {
     DataStream(const uint8_t *begin, const uint8_t *end): buffer(begin, end), offset(0) {}
     DataStream(bytearray_t &&data): buffer(std::move(data)), offset(0) {}
     DataStream(const bytearray_t &data): buffer(data), offset(0) {}
+    DataStream(const std::string &data):
+        DataStream((uint8_t *)data.data(),
+                    (uint8_t *)data.data() + data.size()) {}
 
     DataStream(DataStream &&other):
             buffer(std::move(other.buffer)),
