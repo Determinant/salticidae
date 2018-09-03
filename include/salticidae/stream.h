@@ -98,11 +98,13 @@ class DataStream {
     }
 
     template<typename T>
-    typename std::enable_if<is_ranged<T>::value, DataStream &>::type
-    operator<<(const T &d) {
+    typename std::enable_if<is_ranged<T>::value>::type
+    put_data(const T &d) {
         buffer.insert(buffer.end(), d.begin(), d.end());
-        return *this;
     }
+
+    DataStream &operator<<(const std::string &d) { put_data(d); return *this; }
+    DataStream &operator<<(const bytearray_t &d) { put_data(d); return *this; }
 
     void put_data(const uint8_t *begin, const uint8_t *end) {
         size_t len = end - begin;
@@ -121,8 +123,7 @@ class DataStream {
     }
 
     template<typename T>
-    typename std::enable_if<!is_ranged<T>::value &&
-                            !std::is_integral<T>::value, DataStream &>::type
+    typename std::enable_if<!std::is_integral<T>::value, DataStream &>::type
     operator<<(const T &obj) {
         obj.serialize(*this);
         return *this;
