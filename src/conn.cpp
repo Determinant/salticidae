@@ -60,7 +60,7 @@ void ConnPool::Conn::send_data(evutil_socket_t fd, short events) {
             if (ret < 1) /* nothing is sent */
             {
                 /* rewind the whole buff_seg */
-                send_buffer.push(std::move(buff_seg));
+                send_buffer.rewind(std::move(buff_seg));
                 if (ret < 0 && errno != EWOULDBLOCK)
                 {
                     SALTICIDAE_LOG_INFO("reason: %s", strerror(errno));
@@ -69,13 +69,9 @@ void ConnPool::Conn::send_data(evutil_socket_t fd, short events) {
                 }
             }
             else
-            {
                 /* rewind the leftover */
-                bytearray_t left_over;
-                left_over.resize(size);
-                memmove(left_over.data(), buff_seg.data() + ret, size);
-                send_buffer.push(std::move(left_over));
-            }
+                send_buffer.rewind(
+                    bytearray_t(buff_seg.begin() + ret, buff_seg.end()));
             /* wait for the next write callback */
             ready_send = false;
             ev_write.add();

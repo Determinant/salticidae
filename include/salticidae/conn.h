@@ -104,7 +104,12 @@ class SegBuffer {
         }
         return *this;
     }
-   
+
+    void rewind(bytearray_t &&data) {
+        _size += data.size();
+        buffer.push_front(buffer_entry_t(std::move(data)));
+    }
+  
     void push(bytearray_t &&data) {
         _size += data.size();
         buffer.push_back(buffer_entry_t(std::move(data)));
