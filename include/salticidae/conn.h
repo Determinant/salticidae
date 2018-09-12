@@ -114,6 +114,12 @@ class SegBuffer {
         _size += data.size();
         buffer.push_back(buffer_entry_t(std::move(data)));
     }
+
+    bytearray_t move_pop() {
+        auto res = std::move(buffer.front().data);
+        buffer.pop_front();
+        return std::move(res);
+    }
     
     bytearray_t pop(size_t len) {
         bytearray_t res;

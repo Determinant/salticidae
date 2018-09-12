@@ -48,9 +48,9 @@ void ConnPool::Conn::send_data(evutil_socket_t fd, short events) {
     if (!(events & EV_WRITE)) return;
     auto conn = self(); /* pin the connection */
     ssize_t ret = seg_buff_size;
-    while (!send_buffer.empty() && ret == (ssize_t)seg_buff_size)
+    while (!send_buffer.empty())
     {
-        bytearray_t buff_seg = send_buffer.pop(seg_buff_size);
+        bytearray_t buff_seg = send_buffer.move_pop();
         ssize_t size = buff_seg.size();
         ret = send(fd, buff_seg.data(), size, MSG_NOSIGNAL);
         SALTICIDAE_LOG_DEBUG("socket sent %zd bytes", ret);
