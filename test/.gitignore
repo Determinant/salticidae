@@ -1,5 +1,6 @@
 test_msg
 test_bits
 test_network
+test_queue
 bench_network
 Makefile

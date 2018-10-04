@@ -29,5 +29,8 @@ target_link_libraries(test_bits salticidae_static)
 add_executable(test_network test_network.cpp)
 target_link_libraries(test_network salticidae_static)
 
+add_executable(test_queue test_queue.cpp)
+target_link_libraries(test_queue salticidae_static pthread)
+
 add_executable(bench_network bench_network.cpp)
 target_link_libraries(bench_network salticidae_static pthread)
