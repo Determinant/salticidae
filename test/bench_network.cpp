@@ -97,7 +97,7 @@ struct MyNet: public MsgNetworkByteOp {
 
     struct Conn: public MsgNetworkByteOp::Conn {
         MyNet *get_net() { return static_cast<MyNet *>(get_pool()); }
-        salticidae::RcObj<Conn> self() {
+        salticidae::ArcObj<Conn> self() {
             return salticidae::static_pointer_cast<Conn>(
                 MsgNetworkByteOp::Conn::self());
         }

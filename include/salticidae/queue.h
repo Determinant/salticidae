@@ -90,6 +90,7 @@ class FreeList {
 
 template<typename T>
 class MPMCQueue {
+    protected:
     struct Block: public FreeList::Node {
         T elem;
         std::atomic<Block *> next;
@@ -168,6 +169,33 @@ class MPMCQueue {
                 blks.release_ref(h);
             }
         }
+    }
+};
+
+template<typename T>
+struct MPSCQueue: public MPMCQueue<T> {
+    using MPMCQueue<T>::MPMCQueue;
+    bool try_dequeue(T &e) {
+        auto h = this->head.load(std::memory_order_acquire);
+        auto nh = h->next.load(std::memory_order_relaxed);
+        if (nh == nullptr)
+            return false;
+        e = std::move(nh->elem);
+        this->head.store(nh, std::memory_order_release);
+        this->blks.push(h);
+        return true;
+    }
+
+    template<typename U>
+    bool rewind(U &&e) {
+        FreeList::Node * _nblk;
+        if (!this->blks.pop(_nblk)) return false;
+        auto nblk = static_cast<typename MPMCQueue<T>::Block *>(_nblk);
+        auto h = this->head.load(std::memory_order_acquire);
+        nblk->next.store(h, std::memory_order_release);
+        new (&(h->elem)) T(std::forward<U>(e));
+        this->head.store(nblk, std::memory_order_release);
+        return true;
     }
 };
 
