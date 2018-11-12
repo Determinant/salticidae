@@ -66,7 +66,7 @@ void ConnPool::Conn::send_data(evutil_socket_t fd, short events) {
                 send_buffer.rewind(std::move(buff_seg));
                 if (ret < 0 && errno != EWOULDBLOCK)
                 {
-                    SALTICIDAE_LOG_INFO("reason: %s", strerror(errno));
+                    SALTICIDAE_LOG_INFO("send(%d) failure: %s", fd, strerror(errno));
                     terminate();
                     return;
                 }
@@ -98,7 +98,7 @@ void ConnPool::Conn::recv_data(evutil_socket_t fd, short events) {
         if (ret < 0)
         {
             if (errno == EWOULDBLOCK) break;
-            SALTICIDAE_LOG_INFO("reason: %s", strerror(errno));
+            SALTICIDAE_LOG_INFO("recv(%d) failure: %s", fd, strerror(errno));
             /* connection err or half-opened connection */
             terminate();
             return;

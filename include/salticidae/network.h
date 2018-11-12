@@ -200,9 +200,13 @@ class MsgNetwork: public ConnPool {
 /** Simple network that handles client-server requests. */
 template<typename OpcodeType>
 class ClientNetwork: public MsgNetwork<OpcodeType> {
+    public:
     using MsgNet = MsgNetwork<OpcodeType>;
     using Msg = typename MsgNet::Msg;
+
+    private:
     std::unordered_map<NetAddr, typename MsgNet::conn_t> addr2conn;
+    std::mutex cn_mlock;
 
     public:
     class Conn: public MsgNet::Conn {
@@ -248,9 +252,9 @@ template<typename OpcodeType = uint8_t,
         OpcodeType OPCODE_PING = 0xf0,
         OpcodeType OPCODE_PONG = 0xf1>
 class PeerNetwork: public MsgNetwork<OpcodeType> {
+    public:
     using MsgNet = MsgNetwork<OpcodeType>;
     using Msg = typename MsgNet::Msg;
-    public:
     enum IdentityMode {
         IP_BASED,
         IP_PORT_BASED
@@ -319,7 +323,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     std::unordered_map <NetAddr, BoxObj<Peer>> id2peer;
     std::mutex pn_mlock;
 
-    IdentityMode id_mode;
+    const IdentityMode id_mode;
     double retry_conn_delay;
     double ping_period;
     double conn_timeout;
@@ -351,8 +355,29 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         }
     };
 
+    struct PingCmd: public ConnPool::DispatchCmd {
+        conn_t conn;
+        uint16_t port;
+        PingCmd(const conn_t &conn, uint16_t port):
+            conn(conn), port(port) {}
+        void exec(ConnPool *cpool) override {
+            auto pn = static_cast<PeerNetwork *>(cpool);
+            pn->_ping_msg_cb(conn, port);
+        }
+    };
+    
+    struct PongCmd: public PingCmd {
+        using PingCmd::PingCmd;
+        void exec(ConnPool *cpool) override {
+            auto pn = static_cast<PeerNetwork *>(cpool);
+            pn->_pong_msg_cb(this->conn, this->port);
+        }
+    };
+
     void msg_ping(MsgPing &&msg, Conn &conn);
     void msg_pong(MsgPong &&msg, Conn &conn);
+    void _ping_msg_cb(const conn_t &conn, uint16_t port);
+    void _pong_msg_cb(const conn_t &conn, uint16_t port);
     bool check_new_conn(Conn &conn, uint16_t port);
     void start_active_conn(const NetAddr &paddr);
 
@@ -387,9 +412,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     void send_msg(const MsgType &msg, const NetAddr &paddr);
     void listen(NetAddr listen_addr);
     bool has_peer(const NetAddr &paddr) const;
-    conn_t connect(const NetAddr &addr) {
-        return static_pointer_cast<Conn>(ConnPool::connect(addr));
-    }
+    conn_t connect(const NetAddr &addr) = delete;
 };
 
 /* this callback is run by a worker */
@@ -455,11 +478,11 @@ void PeerNetwork<O, _, __>::Conn::on_setup() {
     if (this->get_mode() == Conn::ConnMode::ACTIVE)
     {
         peer_id = this->get_addr();
-        if (id_mode == IP_BASED) peer_id.port = 0;
+        if (pn->id_mode == IP_BASED) peer_id.port = 0;
     }
     /* the initial ping-pong to set up the connection */
     auto &conn = static_cast<Conn &>(*this);
-    conn->reset_timeout(pn->conn_timeout);
+    reset_timeout(pn->conn_timeout);
     pn->MsgNet::send_msg(MsgPing(pn->listen_port), conn);
 }
 
@@ -572,51 +595,34 @@ bool PeerNetwork<O, _, __>::check_new_conn(Conn &conn, uint16_t port) {
 }
 
 template<typename O, O _, O __>
-class PeerNetworkPing: public ConnPool::DispatchCmd {
-    using conn_t = typename PeerNetwork<O, _, __>::conn_t;
-    conn_t conn;
-    uint16_t port;
-    public:
-    PeerNetworkPing(const conn_t &conn, uint16_t port):
-        conn(conn), port(port) {}
-    void exec(ConnPool *cpool) override {
-        auto pn = static_cast<PeerNetwork<O, _, __> *>(cpool);
-        mutex_lg_t _pn_lg(pn->pn_mlock);
-        if (pn->check_new_conn(conn, port)) return;
-        auto p = pn->id2peer.find(conn.peer_id)->second.get();
-        mutex_lg_t _p_lg(p->mlock);
-        pn->_send_msg(MsgPong(this->listen_port), p);
-    }
-};
+void PeerNetwork<O, _, __>::_ping_msg_cb(const conn_t &conn, uint16_t port) {
+    mutex_lg_t _pn_lg(pn_mlock);
+    if (check_new_conn(*conn, port)) return;
+    auto p = id2peer.find(conn->peer_id)->second.get();
+    mutex_lg_t _p_lg(p->mlock);
+    _send_msg(MsgPong(this->listen_port), p);
+}
 
 template<typename O, O _, O __>
-class PeerNetworkPong: public ConnPool::DispatchCmd {
-    using conn_t = typename PeerNetwork<O, _, __>::conn_t;
-    conn_t conn;
-    uint16_t port;
-    public:
-    PeerNetworkPong(const conn_t &conn, uint16_t port):
-        conn(conn), port(port) {}
-    void exec(ConnPool *cpool) override {
-        auto pn = static_cast<PeerNetwork<O, _, __> *>(cpool);
-        mutex_lg_t _pn_lg(pn->pn_mlock);
-        auto it = pn->id2peer.find(conn->peer_id);
-        if (it == pn->id2peer.end())
-        {
-            SALTICIDAE_LOG_WARN("pong message discarded");
-            return;
-        }
-        if (pn->check_new_conn(conn, port)) return;
-        auto p = it->second.get();
-        mutex_lg_t _p_lg(p->mlock);
-        p->pong_msg_ok = true;
-        if (p->ping_timer_ok)
-        {
-            p->reset_ping_timer();
-            p->send_ping();
-        }
+void PeerNetwork<O, _, __>::_pong_msg_cb(const conn_t &conn, uint16_t port) {
+    mutex_lg_t _pn_lg(pn_mlock);
+    auto it = id2peer.find(conn->peer_id);
+    if (it == id2peer.end())
+    {
+        SALTICIDAE_LOG_WARN("pong message discarded");
+        return;
     }
-};
+    if (check_new_conn(*conn, port)) return;
+    auto p = it->second.get();
+    mutex_lg_t _p_lg(p->mlock);
+    p->pong_msg_ok = true;
+    if (p->ping_timer_ok)
+    {
+        p->reset_ping_timer();
+        p->send_ping();
+    }
+}
+
 /* end: functions invoked by the dispatcher */
 
 /* this function could be both invoked by the dispatcher and the user loop */
@@ -625,7 +631,7 @@ void PeerNetwork<O, _, __>::start_active_conn(const NetAddr &addr) {
     auto p = id2peer.find(addr)->second.get();
     mutex_lg_t _p_lg(p->mlock);
     if (p->connected) return;
-    auto conn = static_pointer_cast<Conn>(connect(addr));
+    auto conn = static_pointer_cast<Conn>(MsgNet::connect(addr));
     assert(p->conn == nullptr);
     p->conn = conn;
 }
@@ -635,13 +641,13 @@ template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, Conn &conn) {
     uint16_t port = msg.port;
     SALTICIDAE_LOG_INFO("ping from %s, port %u", std::string(conn).c_str(), ntohs(port));
-    auto dcmd = new PeerNetworkPing<O, _, __>(conn.self(), port);
+    auto dcmd = new PingCmd(static_pointer_cast<Conn>(conn.self()), port);
     write(this->dlisten_fd[1], &dcmd, sizeof(dcmd));
 }
 
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::msg_pong(MsgPong &&msg, Conn &conn) {
-    auto dcmd = new PeerNetworkPong<O, _, __>(conn.self(), msg.port);
+    auto dcmd = new PongCmd(static_pointer_cast<Conn>(conn.self()), msg.port);
     write(this->dlisten_fd[1], &dcmd, sizeof(dcmd));
 }
 
@@ -710,6 +716,7 @@ void ClientNetwork<OpcodeType>::Conn::on_setup() {
     MsgNet::Conn::on_setup();
     assert(this->get_mode() == Conn::PASSIVE);
     const auto &addr = this->get_addr();
+    mutex_lg_t _cn_lg(cn_mlock);
     auto cn = get_net();
     cn->addr2conn.erase(addr);
     cn->addr2conn.insert(
@@ -721,12 +728,14 @@ template<typename OpcodeType>
 void ClientNetwork<OpcodeType>::Conn::on_teardown() {
     MsgNet::Conn::on_teardown();
     assert(this->get_mode() == Conn::PASSIVE);
+    mutex_lg_t _cn_lg(cn_mlock);
     get_net()->addr2conn.erase(this->get_addr());
 }
 
 template<typename OpcodeType>
 template<typename MsgType>
 void ClientNetwork<OpcodeType>::send_msg(const MsgType &msg, const NetAddr &addr) {
+    mutex_lg_t _cn_lg(cn_mlock);
     auto it = addr2conn.find(addr);
     if (it == addr2conn.end()) return;
     MsgNet::send_msg(msg, *(it->second));
