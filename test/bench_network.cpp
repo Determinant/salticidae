@@ -148,6 +148,10 @@ void signal_handler(int) {
 }
 
 int main() {
+    struct sigaction sa;
+    sa.sa_handler = signal_handler;
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
     /* test two nodes */
     MyNet alice(ec, "Alice", bob_addr, 10);
     alice.listen(alice_addr);
@@ -158,13 +162,12 @@ int main() {
         try {
             ec.dispatch();
         } catch (std::exception &) {}
+        SALTICIDAE_LOG_INFO("exiting");
     });
-    signal(SIGTERM, signal_handler);
-    signal(SIGINT, signal_handler);
     try {
         ec.dispatch();
     } catch (std::exception &e) {
-        pthread_kill(bob_thread.native_handle(), SIGINT);
+        pthread_kill(bob_thread.native_handle(), SIGTERM);
         bob_thread.join();
         SALTICIDAE_LOG_INFO("exception: %s", e.what());
     }

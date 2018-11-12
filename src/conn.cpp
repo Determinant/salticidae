@@ -143,18 +143,10 @@ void ConnPool::accept_client(evutil_socket_t fd, short) {
         conn->cpool = this;
         conn->mode = Conn::PASSIVE;
         conn->addr = addr;
-
-        //Conn *conn_ptr = conn.get();
-        // TODO: use worker thread ec
-        //conn->ev_read = Event(ec, client_fd, EV_READ,
-        //                        std::bind(&Conn::recv_data, conn_ptr, _1, _2));
-        //conn->ev_write = Event(ec, client_fd, EV_WRITE,
-        //                        std::bind(&Conn::send_data, conn_ptr, _1, _2));
-        //conn->ev_read.add();
-        //conn->ev_write.add();
         add_conn(conn);
-        SALTICIDAE_LOG_INFO("created %s", std::string(*conn).c_str());
+        SALTICIDAE_LOG_INFO("accepted %s", std::string(*conn).c_str());
         conn->on_setup();
+        update_conn(conn, true);
         select_worker().feed(conn, client_fd);
     }
 }
@@ -163,17 +155,11 @@ void ConnPool::Conn::conn_server(evutil_socket_t fd, short events) {
     auto conn = self(); /* pin the connection */
     if (send(fd, "", 0, MSG_NOSIGNAL) == 0)
     {
-        // TODO: use worker thread ec
-        //ev_read = Event(cpool->ec, fd, EV_READ,
-        //        std::bind(&Conn::recv_data, this, _1, _2));
-        //ev_write = Event(cpool->ec, fd, EV_WRITE,
-        //        std::bind(&Conn::send_data, this, _1, _2));
-        //ev_read.add();
-        //ev_write.add();
         ev_connect.clear();
-        SALTICIDAE_LOG_INFO("connected to peer %s", std::string(*this).c_str());
+        SALTICIDAE_LOG_INFO("connected to remote %s", std::string(*this).c_str());
         on_setup();
-        cpool->select_worker().feed(self(), fd);
+        cpool->update_conn(conn, true);
+        cpool->select_worker().feed(conn, fd);
     }
     else
     {
@@ -184,7 +170,7 @@ void ConnPool::Conn::conn_server(evutil_socket_t fd, short events) {
     }
 }
 
-void ConnPool::_listen(NetAddr listen_addr) {
+void ConnPool::listen(NetAddr listen_addr) {
     std::lock_guard<std::mutex> _(cp_mlock);
     int one = 1;
     if (listen_fd != -1)
@@ -246,8 +232,8 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
     if (::connect(fd, (struct sockaddr *)&sockin,
                 sizeof(struct sockaddr_in)) < 0 && errno != EINPROGRESS)
     {
-            SALTICIDAE_LOG_INFO("cannot connect to %s", std::string(addr).c_str());
-            conn->terminate();
+        SALTICIDAE_LOG_INFO("cannot connect to %s", std::string(addr).c_str());
+        conn->terminate();
     }
     else
     {
@@ -275,17 +261,13 @@ void ConnPool::_post_terminate(int fd) {
         conn->on_close();
         /* inform the upper layer the connection will be destroyed */
         conn->on_teardown();
+        update_conn(conn, false);
     }
 }
 
 ConnPool::conn_t ConnPool::add_conn(const conn_t &conn) {
     std::lock_guard<std::mutex> _(cp_mlock);
     assert(pool.find(conn->fd) == pool.end());
-    //if (it != pool.end())
-    //{
-    //    auto old_conn = it->second;
-    //    old_conn->terminate();
-    //}
     return pool.insert(std::make_pair(conn->fd, conn)).first->second;
 }
 

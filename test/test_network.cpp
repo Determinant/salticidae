@@ -89,8 +89,8 @@ struct MyNet: public MsgNetworkByteOp {
         reg_handler(salticidae::generic_bind(
             &MyNet::on_receive_hello, this, _1, _2));
 
-        reg_conn_handler([this](ConnPool::Conn &conn) {
-            if (conn.get_fd() != -1)
+        reg_conn_handler([this](ConnPool::Conn &conn, bool connected) {
+            if (connected)
             {
                 if (conn.get_mode() == ConnPool::Conn::ACTIVE)
                 {

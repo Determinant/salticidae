@@ -33,6 +33,7 @@
 #include <cstdio>
 #include <ios>
 #include <functional>
+#include <mutex>
 
 namespace salticidae {
 
@@ -40,6 +41,8 @@ const auto _1 = std::placeholders::_1;
 const auto _2 = std::placeholders::_2;
 
 using bytearray_t = std::vector<uint8_t>;
+using mutex_lg_t = std::lock_guard<std::mutex>;
+using mutex_ul_t = std::unique_lock<std::mutex>;
 
 template<typename T> T htole(T) = delete;
 template<> inline uint16_t htole<uint16_t>(uint16_t x) { return htole16(x); }
