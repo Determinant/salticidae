@@ -29,7 +29,6 @@
 #include <ctime>
 #include <sys/time.h>
 #include <cmath>
-#include <event2/event.h>
 
 #include "salticidae/util.h"
 
@@ -38,13 +37,6 @@ namespace salticidae {
 void sec2tv(double t, struct timeval &tv) {
     tv.tv_sec = trunc(t);
     tv.tv_usec = trunc((t - tv.tv_sec) * 1e6);
-}
-
-void event_add_with_timeout(struct event *ev, double timeout) {
-    struct timeval tv;
-    tv.tv_sec = trunc(timeout);
-    tv.tv_usec = trunc((timeout - tv.tv_sec) * 1e6);
-    event_add(ev, &tv);
 }
 
 double gen_rand_timeout(double base_timeout, double alpha) {

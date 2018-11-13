@@ -192,7 +192,7 @@ class MsgBase {
 
 #ifndef SALTICIDAE_NOCHECKSUM
     uint32_t get_checksum() const {
-        static class SHA256 sha256;
+        static thread_local class SHA256 sha256;
         uint32_t res;
         bytearray_t tmp;
 #ifndef SALTICIDAE_NOCHECK

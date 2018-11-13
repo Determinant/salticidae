@@ -310,7 +310,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         Peer &operator=(const Peer &) = delete;
         Peer(const Peer &) = delete;
 
-        void ping_timer(evutil_socket_t, short);
+        void ping_timer(int, int);
         void reset_ping_timer();
         void send_ping();
         void clear_all_events() {
@@ -471,7 +471,7 @@ void PeerNetwork<O, _, __>::Conn::on_setup() {
     MsgNet::Conn::on_setup();
     auto pn = get_net();
     assert(!ev_timeout);
-    ev_timeout = Event(pn->ec, -1, 0, [this](evutil_socket_t, short) {
+    ev_timeout = Event(pn->ec, -1, 0, [this](int, int) {
         SALTICIDAE_LOG_INFO("peer ping-pong timeout");
         this->terminate();
     });
@@ -504,7 +504,7 @@ void PeerNetwork<O, _, __>::Conn::on_teardown() {
             std::string(peer_id).c_str());
     // try to reconnect
     p->ev_retry_timer = Event(pn->dispatcher_ec, -1, 0,
-            [pn, peer_id = this->peer_id](evutil_socket_t, short) {
+            [pn, peer_id = this->peer_id](int, int) {
         mutex_lg_t _pn_lg(pn->pn_mlock);
         pn->start_active_conn(peer_id);
     });
@@ -554,7 +554,7 @@ void PeerNetwork<O, _, __>::Peer::send_ping() {
 }
 
 template<typename O, O _, O __>
-void PeerNetwork<O, _, __>::Peer::ping_timer(evutil_socket_t, short) {
+void PeerNetwork<O, _, __>::Peer::ping_timer(int, int) {
     mutex_lg_t _p_lg(mlock);
     ping_timer_ok = true;
     if (pong_msg_ok)

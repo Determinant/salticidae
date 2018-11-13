@@ -129,8 +129,8 @@ void on_receive_ack(MsgAck &&msg, MyNet::Conn &conn) {
 }
 
 salticidae::EventContext ec;
-NetAddr alice_addr("127.0.0.1:1234");
-NetAddr bob_addr("127.0.0.1:1235");
+NetAddr alice_addr("127.0.0.1:12345");
+NetAddr bob_addr("127.0.0.1:12346");
 
 int main() {
     /* test two nodes */
