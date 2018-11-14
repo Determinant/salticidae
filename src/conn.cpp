@@ -116,11 +116,19 @@ void ConnPool::Conn::recv_data(int fd, int events) {
     on_read();
 }
 
-void ConnPool::Conn::terminate() {
+void ConnPool::Conn::stop() {
     ev_read.clear();
     ev_write.clear();
-    cpool->post_terminate(fd);
 }
+
+void ConnPool::Conn::terminate() {
+    stop();
+    cpool->disp_tcall->call(
+            [cpool=this->cpool, fd=this->fd](ThreadCall::Handle &) {
+        cpool->terminate(fd);
+    });
+}
+
 
 void ConnPool::accept_client(int fd, int) {
     int client_fd;
@@ -171,8 +179,7 @@ void ConnPool::Conn::conn_server(int fd, int events) {
     }
 }
 
-void ConnPool::listen(NetAddr listen_addr) {
-    std::lock_guard<std::mutex> _(cp_mlock);
+void ConnPool::_listen(NetAddr listen_addr) {
     int one = 1;
     if (listen_fd != -1)
     { /* reset the previous listen() */
@@ -197,8 +204,9 @@ void ConnPool::listen(NetAddr listen_addr) {
         throw ConnPoolError(std::string("binding error"));
     if (::listen(listen_fd, max_listen_backlog) < 0)
         throw ConnPoolError(std::string("listen error"));
-    auto dcmd = new DspAcceptListen(listen_fd);
-    write(dlisten_fd[1], &dcmd, sizeof(dcmd));
+    ev_listen = Event(dispatcher_ec, listen_fd, Event::READ,
+                    std::bind(&ConnPool::accept_client, this, _1, _2));
+    ev_listen.add();
     SALTICIDAE_LOG_INFO("listening to %u", ntohs(listen_addr.port));
 }
 
@@ -234,16 +242,16 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
     }
     else
     {
-        auto dcmd = new DspConnectListen(conn);
-        write(dlisten_fd[1], &dcmd, sizeof(dcmd));
+        conn->ev_connect = Event(dispatcher_ec, conn->fd, Event::WRITE,
+                                std::bind(&Conn::conn_server, conn.get(), _1, _2));
+        conn->ev_connect.add_with_timeout(conn_server_timeout);
         add_conn(conn);
         SALTICIDAE_LOG_INFO("created %s", std::string(*conn).c_str());
     }
     return conn;
 }
 
-void ConnPool::_post_terminate(int fd) {
-    std::lock_guard<std::mutex> _(cp_mlock);
+void ConnPool::terminate(int fd) {
     auto it = pool.find(fd);
     if (it != pool.end())
     {
@@ -259,23 +267,8 @@ void ConnPool::_post_terminate(int fd) {
 }
 
 ConnPool::conn_t ConnPool::add_conn(const conn_t &conn) {
-    std::lock_guard<std::mutex> _(cp_mlock);
     assert(pool.find(conn->fd) == pool.end());
     return pool.insert(std::make_pair(conn->fd, conn)).first->second;
-}
-
-void ConnPool::_accept_listen(int listen_fd) {
-    std::lock_guard<std::mutex> _(cp_mlock);
-    ev_listen = Event(dispatcher_ec, listen_fd, Event::READ,
-                        std::bind(&ConnPool::accept_client, this, _1, _2));
-    ev_listen.add();
-}
-
-void ConnPool::_connect_listen(const conn_t &conn) {
-    std::lock_guard<std::mutex> _(cp_mlock);
-    conn->ev_connect = Event(dispatcher_ec, conn->fd, Event::WRITE,
-                        std::bind(&Conn::conn_server, conn.get(), _1, _2));
-    conn->ev_connect.add_with_timeout(conn_server_timeout);
 }
 
 }

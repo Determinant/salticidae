@@ -105,7 +105,7 @@ class MPMCQueue {
     void _enqueue(Block *nblk, U &&e) {
         new (&(nblk->elem)) T(std::forward<U>(e));
         nblk->next.store(nullptr, std::memory_order_release);
-        auto prev = tail.exchange(nblk, std::memory_order_relaxed);
+        auto prev = tail.exchange(nblk, std::memory_order_acq_rel);
         prev->next.store(nblk, std::memory_order_relaxed);
     }
 

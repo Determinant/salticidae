@@ -139,6 +139,9 @@ int main() {
     alice.reg_handler(on_receive_ack);
     bob.reg_handler(on_receive_ack);
 
+    alice.start();
+    bob.start();
+
     alice.listen(alice_addr);
     bob.listen(bob_addr);
 
