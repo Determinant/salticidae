@@ -85,7 +85,7 @@ class Event {
     static inline void fd_then(uv_poll_t *h, int status, int events) {
         if (status != 0)
         {
-            SALTICIDAE_LOG_WARN("%s", uv_strerror(status));
+            //SALTICIDAE_LOG_WARN("%s", uv_strerror(status));
             return;
         }
         auto event = static_cast<Event *>(h->data);

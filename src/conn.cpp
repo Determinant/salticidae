@@ -173,7 +173,7 @@ void ConnPool::Conn::conn_server(int fd, int events) {
     {
         if (events & Event::TIMEOUT)
             SALTICIDAE_LOG_INFO("%s connect timeout", std::string(*this).c_str());
-        stop();
+        cpool->terminate(conn);
         return;
     }
 }
@@ -237,7 +237,7 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
                 sizeof(struct sockaddr_in)) < 0 && errno != EINPROGRESS)
     {
         SALTICIDAE_LOG_INFO("cannot connect to %s", std::string(addr).c_str());
-        conn->stop();
+        terminate(conn);
     }
     else
     {
@@ -256,6 +256,7 @@ void ConnPool::remove_conn(int fd) {
         /* temporarily pin the conn before it dies */
         auto conn = it->second;
         //assert(conn->fd == fd);
+        conn->fd = -1;
         pool.erase(it);
         /* inform the upper layer the connection will be destroyed */
         conn->on_teardown();

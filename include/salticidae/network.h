@@ -405,7 +405,7 @@ void MsgNetwork<OpcodeType>::Conn::on_read() {
     ConnPool::Conn::on_read();
     auto &recv_buffer = this->recv_buffer;
     auto mn = get_net();
-    while (fd != -1)
+    while (self_ref)
     {
         if (msg_state == Conn::HEADER)
         {
@@ -472,11 +472,6 @@ void PeerNetwork<O, _, __>::Conn::on_setup() {
         SALTICIDAE_LOG_INFO("peer ping-pong timeout");
         conn->terminate();
     });
-    if (this->get_mode() == Conn::ConnMode::ACTIVE)
-    {
-        peer_id = this->get_addr();
-        if (pn->id_mode == IP_BASED) peer_id.port = 0;
-    }
     /* the initial ping-pong to set up the connection */
     tcall_reset_timeout(worker, conn, pn->conn_timeout);
     pn->send_msg(MsgPing(pn->listen_port), *conn);
@@ -584,6 +579,9 @@ void PeerNetwork<O, _, __>::start_active_conn(const NetAddr &addr) {
     auto conn = static_pointer_cast<Conn>(MsgNet::_connect(addr));
     assert(p->conn == nullptr);
     p->conn = conn;
+    conn->peer_id = addr;
+    if (id_mode == IP_BASED)
+        conn->peer_id.port = 0;
 }
 /* end: functions invoked by the dispatcher */
 

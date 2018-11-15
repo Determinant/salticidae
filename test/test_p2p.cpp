@@ -73,90 +73,32 @@ struct MsgAck {
 const uint8_t MsgHello::opcode;
 const uint8_t MsgAck::opcode;
 
-using PeerNetworkByteOp = salticidae::PeerNetwork<uint8_t>;
+using MyNet = salticidae::PeerNetwork<uint8_t>;
 
-struct MyNet: public PeerNetworkByteOp {
-    const std::string name;
-    const NetAddr peer;
-
-    MyNet(const salticidae::EventContext &ec,
-            const std::string name,
-            const NetAddr &peer):
-            PeerNetwork<uint8_t>(ec, 10, 2, 2, 4096, 2, 10),
-            name(name),
-            peer(peer) {
-        /* message handler could be a bound method */
-        reg_handler(salticidae::generic_bind(
-            &MyNet::on_receive_hello, this, _1, _2));
-
-        reg_conn_handler([this](ConnPool::Conn &conn, bool connected) {
-            if (connected)
-            {
-                if (conn.get_mode() == ConnPool::Conn::ACTIVE)
-                {
-                    printf("[%s] Connected, sending hello.\n",
-                            this->name.c_str());
-                    /* send the first message through this connection */
-                    MsgNet::send_msg(MsgHello(this->name, "Hello there!"),
-                            static_cast<MsgNet::Conn &>(conn));
-                }
-                else
-                    printf("[%s] Accepted, waiting for greetings.\n",
-                            this->name.c_str());
-            }
-            else
-            {
-                printf("[%s] Disconnected, retrying.\n", this->name.c_str());
-            }
-        });
-    }
-
-    void on_receive_hello(MsgHello &&msg, MyNet::Conn &conn) {
-        printf("[%s] %s says %s\n",
-                name.c_str(),
-                msg.name.c_str(), msg.text.c_str());
-        /* send acknowledgement */
-        MsgNet::send_msg(MsgAck(), conn);
-    }
+NetAddr addrs[] = {
+    NetAddr("127.0.0.1:12345"),
+    NetAddr("127.0.0.1:12346"),
+    NetAddr("127.0.0.1:12347")
 };
-
-
-void on_receive_ack(MsgAck &&msg, MyNet::Conn &conn) {
-    auto net = static_cast<MyNet *>(conn.get_net());
-    printf("[%s] the peer knows\n", net->name.c_str());
-}
-
-salticidae::EventContext ec;
-NetAddr alice_addr("127.0.0.1:12345");
-NetAddr bob_addr("127.0.0.1:12346");
 
 void signal_handler(int) {
     throw salticidae::SalticidaeError("got termination signal");
 }
 
-int main() {
+int main(int argc, char **argv) {
     signal(SIGTERM, signal_handler);
     signal(SIGINT, signal_handler);
 
+    salticidae::EventContext ec;
     /* test two nodes */
-    MyNet alice(ec, "Alice", bob_addr);
-    MyNet bob(ec, "Bob", alice_addr);
-
-    /* message handler could be a normal function */
-    alice.reg_handler(on_receive_ack);
-    bob.reg_handler(on_receive_ack);
+    MyNet net(ec, 10, 2, 2, 4096, 3, 5);
 
     try {
-        alice.start();
-        bob.start();
-
-        alice.listen(alice_addr);
-        bob.listen(bob_addr);
-
-        /* first attempt */
-        alice.add_peer(bob_addr);
-        bob.add_peer(alice_addr);
-
+        int i;
+        net.start();
+        net.listen(addrs[i = atoi(argv[1])]);
+        for (int j = 0; j < 3; j++)
+            if (i != j) net.add_peer(addrs[j]);
         ec.dispatch();
     } catch (salticidae::SalticidaeError &e) {}
     return 0;

@@ -123,12 +123,11 @@ class ConnPool {
         protected:
         /** Close the IO and clear all on-going or planned events. */
         virtual void stop() {
-            if (fd == -1) return;
+            if (!self_ref) return;
             ev_connect.clear();
             ev_socket.clear();
             send_buffer.get_queue().unreg_handler();
             ::close(fd);
-            fd = -1;
             self_ref = nullptr; /* remove the self-cycle */
         }
 
@@ -189,7 +188,7 @@ class ConnPool {
                         .get_queue()
                         .reg_handler(this->ec, [conn, client_fd]
                                     (MPSCWriteBuffer::queue_t &) {
-                    if (conn->ready_send && conn->fd != -1)
+                    if (conn->ready_send && conn->self_ref)
                     {
                         conn->ev_socket.del();
                         conn->ev_socket.add(Event::READ | Event::WRITE);
@@ -340,9 +339,13 @@ class ConnPool {
 
     void terminate(const conn_t &conn, bool blocking = true) {
         int fd = conn->fd;
-        conn->worker->get_tcall()->call([conn](ThreadCall::Handle &) {
+        auto worker = conn->worker;
+        if (worker)
+            worker->get_tcall()->call([conn](ThreadCall::Handle &) {
+                conn->stop();
+            }, blocking);
+        else
             conn->stop();
-        }, blocking);
         remove_conn(fd);
     }
 };
