@@ -25,7 +25,7 @@ project(Salticidae)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-find_package(Libevent REQUIRED)
+find_package(Libuv REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 include_directories(include)

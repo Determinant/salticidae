@@ -67,7 +67,6 @@ Example (MsgNetwork layer)
 --------------------------
 
 .. code-block:: cpp
-
   #include <cstdio>
   #include <string>
   #include <functional>
@@ -135,8 +134,8 @@ Example (MsgNetwork layer)
           reg_handler(salticidae::generic_bind(
               &MyNet::on_receive_hello, this, _1, _2));
   
-          reg_conn_handler([this](ConnPool::Conn &conn) {
-              if (conn.get_fd() != -1)
+          reg_conn_handler([this](ConnPool::Conn &conn, bool connected) {
+              if (connected)
               {
                   if (conn.get_mode() == ConnPool::Conn::ACTIVE)
                   {
@@ -175,8 +174,8 @@ Example (MsgNetwork layer)
   }
   
   salticidae::EventContext ec;
-  NetAddr alice_addr("127.0.0.1:1234");
-  NetAddr bob_addr("127.0.0.1:1235");
+  NetAddr alice_addr("127.0.0.1:12345");
+  NetAddr bob_addr("127.0.0.1:12346");
   
   int main() {
       /* test two nodes */
@@ -187,6 +186,9 @@ Example (MsgNetwork layer)
       alice.reg_handler(on_receive_ack);
       bob.reg_handler(on_receive_ack);
   
+      alice.start();
+      bob.start();
+
       alice.listen(alice_addr);
       bob.listen(bob_addr);
   
