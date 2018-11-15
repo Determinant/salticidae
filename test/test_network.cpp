@@ -82,7 +82,7 @@ struct MyNet: public MsgNetworkByteOp {
     MyNet(const salticidae::EventContext &ec,
             const std::string name,
             const NetAddr &peer):
-            MsgNetwork<uint8_t>(ec, 10, 1.0, 4096),
+            MsgNetwork<uint8_t>(ec, MsgNetwork::Config()),
             name(name),
             peer(peer) {
         /* message handler could be a bound method */

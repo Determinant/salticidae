@@ -261,17 +261,49 @@ class ConnPool {
     }
 
     public:
-    ConnPool(const EventContext &ec,
-            int max_listen_backlog = 10,
-            double conn_server_timeout = 2,
-            size_t seg_buff_size = 4096,
-            size_t nworker = 4):
+
+    class Config {
+        friend ConnPool;
+        int _max_listen_backlog;
+        double _conn_server_timeout;
+        size_t _seg_buff_size;
+        size_t _nworker;
+
+        public:
+        Config():
+            _max_listen_backlog(10),
+            _conn_server_timeout(2),
+            _seg_buff_size(4096),
+            _nworker(1) {}
+
+        Config &max_listen_backlog(int x) {
+            _max_listen_backlog = x;
+            return *this;
+        }
+
+        Config &conn_server_timeout(double x) {
+            _conn_server_timeout = x;
+            return *this;
+        }
+
+        Config &seg_buff_size(size_t x) {
+            _seg_buff_size = x;
+            return *this;
+        }
+
+        Config &nworker(size_t x) {
+            _nworker = std::max((size_t)1, x);
+            return *this;
+        }
+    };
+
+    ConnPool(const EventContext &ec, const Config &config):
             ec(ec),
-            max_listen_backlog(max_listen_backlog),
-            conn_server_timeout(conn_server_timeout),
-            seg_buff_size(seg_buff_size),
+            max_listen_backlog(config._max_listen_backlog),
+            conn_server_timeout(config._conn_server_timeout),
+            seg_buff_size(config._seg_buff_size),
             listen_fd(-1),
-            nworker(std::max((size_t)1, nworker)) {
+            nworker(config._nworker) {
         workers = new Worker[nworker];
         user_tcall = new ThreadCall(ec);
         disp_ec = workers[0].get_ec();

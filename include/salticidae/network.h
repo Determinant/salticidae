@@ -134,15 +134,23 @@ class MsgNetwork: public ConnPool {
     ConnPool::Conn *create_conn() override { return new Conn(); }
 
     public:
-    MsgNetwork(const EventContext &ec,
-            int max_listen_backlog,
-            double conn_server_timeout,
-            size_t seg_buff_size,
-            size_t burst_size = 1000):
-        ConnPool(ec, max_listen_backlog,
-                    conn_server_timeout,
-                    seg_buff_size) {
-        incoming_msgs.reg_handler(ec, [this, burst_size](queue_t &q) {
+
+    class Config: public ConnPool::Config {
+        friend MsgNetwork;
+        size_t _burst_size;
+
+        public:
+        Config(): _burst_size(1000) {}
+
+        Config &burst_size(size_t x) {
+            _burst_size = x;
+            return *this;
+        }
+    };
+
+    MsgNetwork(const EventContext &ec, const Config &config):
+            ConnPool(ec, config) {
+        incoming_msgs.reg_handler(ec, [this, burst_size=config._burst_size](queue_t &q) {
             std::pair<Msg, conn_t> item;
             size_t cnt = 0;
             while (q.try_dequeue(item))
@@ -229,13 +237,8 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
     ConnPool::Conn *create_conn() override { return new Conn(); }
 
     public:
-    ClientNetwork(const EventContext &ec,
-                int max_listen_backlog = 10,
-                double conn_server_timeout = 0,
-                size_t seg_buff_size = 4096):
-        MsgNet(ec, max_listen_backlog,
-                conn_server_timeout,
-                seg_buff_size) {}
+    ClientNetwork(const EventContext &ec, const Config &config):
+        MsgNet(ec, config) {}
 
     template<typename MsgType>
     void send_msg(const MsgType &msg, const NetAddr &addr);
@@ -368,21 +371,48 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     }
 
     public:
-    PeerNetwork(const EventContext &ec,
-                int max_listen_backlog = 10,
-                double retry_conn_delay = 2,
-                double conn_server_timeout = 2,
-                size_t seg_buff_size = 4096,
-                double ping_period = 30,
-                double conn_timeout = 180,
-                IdentityMode id_mode = IP_PORT_BASED):
-        MsgNet(ec, max_listen_backlog,
-                    conn_server_timeout,
-                    seg_buff_size),
-        id_mode(id_mode),
-        retry_conn_delay(retry_conn_delay),
-        ping_period(ping_period),
-        conn_timeout(conn_timeout) {
+
+    class Config: public MsgNet::Config {
+        friend PeerNetwork;
+        double _retry_conn_delay;
+        double _ping_period;
+        double _conn_timeout;
+        IdentityMode _id_mode;
+
+        public:
+        Config():
+            _retry_conn_delay(2),
+            _ping_period(30),
+            _conn_timeout(180),
+            _id_mode(IP_PORT_BASED) {}
+
+        Config &retry_conn_delay(double x) {
+            _retry_conn_delay = x;
+            return *this;
+        }
+
+        Config &ping_period(double x) {
+            _ping_period = x;
+            return *this;
+        }
+
+        Config &conn_timeout(double x) {
+            _conn_timeout = x;
+            return *this;
+        }
+
+        Config &id_mode(IdentityMode x) {
+            _id_mode = x;
+            return *this;
+        }
+    };
+
+    PeerNetwork(const EventContext &ec, const Config &config):
+        MsgNet(ec, config),
+        id_mode(config._id_mode),
+        retry_conn_delay(config._retry_conn_delay),
+        ping_period(config._ping_period),
+        conn_timeout(config._conn_timeout) {
         this->reg_handler(generic_bind(&PeerNetwork::msg_ping, this, _1, _2));
         this->reg_handler(generic_bind(&PeerNetwork::msg_pong, this, _1, _2));
     }

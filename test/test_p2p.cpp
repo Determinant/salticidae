@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
 
     salticidae::EventContext ec;
     /* test two nodes */
-    MyNet net(ec, 10, 2, 2, 4096, 3, 5);
+    MyNet net(ec, MyNet::Config().conn_timeout(5).ping_period(2));
 
     try {
         int i;

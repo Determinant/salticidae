@@ -1,2 +1,1 @@
-- use config factory class to configure ConnPool, MsgNetwork, PeerNetwork, etc.
 - stress test for PeerNetwork

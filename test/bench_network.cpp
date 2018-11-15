@@ -79,7 +79,7 @@ struct MyNet: public MsgNetworkByteOp {
             const std::string name,
             const NetAddr &peer,
             double stat_timeout = -1):
-            MsgNetwork<opcode_t>(ec, 10, 1.0, 4096),
+            MsgNetworkByteOp(ec, MsgNetworkByteOp::Config()),
             name(name),
             peer(peer),
             ev_period_stat(ec, -1, [this, stat_timeout](int, short) {
