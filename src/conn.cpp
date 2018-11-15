@@ -67,7 +67,7 @@ void ConnPool::Conn::send_data(int fd, int events) {
                 if (ret < 0 && errno != EWOULDBLOCK)
                 {
                     SALTICIDAE_LOG_INFO("send(%d) failure: %s", fd, strerror(errno));
-                    terminate();
+                    worker_terminate();
                     return;
                 }
             }
@@ -102,13 +102,13 @@ void ConnPool::Conn::recv_data(int fd, int events) {
             if (errno == EWOULDBLOCK) break;
             SALTICIDAE_LOG_INFO("recv(%d) failure: %s", fd, strerror(errno));
             /* connection err or half-opened connection */
-            terminate();
+            worker_terminate();
             return;
         }
         if (ret == 0)
         {
             //SALTICIDAE_LOG_INFO("recv(%d) terminates", fd, strerror(errno));
-            terminate();
+            worker_terminate();
             return;
         }
         buff_seg.resize(ret);
@@ -118,12 +118,31 @@ void ConnPool::Conn::recv_data(int fd, int events) {
     on_read();
 }
 
-void ConnPool::Conn::terminate() {
+void ConnPool::Conn::stop() {
+    if (!self_ref) return;
+    if (worker) worker->unfeed();
+    ev_connect.clear();
+    ev_socket.clear();
+    send_buffer.get_queue().unreg_handler();
+    ::close(fd);
+    self_ref = nullptr; /* remove the self-cycle */
+}
+
+void ConnPool::Conn::worker_terminate() {
     stop();
     cpool->disp_tcall->call(
             [cpool=this->cpool, fd=this->fd](ThreadCall::Handle &) {
         cpool->remove_conn(fd);
     });
+}
+
+void ConnPool::Conn::disp_terminate(bool blocking) {
+    if (worker && !worker->is_dispatcher())
+        worker->get_tcall()->call([conn=self()](ThreadCall::Handle &) {
+            conn->stop();
+        }, blocking);
+    else stop();
+    cpool->remove_conn(fd);
 }
 
 void ConnPool::accept_client(int fd, int) {
@@ -173,7 +192,7 @@ void ConnPool::Conn::conn_server(int fd, int events) {
     {
         if (events & Event::TIMEOUT)
             SALTICIDAE_LOG_INFO("%s connect timeout", std::string(*this).c_str());
-        cpool->terminate(conn);
+        conn->disp_terminate();
         return;
     }
 }
@@ -237,7 +256,7 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
                 sizeof(struct sockaddr_in)) < 0 && errno != EINPROGRESS)
     {
         SALTICIDAE_LOG_INFO("cannot connect to %s", std::string(addr).c_str());
-        terminate(conn);
+        conn->disp_terminate();
     }
     else
     {

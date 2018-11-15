@@ -470,7 +470,7 @@ void PeerNetwork<O, _, __>::Conn::on_setup() {
     assert(!ev_timeout);
     ev_timeout = Event(worker->get_ec(), -1, [conn](int, int) {
         SALTICIDAE_LOG_INFO("peer ping-pong timeout");
-        conn->terminate();
+        conn->worker_terminate();
     });
     /* the initial ping-pong to set up the connection */
     tcall_reset_timeout(worker, conn, pn->conn_timeout);
@@ -508,7 +508,7 @@ void PeerNetwork<O, _, __>::Peer::reset_conn(conn_t new_conn) {
             //SALTICIDAE_LOG_DEBUG("moving send buffer");
             //new_conn->move_send_buffer(conn);
             SALTICIDAE_LOG_INFO("terminating old connection %s", std::string(*conn).c_str());
-            conn->cpool->terminate(conn);
+            conn->disp_terminate();
         }
         addr = new_conn->get_addr();
         conn = new_conn;
@@ -557,7 +557,7 @@ bool PeerNetwork<O, _, __>::check_new_conn(const conn_t &conn, uint16_t port) {
     {
         if (conn != p->conn)
         {
-            conn->cpool->terminate(conn);
+            conn->disp_terminate();
             return true;
         }
         return false;

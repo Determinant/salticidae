@@ -75,10 +75,11 @@ const uint8_t MsgAck::opcode;
 
 using MyNet = salticidae::PeerNetwork<uint8_t>;
 
-NetAddr addrs[] = {
+std::vector<NetAddr> addrs = {
     NetAddr("127.0.0.1:12345"),
     NetAddr("127.0.0.1:12346"),
-    NetAddr("127.0.0.1:12347")
+    NetAddr("127.0.0.1:12347"),
+    NetAddr("127.0.0.1:12348")
 };
 
 void signal_handler(int) {
@@ -97,7 +98,7 @@ int main(int argc, char **argv) {
         int i;
         net.start();
         net.listen(addrs[i = atoi(argv[1])]);
-        for (int j = 0; j < 3; j++)
+        for (int j = 0; j < addrs.size(); j++)
             if (i != j) net.add_peer(addrs[j]);
         ec.dispatch();
     } catch (salticidae::SalticidaeError &e) {}
