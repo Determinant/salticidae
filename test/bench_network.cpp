@@ -82,17 +82,17 @@ struct MyNet: public MsgNetworkByteOp {
             MsgNetwork<opcode_t>(ec, 10, 1.0, 4096),
             name(name),
             peer(peer),
-            ev_period_stat(ec, -1, 0, [this, stat_timeout](int, short) {
+            ev_period_stat(ec, -1, [this, stat_timeout](int, short) {
                 printf("%.2f mps\n", nrecv / (double)stat_timeout);
                 nrecv = 0;
-                ev_period_stat.add_with_timeout(stat_timeout);
+                ev_period_stat.add_with_timeout(stat_timeout, 0);
             }),
             nrecv(0) {
         /* message handler could be a bound method */
         reg_handler(salticidae::generic_bind(
             &MyNet::on_receive_bytes, this, _1, _2));
         if (stat_timeout > 0)
-            ev_period_stat.add_with_timeout(0);
+            ev_period_stat.add_with_timeout(0, 0);
     }
 
     struct Conn: public MsgNetworkByteOp::Conn {
@@ -109,12 +109,12 @@ struct MyNet: public MsgNetworkByteOp {
                 printf("[%s] Connected, sending hello.\n",
                         net->name.c_str());
                 /* send the first message through this connection */
-                net->ev_period_send = Event(net->ec, -1, 0,
+                net->ev_period_send = Event(net->ec, -1,
                                             [net, conn = self()](int, short) {
                     net->send_msg(MsgBytes(256), *conn);
-                    net->ev_period_send.add_with_timeout(0);
+                    net->ev_period_send.add_with_timeout(0, 0);
                 });
-                net->ev_period_send.add_with_timeout(0);
+                net->ev_period_send.add_with_timeout(0, 0);
 
             }
             else

@@ -81,6 +81,8 @@ void ConnPool::Conn::send_data(int fd, int events) {
             return;
         }
     }
+    ev_socket.del();
+    ev_socket.add(Event::READ);
     /* consumed the buffer but endpoint still seems to be writable */
     ready_send = true;
 }
@@ -116,19 +118,13 @@ void ConnPool::Conn::recv_data(int fd, int events) {
     on_read();
 }
 
-void ConnPool::Conn::stop() {
-    ev_read.clear();
-    ev_write.clear();
-}
-
 void ConnPool::Conn::terminate() {
     stop();
     cpool->disp_tcall->call(
             [cpool=this->cpool, fd=this->fd](ThreadCall::Handle &) {
-        cpool->terminate(fd);
+        cpool->remove_conn(fd);
     });
 }
-
 
 void ConnPool::accept_client(int fd, int) {
     int client_fd;
@@ -154,9 +150,11 @@ void ConnPool::accept_client(int fd, int) {
         conn->addr = addr;
         add_conn(conn);
         SALTICIDAE_LOG_INFO("accepted %s", std::string(*conn).c_str());
+        auto &worker = select_worker();
+        conn->worker = &worker;
         conn->on_setup();
         update_conn(conn, true);
-        select_worker().feed(conn, client_fd);
+        worker.feed(conn, client_fd);
     }
 }
 
@@ -166,15 +164,16 @@ void ConnPool::Conn::conn_server(int fd, int events) {
     {
         ev_connect.clear();
         SALTICIDAE_LOG_INFO("connected to remote %s", std::string(*this).c_str());
+        worker = &(cpool->select_worker());
         on_setup();
         cpool->update_conn(conn, true);
-        cpool->select_worker().feed(conn, fd);
+        worker->feed(conn, fd);
     }
     else
     {
         if (events & Event::TIMEOUT)
             SALTICIDAE_LOG_INFO("%s connect timeout", std::string(*this).c_str());
-        terminate();
+        stop();
         return;
     }
 }
@@ -204,9 +203,9 @@ void ConnPool::_listen(NetAddr listen_addr) {
         throw ConnPoolError(std::string("binding error"));
     if (::listen(listen_fd, max_listen_backlog) < 0)
         throw ConnPoolError(std::string("listen error"));
-    ev_listen = Event(dispatcher_ec, listen_fd, Event::READ,
+    ev_listen = Event(disp_ec, listen_fd,
                     std::bind(&ConnPool::accept_client, this, _1, _2));
-    ev_listen.add();
+    ev_listen.add(Event::READ);
     SALTICIDAE_LOG_INFO("listening to %u", ntohs(listen_addr.port));
 }
 
@@ -238,28 +237,26 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
                 sizeof(struct sockaddr_in)) < 0 && errno != EINPROGRESS)
     {
         SALTICIDAE_LOG_INFO("cannot connect to %s", std::string(addr).c_str());
-        conn->terminate();
+        conn->stop();
     }
     else
     {
-        conn->ev_connect = Event(dispatcher_ec, conn->fd, Event::WRITE,
-                                std::bind(&Conn::conn_server, conn.get(), _1, _2));
-        conn->ev_connect.add_with_timeout(conn_server_timeout);
+        conn->ev_connect = Event(disp_ec, conn->fd, std::bind(&Conn::conn_server, conn.get(), _1, _2));
+        conn->ev_connect.add_with_timeout(conn_server_timeout, Event::WRITE);
         add_conn(conn);
         SALTICIDAE_LOG_INFO("created %s", std::string(*conn).c_str());
     }
     return conn;
 }
 
-void ConnPool::terminate(int fd) {
+void ConnPool::remove_conn(int fd) {
     auto it = pool.find(fd);
     if (it != pool.end())
     {
         /* temporarily pin the conn before it dies */
         auto conn = it->second;
-        assert(conn->fd == fd);
+        //assert(conn->fd == fd);
         pool.erase(it);
-        conn->on_close();
         /* inform the upper layer the connection will be destroyed */
         conn->on_teardown();
         update_conn(conn, false);
@@ -267,7 +264,7 @@ void ConnPool::terminate(int fd) {
 }
 
 ConnPool::conn_t ConnPool::add_conn(const conn_t &conn) {
-    assert(pool.find(conn->fd) == pool.end());
+    //assert(pool.find(conn->fd) == pool.end());
     return pool.insert(std::make_pair(conn->fd, conn)).first->second;
 }
 

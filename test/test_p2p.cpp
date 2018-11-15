@@ -130,7 +130,14 @@ salticidae::EventContext ec;
 NetAddr alice_addr("127.0.0.1:12345");
 NetAddr bob_addr("127.0.0.1:12346");
 
+void signal_handler(int) {
+    throw salticidae::SalticidaeError("got termination signal");
+}
+
 int main() {
+    signal(SIGTERM, signal_handler);
+    signal(SIGINT, signal_handler);
+
     /* test two nodes */
     MyNet alice(ec, "Alice", bob_addr);
     MyNet bob(ec, "Bob", alice_addr);
@@ -139,16 +146,18 @@ int main() {
     alice.reg_handler(on_receive_ack);
     bob.reg_handler(on_receive_ack);
 
-    alice.start();
-    bob.start();
+    try {
+        alice.start();
+        bob.start();
 
-    alice.listen(alice_addr);
-    bob.listen(bob_addr);
+        alice.listen(alice_addr);
+        bob.listen(bob_addr);
 
-    /* first attempt */
-    alice.add_peer(bob_addr);
-    bob.add_peer(alice_addr);
+        /* first attempt */
+        alice.add_peer(bob_addr);
+        bob.add_peer(alice_addr);
 
-    ec.dispatch();
+        ec.dispatch();
+    } catch (salticidae::SalticidaeError &e) {}
     return 0;
 }

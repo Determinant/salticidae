@@ -23,11 +23,10 @@ void test_mpsc(int nproducers = 16, int nops = 100000, size_t burst_size = 128) 
     });
     std::vector<std::thread> producers;
     std::thread consumer([&collected, total, &ec]() {
-        salticidae::Event timer(ec, -1, EV_TIMEOUT | EV_PERSIST,
-            [&ec, &collected, total](int, short) {
+        salticidae::Event timer(ec, -1, [&ec, &collected, total](int, short) {
             if (collected.load() == total) ec.stop();
         });
-        timer.add_with_timeout(1);
+        timer.add_with_timeout(1, EV_TIMEOUT | EV_PERSIST);
         ec.dispatch();
     });
     for (int i = 0; i < nproducers; i++)
