@@ -483,7 +483,7 @@ template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::tcall_reset_timeout(ConnPool::Worker *worker,
                                     const conn_t &conn, double timeout) {
     worker->get_tcall()->call([conn, t=timeout](ThreadCall::Handle &) {
-        assert(conn->ev_timeout);
+        if (!conn->ev_timeout) return;
         conn->ev_timeout.del();
         conn->ev_timeout.add_with_timeout(t, 0);
         SALTICIDAE_LOG_INFO("reset timeout %.2f", t);

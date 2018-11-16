@@ -119,13 +119,15 @@ void ConnPool::Conn::recv_data(int fd, int events) {
 }
 
 void ConnPool::Conn::stop() {
-    if (!self_ref) return;
-    if (worker) worker->unfeed();
-    ev_connect.clear();
-    ev_socket.clear();
-    send_buffer.get_queue().unreg_handler();
-    ::close(fd);
-    self_ref = nullptr; /* remove the self-cycle */
+    if (mode != ConnMode::DEAD)
+    {
+        if (worker) worker->unfeed();
+        ev_connect.clear();
+        ev_socket.clear();
+        send_buffer.get_queue().unreg_handler();
+        ::close(fd);
+        mode = ConnMode::DEAD;
+    }
 }
 
 void ConnPool::Conn::worker_terminate() {
@@ -280,6 +282,7 @@ void ConnPool::remove_conn(int fd) {
         /* inform the upper layer the connection will be destroyed */
         conn->on_teardown();
         update_conn(conn, false);
+        conn->self_ref = nullptr; /* remove the self-cycle */
     }
 }
 

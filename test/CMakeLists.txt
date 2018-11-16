@@ -32,6 +32,9 @@ target_link_libraries(test_network salticidae_static)
 add_executable(test_p2p test_p2p.cpp)
 target_link_libraries(test_p2p salticidae_static)
 
+add_executable(test_p2p_stress test_p2p_stress.cpp)
+target_link_libraries(test_p2p_stress salticidae_static)
+
 add_executable(test_queue test_queue.cpp)
 target_link_libraries(test_queue salticidae_static pthread)
 

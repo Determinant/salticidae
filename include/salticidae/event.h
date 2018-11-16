@@ -125,7 +125,7 @@ class Event {
             ev_fd(other.ev_fd), ev_timer(other.ev_timer),
             callback(std::move(other.callback)) {
         other.del();
-        if (fd != -1)
+        if (ev_fd != nullptr)
         {
             other.ev_fd = nullptr;
             ev_fd->data = this;
@@ -143,7 +143,7 @@ class Event {
         ev_timer = other.ev_timer;
         callback = std::move(other.callback);
 
-        if (fd != -1)
+        if (ev_fd != nullptr)
         {
             other.ev_fd = nullptr;
             ev_fd->data = this;
@@ -181,7 +181,7 @@ class Event {
     void del() {
         if (ev_fd) uv_poll_stop(ev_fd);
         if (ev_timer == nullptr)
-        assert(ev_timer);
+            assert(ev_timer);
         uv_timer_stop(ev_timer);
     }
     void add_with_timeout(double t_sec, int events) {
@@ -205,11 +205,9 @@ class ThreadNotifier {
         return data;
     }
     void notify(void *_data) { 
-        {
-            mutex_lg_t _(mlock);
-            ready = true;
-            data = _data;
-        }
+        mutex_lg_t _(mlock);
+        ready = true;
+        data = _data;
         cv.notify_all();
     }
 };

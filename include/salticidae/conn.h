@@ -71,6 +71,7 @@ class ConnPool {
         enum ConnMode {
             ACTIVE, /**< the connection is established by connect() */
             PASSIVE, /**< the connection is established by accept() */
+            DEAD, /**< the connection is dead */
         };
     
         protected:
@@ -178,6 +179,12 @@ class ConnPool {
 
         void feed(const conn_t &conn, int client_fd) {
             tcall.call([this, conn, client_fd](ThreadCall::Handle &) {
+                if (conn->mode == Conn::ConnMode::DEAD)
+                {
+                    SALTICIDAE_LOG_INFO("worker %x discarding dead connection",
+                        std::this_thread::get_id());
+                    return;
+                }
                 SALTICIDAE_LOG_INFO("worker %x got %s",
                         std::this_thread::get_id(),
                         std::string(*conn).c_str());
@@ -193,7 +200,6 @@ class ConnPool {
                     }
                     return false;
                 });
-                //auto conn_ptr = conn.get();
                 conn->ev_socket = Event(ec, client_fd, [conn=conn](int fd, int what) {
                     if (what & Event::READ)
                         conn->recv_data(fd, what);
@@ -317,6 +323,7 @@ class ConnPool {
         {
             conn_t conn = it.second;
             conn->stop();
+            conn->self_ref = nullptr;
         }
         if (listen_fd != -1) close(listen_fd);
     }
