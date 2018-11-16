@@ -138,11 +138,11 @@ void ConnPool::Conn::worker_terminate() {
     });
 }
 
-void ConnPool::Conn::disp_terminate(bool blocking) {
+void ConnPool::Conn::disp_terminate() {
     if (worker && !worker->is_dispatcher())
         worker->get_tcall()->call([conn=self()](ThreadCall::Handle &) {
             conn->stop();
-        }, blocking);
+        });
     else stop();
     cpool->remove_conn(fd);
 }

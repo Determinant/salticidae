@@ -98,7 +98,7 @@ class ConnPool {
         /** Terminate the connection (from the worker thread). */
         void worker_terminate();
         /** Terminate the connection (from the dispatcher thread). */
-        void disp_terminate(bool blocking = true);
+        void disp_terminate();
 
         public:
         Conn(): ready_send(false) {}
@@ -157,7 +157,7 @@ class ConnPool {
     int listen_fd;  /**< for accepting new network connections */
 
     void update_conn(const conn_t &conn, bool connected) {
-        user_tcall->call([this, conn, connected](ThreadCall::Handle &) {
+        user_tcall->async_call([this, conn, connected](ThreadCall::Handle &) {
             if (conn_cb) conn_cb(*conn, connected);
         });
     }
@@ -178,7 +178,7 @@ class ConnPool {
         }
 
         void feed(const conn_t &conn, int client_fd) {
-            tcall.call([this, conn, client_fd](ThreadCall::Handle &) {
+            tcall.async_call([this, conn, client_fd](ThreadCall::Handle &) {
                 if (conn->mode == Conn::ConnMode::DEAD)
                 {
                     SALTICIDAE_LOG_INFO("worker %x discarding dead connection",
@@ -214,7 +214,7 @@ class ConnPool {
         void unfeed() { nconn--; }
 
         void stop() {
-            tcall.call([this](ThreadCall::Handle &) { ec.stop(); });
+            tcall.async_call([this](ThreadCall::Handle &) { ec.stop(); });
         }
 
         std::thread &get_handle() { return handle; }
@@ -352,24 +352,19 @@ class ConnPool {
     conn_t connect(const NetAddr &addr, bool blocking = true) {
         if (blocking)
         {
-            auto ret = static_cast<conn_t *>(disp_tcall->call(
+            auto ret = *(static_cast<conn_t *>(disp_tcall->call(
                         [this, addr](ThreadCall::Handle &h) {
-                auto ptr = new conn_t(_connect(addr));
+                auto conn = _connect(addr);
                 std::atomic_thread_fence(std::memory_order_release);
-                h.set_result(ptr);
-                h.set_deleter([](void *data) {
-                    delete static_cast<conn_t *>(data);
-                });
-            }, true));
-            auto conn = *ret;
-            delete ret;
-            return std::move(conn);
+                h.set_result(std::move(conn));
+            }).get()));
+            return std::move(ret);
         }
         else
         {
-            disp_tcall->call([this, addr](ThreadCall::Handle &) {
+            disp_tcall->async_call([this, addr](ThreadCall::Handle &) {
                 _connect(addr);
-            }, false);
+            });
             return nullptr;
         }
     }
@@ -380,7 +375,7 @@ class ConnPool {
     void listen(NetAddr listen_addr) {
         disp_tcall->call([this, listen_addr](ThreadCall::Handle &) {
             _listen(listen_addr);
-        }, true);
+        });
     }
 
     template<typename Func>

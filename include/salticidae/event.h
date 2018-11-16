@@ -192,22 +192,23 @@ class Event {
     operator bool() const { return ev_fd != nullptr || ev_timer != nullptr; }
 };
 
+template<typename T>
 class ThreadNotifier {
     std::condition_variable cv;
     std::mutex mlock;
     mutex_ul_t ul;
     bool ready;
-    void *data;
+    T data;
     public:
     ThreadNotifier(): ul(mlock), ready(false) {}
-    void *wait() {
+    T wait() {
         cv.wait(ul, [this]{ return ready; });
-        return data;
+        return std::move(data);
     }
-    void notify(void *_data) { 
+    void notify(T &&_data) { 
         mutex_lg_t _(mlock);
         ready = true;
-        data = _data;
+        data = std::move(_data);
         cv.notify_all();
     }
 };
@@ -218,21 +219,50 @@ class ThreadCall {
     Event ev_listen;
 
     public:
+    struct Result {
+        void *data;
+        std::function<void(void *)> deleter;
+        Result(): data(nullptr) {}
+        Result(void *data, std::function<void(void *)> &&deleter):
+            data(data), deleter(std::move(deleter)) {}
+        ~Result() { if (data != nullptr) deleter(data); }
+        Result(const Result &) = delete;
+        Result(Result &&other):
+                data(other.data), deleter(std::move(other.deleter)) {
+            other.data = nullptr;
+        }
+        void swap(Result &other) {
+            std::swap(data, other.data);
+            std::swap(deleter, other.deleter);
+        }
+        Result &operator=(const Result &other) = delete;
+        Result &operator=(Result &&other) {
+            if (this != &other)
+            {
+                Result tmp(std::move(other));
+                tmp.swap(*this);
+            }
+            return *this;
+        }
+        void *get() { return data; }
+    };
     class Handle {
         std::function<void(Handle &)> callback;
-        std::function<void(void *)> deleter;
-        ThreadNotifier* notifier;
-        void *result;
+        ThreadNotifier<Result> * notifier;
+        Result result;
         friend ThreadCall;
         public:
-        Handle(): notifier(nullptr), result(nullptr) {}
+        Handle(): notifier(nullptr) {}
         void exec() {
             callback(*this);
-            if (notifier) notifier->notify(result);
+            if (notifier)
+                notifier->notify(std::move(result));
         }
-        void set_result(void *data) { result = data; }
-        template<typename Func>
-        void set_deleter(Func _deleter) { deleter = _deleter; }
+        template<typename T>
+        void set_result(T data) {
+            result = Result(new T(std::forward<T>(data)),
+                            [](void *ptr) {delete static_cast<T *>(ptr);});
+        }
     };
 
     ThreadCall() = default;
@@ -254,33 +284,28 @@ class ThreadCall {
         ev_listen.clear();
         Handle *h;
         while (read(ctl_fd[0], &h, sizeof(h)) == sizeof(h))
-        {
-            if (h->result && h->deleter)
-                h->deleter(h->result);
             delete h;
-        }
         close(ctl_fd[0]);
         close(ctl_fd[1]);
     }
 
     template<typename Func>
-    void *call(Func callback, bool blocking = false) {
+    void async_call(Func callback) {
         auto h = new Handle();
         h->callback = callback;
-        if (blocking)
-        {
-            ThreadNotifier notifier;
-            h->notifier = &notifier;
-            std::atomic_thread_fence(std::memory_order_release);
-            write(ctl_fd[1], &h, sizeof(h));
-            return notifier.wait();
-        }
-        else
-        {
-            std::atomic_thread_fence(std::memory_order_release);
-            write(ctl_fd[1], &h, sizeof(h));
-            return nullptr;
-        }
+        std::atomic_thread_fence(std::memory_order_release);
+        write(ctl_fd[1], &h, sizeof(h));
+    }
+
+    template<typename Func>
+    Result call(Func callback) {
+        auto h = new Handle();
+        h->callback = callback;
+        ThreadNotifier<Result> notifier;
+        h->notifier = &notifier;
+        std::atomic_thread_fence(std::memory_order_release);
+        write(ctl_fd[1], &h, sizeof(h));
+        return notifier.wait();
     }
 };
 

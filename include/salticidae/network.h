@@ -482,7 +482,7 @@ void MsgNetwork<OpcodeType>::send_msg(const MsgType &_msg, Conn &conn) {
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::tcall_reset_timeout(ConnPool::Worker *worker,
                                     const conn_t &conn, double timeout) {
-    worker->get_tcall()->call([conn, t=timeout](ThreadCall::Handle &) {
+    worker->get_tcall()->async_call([conn, t=timeout](ThreadCall::Handle &) {
         if (!conn->ev_timeout) return;
         conn->ev_timeout.del();
         conn->ev_timeout.add_with_timeout(t, 0);
@@ -621,7 +621,7 @@ void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, Conn &_conn) {
     auto conn = static_pointer_cast<Conn>(_conn.self());
     if (!conn) return;
     uint16_t port = msg.port;
-    this->disp_tcall->call([this, conn, port](ThreadCall::Handle &msg) {
+    this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &msg) {
         SALTICIDAE_LOG_INFO("ping from %s, port %u",
                             std::string(*conn).c_str(), ntohs(port));
         if (check_new_conn(conn, port)) return;
@@ -635,7 +635,7 @@ void PeerNetwork<O, _, __>::msg_pong(MsgPong &&msg, Conn &_conn) {
     auto conn = static_pointer_cast<Conn>(_conn.self());
     if (!conn) return;
     uint16_t port = msg.port;
-    this->disp_tcall->call([this, conn, port](ThreadCall::Handle &msg) {
+    this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &msg) {
         auto it = id2peer.find(conn->peer_id);
         if (it == id2peer.end())
         {
@@ -658,7 +658,7 @@ void PeerNetwork<O, _, __>::listen(NetAddr listen_addr) {
     this->disp_tcall->call([this, listen_addr](ThreadCall::Handle &msg) {
         MsgNet::_listen(listen_addr);
         listen_port = listen_addr.port;
-    }, true);
+    });
 }
 
 template<typename O, O _, O __>
@@ -669,40 +669,28 @@ void PeerNetwork<O, _, __>::add_peer(const NetAddr &addr) {
             throw PeerNetworkError("peer already exists");
         id2peer.insert(std::make_pair(addr, new Peer(addr, nullptr, this->disp_ec)));
         start_active_conn(addr);
-    }, true);
+    });
 }
 
 template<typename O, O _, O __>
 const typename PeerNetwork<O, _, __>::conn_t
 PeerNetwork<O, _, __>::get_peer_conn(const NetAddr &paddr) const {
-    auto ret = static_cast<conn_t *>(this->disp_tcall->call(
+    auto ret = *(static_cast<conn_t *>(this->disp_tcall->call(
                 [this, paddr](ThreadCall::Handle &h) {
         auto it = id2peer.find(paddr);
         if (it == id2peer.end())
             throw PeerNetworkError("peer does not exist");
-        auto ptr = new conn_t(it->second->conn);
-        h.set_result(ptr);
-        h.set_deleter([](void *data) {
-            delete static_cast<conn_t *>(data);
-        });
-    }));
-    auto conn = *ret;
-    delete ret;
-    return std::move(conn);
+        h.set_result(it->second->conn);
+    }).get()));
+    return std::move(*ret);
 }
 
 template<typename O, O _, O __>
 bool PeerNetwork<O, _, __>::has_peer(const NetAddr &paddr) const {
-    auto ret = static_cast<bool *>(this->disp_tcall->call(
+    return *(static_cast<bool *>(this->disp_tcall->call(
                 [this, paddr](ThreadCall::Handle &h) {
         h.set_result(id2peer.count(paddr));
-        h.set_deleter([](void *data) {
-            delete static_cast<bool *>(data);
-        });
-    }));
-    auto has = *ret;
-    delete ret;
-    return has;
+    }).get()));
 }
 
 template<typename O, O _, O __>
@@ -734,19 +722,14 @@ void ClientNetwork<OpcodeType>::Conn::on_teardown() {
 template<typename OpcodeType>
 template<typename MsgType>
 void ClientNetwork<OpcodeType>::send_msg(const MsgType &msg, const NetAddr &addr) {
-    auto ret = static_cast<conn_t *>(this->disp_tcall->call(
+    auto ret = *(static_cast<conn_t *>(this->disp_tcall->call(
                 [this, addr](ThreadCall::Handle &h) {
         auto it = addr2conn.find(addr);
         if (it == addr2conn.end())
             throw PeerNetworkError("client does not exist");
-        auto ptr = new conn_t(it->second->conn);
-        h.set_result(ptr);
-        h.set_deleter([](void *data) {
-            delete static_cast<conn_t *>(data);
-        });
-    }));
-    send_msg(msg, **ret);
-    delete ret;
+        h.set_result(it->second->conn);
+    }).get()));
+    send_msg(msg, *ret);
 }
 
 template<typename O, O OPCODE_PING, O _>
