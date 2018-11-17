@@ -70,11 +70,11 @@ class EventContext: public _event_context_ot {
 
 class Event {
     public:
-    using callback_t = std::function<void(int fd, short events)>;
+    using callback_t = std::function<void(int fd, int events)>;
     static const int READ = UV_READABLE;
     static const int WRITE = UV_WRITABLE;
-    static const int TIMEOUT = ~(UV_READABLE | UV_WRITABLE |
-                                UV_DISCONNECT | UV_PRIORITIZED);
+    static const int ERROR = 1 << 30;
+    static const int TIMEOUT = 1 << 29;
 
     private:
     EventContext eb;
@@ -84,10 +84,7 @@ class Event {
     callback_t callback;
     static inline void fd_then(uv_poll_t *h, int status, int events) {
         if (status != 0)
-        {
-            //SALTICIDAE_LOG_WARN("%s", uv_strerror(status));
-            return;
-        }
+            events |= ERROR;
         auto event = static_cast<Event *>(h->data);
         event->callback(event->fd, events);
     }
@@ -332,7 +329,7 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
     template<typename Func>
     void reg_handler(const EventContext &ec, Func &&func) {
         ev = Event(ec, fd,
-                    [this, func=std::forward<Func>(func)](int, short) {
+                    [this, func=std::forward<Func>(func)](int, int) {
                     //fprintf(stderr, "%x\n", std::this_thread::get_id());
                     uint64_t t;
                     read(fd, &t, 8);
@@ -385,7 +382,7 @@ class MPMCQueueEventDriven: public MPMCQueue<T> {
     void listen(const EventContext &ec, Func &&func, size_t burst_size=128) {
         int fd = eventfd(0, EFD_NONBLOCK);
         evs.emplace(evs.end(), std::make_pair(new Event(ec, fd, EV_READ | EV_PERSIST,
-            [this, func=std::forward<Func>(func), burst_size](int fd, short) {
+            [this, func=std::forward<Func>(func), burst_size](int fd, int) {
             uint64_t t;
             read(fd, &t, 8);
             //fprintf(stderr, "%x\n", std::this_thread::get_id());

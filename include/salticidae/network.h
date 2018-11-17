@@ -140,7 +140,9 @@ class MsgNetwork: public ConnPool {
         size_t _burst_size;
 
         public:
-        Config(): _burst_size(1000) {}
+        Config(): Config(ConnPool::Config()) {}
+        Config(const ConnPool::Config &config):
+            ConnPool::Config(config), _burst_size(1000) {}
 
         Config &burst_size(size_t x) {
             _burst_size = x;
@@ -380,11 +382,15 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         IdentityMode _id_mode;
 
         public:
-        Config():
+        Config(): Config(typename MsgNet::Config()) {}
+
+        Config(const typename MsgNet::Config &config):
+            MsgNet::Config(config),
             _retry_conn_delay(2),
             _ping_period(30),
             _conn_timeout(180),
             _id_mode(IP_PORT_BASED) {}
+
 
         Config &retry_conn_delay(double x) {
             _retry_conn_delay = x;
@@ -518,9 +524,7 @@ void PeerNetwork<O, _, __>::Conn::on_teardown() {
     p->ev_ping_timer.del();
     p->connected = false;
     p->conn = nullptr;
-    SALTICIDAE_LOG_INFO("connection lost %s for %s",
-            std::string(*this).c_str(),
-            std::string(peer_id).c_str());
+    SALTICIDAE_LOG_INFO("connection lost: %s", std::string(*this).c_str());
     // try to reconnect
     p->ev_retry_timer = Event(pn->disp_ec, -1,
             [pn, peer_id = this->peer_id](int, int) {
@@ -618,8 +622,9 @@ void PeerNetwork<O, _, __>::start_active_conn(const NetAddr &addr) {
 /* begin: functions invoked by the user loop */
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, Conn &_conn) {
+    if (_conn.get_mode() == ConnPool::Conn::DEAD) return;
     auto conn = static_pointer_cast<Conn>(_conn.self());
-    if (!conn) return;
+    assert(conn);
     uint16_t port = msg.port;
     this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &msg) {
         SALTICIDAE_LOG_INFO("ping from %s, port %u",
@@ -632,8 +637,9 @@ void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, Conn &_conn) {
 
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::msg_pong(MsgPong &&msg, Conn &_conn) {
+    if (_conn.get_mode() == ConnPool::Conn::DEAD) return;
     auto conn = static_pointer_cast<Conn>(_conn.self());
-    if (!conn) return;
+    assert(conn);
     uint16_t port = msg.port;
     this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &msg) {
         auto it = id2peer.find(conn->peer_id);
