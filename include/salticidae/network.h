@@ -622,11 +622,11 @@ void PeerNetwork<O, _, __>::start_active_conn(const NetAddr &addr) {
 /* begin: functions invoked by the user loop */
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, Conn &_conn) {
-    if (_conn.get_mode() == ConnPool::Conn::DEAD) return;
     auto conn = static_pointer_cast<Conn>(_conn.self());
-    assert(conn);
+    if (!conn) return;
     uint16_t port = msg.port;
     this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &msg) {
+        if (conn->get_mode() == ConnPool::Conn::DEAD) return;
         SALTICIDAE_LOG_INFO("ping from %s, port %u",
                             std::string(*conn).c_str(), ntohs(port));
         if (check_new_conn(conn, port)) return;
@@ -637,11 +637,11 @@ void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, Conn &_conn) {
 
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::msg_pong(MsgPong &&msg, Conn &_conn) {
-    if (_conn.get_mode() == ConnPool::Conn::DEAD) return;
     auto conn = static_pointer_cast<Conn>(_conn.self());
-    assert(conn);
+    if (!conn) return;
     uint16_t port = msg.port;
     this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &msg) {
+        if (conn->get_mode() == ConnPool::Conn::DEAD) return;
         auto it = id2peer.find(conn->peer_id);
         if (it == id2peer.end())
         {

@@ -301,7 +301,7 @@ void ConnPool::remove_conn(int fd) {
         /* inform the upper layer the connection will be destroyed */
         conn->on_teardown();
         update_conn(conn, false);
-        conn->self_ref = nullptr; /* remove the self-cycle */
+        conn->release_self(); /* remove the self-cycle */
         ::close(conn->fd);
         conn->fd = -1;
     }

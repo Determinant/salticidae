@@ -77,10 +77,11 @@ class ConnPool {
         protected:
         size_t seg_buff_size;
         conn_t self_ref;
+        std::mutex ref_mlock;
         int fd;
         Worker *worker;
         ConnPool *cpool;
-        ConnMode mode;
+        std::atomic<ConnMode> mode;
         NetAddr addr;
 
         MPSCWriteBuffer send_buffer;
@@ -110,7 +111,16 @@ class ConnPool {
         }
 
         /** Get the handle to itself. */
-        conn_t self() { return self_ref; }
+        conn_t self() {
+            mutex_lg_t _(ref_mlock);
+            return self_ref;
+        }
+
+        void release_self() {
+            mutex_lg_t _(ref_mlock);
+            self_ref = nullptr;
+        }
+
         operator std::string() const;
         const NetAddr &get_addr() const { return addr; }
         ConnMode get_mode() const { return mode; }
@@ -380,6 +390,14 @@ class ConnPool {
 
     template<typename Func>
     void reg_conn_handler(Func cb) { conn_cb = cb; }
+
+    void terminate(Conn &_conn) {
+        auto conn = _conn.self();
+        if (!conn) return;
+        disp_tcall->async_call([this, conn](ThreadCall::Handle &) {
+            conn->disp_terminate();
+        });
+    }
 };
 
 }
