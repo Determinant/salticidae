@@ -26,7 +26,7 @@ void test_mpsc(int nproducers = 16, int nops = 100000, size_t burst_size = 128) 
         salticidae::Event timer(ec, -1, [&ec, &collected, total](int, short) {
             if (collected.load() == total) ec.stop();
         });
-        timer.add_with_timeout(1, EV_TIMEOUT | EV_PERSIST);
+        timer.add_with_timeout(1, 0);
         ec.dispatch();
     });
     for (int i = 0; i < nproducers; i++)

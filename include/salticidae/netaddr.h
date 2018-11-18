@@ -29,6 +29,7 @@
 #include <cstring>
 #include <cstdint>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 #include "salticidae/util.h"
 #include "salticidae/stream.h"

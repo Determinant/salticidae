@@ -27,7 +27,6 @@
 
 #include <cassert>
 #include <cstdint>
-#include <event2/event.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 

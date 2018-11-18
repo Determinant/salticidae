@@ -32,7 +32,8 @@
 #include <unordered_map>
 #include <functional>
 #include <getopt.h>
-#include <event2/event.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "salticidae/config.h"
 #include "salticidae/ref.h"
@@ -40,13 +41,14 @@
 namespace salticidae {
 
 void sec2tv(double t, struct timeval &tv);
-void event_add_with_timeout(struct event *ev, double timeout);
 double gen_rand_timeout(double base_timeout, double alpha = 0.5);
 
 std::string trim(const std::string &s,
                 const std::string &space = "\t\r\n ");
 std::vector<std::string> split(const std::string &s, const std::string &delim);
 std::vector<std::string> trim_all(const std::vector<std::string> &ss);
+std::string vstringprintf(const char *fmt, va_list ap);
+std::string stringprintf(const char *fmt, ...);
 
 class SalticidaeError: public std::exception {
     std::string msg;
@@ -55,47 +57,48 @@ class SalticidaeError: public std::exception {
 
     template<typename... Args>
     SalticidaeError(const std::string &fmt, Args... args) {
-        int guessed_size = 128;
-        std::string buff;
-        for (;;)
-        {
-            buff.resize(guessed_size);
-            int nwrote = snprintf((char *)buff.data(), guessed_size, fmt.c_str(), args...);
-            if (nwrote < 0 || nwrote == guessed_size)
-            {
-                guessed_size <<= 1;
-                continue;
-            }
-            buff.resize(nwrote);
-            msg = std::move(buff);
-            break;
-        }
+        msg = stringprintf(fmt.c_str(), args...);
     }
 
     operator std::string() const { return msg; }
     const char *what() const throw() override { return msg.c_str(); }
 };
 
+extern const char *TTY_COLOR_RED;
+extern const char *TTY_COLOR_GREEN;
+extern const char *TTY_COLOR_YELLOW;
+extern const char *TTY_COLOR_BLUE;
+extern const char *TTY_COLOR_MAGENT;
+extern const char *TTY_COLOR_CYAN;
+extern const char *TTY_COLOR_RESET;
+
 class Logger {
+    const char *color_info;
+    const char *color_debug;
+    const char *color_warning;
+    const char *color_error;
     protected:
-    FILE *output;
+    int output;
     bool opened;
     const char *prefix;
-    void write(const char *tag, const char *fmt, va_list ap);
+    void write(const char *tag, const char *color,
+                const char *fmt, va_list ap);
+    void set_color();
 
     public:
-    Logger(const char *prefix, FILE *file = stderr):
-        output(file), opened(false), prefix(prefix) {}
+    Logger(const char *prefix, int fd = 2):
+        output(fd), opened(false), prefix(prefix) { set_color(); }
     Logger(const char *prefix, const char *filename):
         opened(true), prefix(prefix) {
-        if ((output = fopen(filename, "w")) == nullptr)
+        if ((output = open(filename, O_CREAT | O_WRONLY)) == -1)
             throw SalticidaeError("logger cannot open file %s", filename);
+        set_color();
     }
 
-    ~Logger() { if (opened) fclose(output); }
+    ~Logger() { if (opened) close(output); }
 
-    void debug(const char *fmt, ...);
     void info(const char *fmt, ...);
+    void debug(const char *fmt, ...);
     void warning(const char *fmt, ...);
     void error(const char *fmt, ...);
 };

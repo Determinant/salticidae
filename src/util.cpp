@@ -27,12 +27,20 @@
 #include <cassert>
 #include <cstdio>
 #include <ctime>
-#include <sys/time.h>
 #include <cmath>
+#include <sys/time.h>
 
 #include "salticidae/util.h"
 
 namespace salticidae {
+
+const char *TTY_COLOR_RED = "\x1b[31m";
+const char *TTY_COLOR_GREEN = "\x1b[32m";
+const char *TTY_COLOR_YELLOW = "\x1b[33m";
+const char *TTY_COLOR_BLUE = "\x1b[34m";
+const char *TTY_COLOR_MAGENTA = "\x1b[35m";
+const char *TTY_COLOR_CYAN = "\x1b[36m";
+const char *TTY_COLOR_RESET = "\x1b[0m";
 
 void sec2tv(double t, struct timeval &tv) {
     tv.tv_sec = trunc(t);
@@ -41,6 +49,32 @@ void sec2tv(double t, struct timeval &tv) {
 
 double gen_rand_timeout(double base_timeout, double alpha) {
     return base_timeout + rand() / (double)RAND_MAX * alpha * base_timeout;
+}
+
+std::string vstringprintf(const char *fmt, va_list ap) {
+    int guessed_size = 1024;
+    std::string buff;
+    buff.resize(guessed_size);
+    int nwrote = vsnprintf(&buff[0], guessed_size, fmt, ap);
+    if (nwrote < 0) buff = "";
+    else
+    {
+        buff.resize(nwrote);
+        if (nwrote > guessed_size)
+        {
+            if (vsnprintf(&buff[0], nwrote, fmt, ap) != nwrote)
+                buff = "";
+        }
+    }
+    return std::move(buff);
+}
+
+std::string stringprintf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    auto ret = vstringprintf(fmt, ap);
+    va_end(ap);
+    return std::move(ret);
 }
 
 const std::string get_current_datetime() {
@@ -56,36 +90,54 @@ const std::string get_current_datetime() {
 
 SalticidaeError::SalticidaeError() : msg("unknown") {}
 
-void Logger::write(const char *tag, const char *fmt, va_list ap) {
-    fprintf(output, "%s [%s %s] ", get_current_datetime().c_str(), prefix, tag);
-    vfprintf(output, fmt, ap);
-    fprintf(output, "\n");
+void Logger::set_color() {
+    if (isatty(output))
+    {
+        color_info = TTY_COLOR_GREEN;
+        color_debug = TTY_COLOR_BLUE;
+        color_warning = TTY_COLOR_YELLOW;
+        color_error = TTY_COLOR_RED;
+    }
+    else
+    {
+        color_info = color_debug = color_warning = color_error = nullptr;
+    }
 }
 
-void Logger::debug(const char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    write("debug", fmt, ap);
-    va_end(ap);
+void Logger::write(const char *tag, const char *color,
+                    const char *fmt, va_list ap) {
+    std::string buff = color ? color : "";
+    buff += stringprintf("%s [%s %s] ", get_current_datetime().c_str(), prefix, tag);
+    if (color) buff += TTY_COLOR_RESET;
+    buff += vstringprintf(fmt, ap);
+    buff.push_back('\n');
+    ::write(output, &buff[0], buff.length());
 }
 
 void Logger::info(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    write("info", fmt, ap);
+    write("info", color_info, fmt, ap);
+    va_end(ap);
+}
+
+void Logger::debug(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    write("debug", color_debug, fmt, ap);
     va_end(ap);
 }
 
 void Logger::warning(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    write("warn", fmt, ap);
+    write("warn", color_warning, fmt, ap);
     va_end(ap);
 }
 void Logger::error(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    write("error", fmt, ap);
+    write("error", color_error, fmt, ap);
     va_end(ap);
 }
 
