@@ -256,6 +256,11 @@ class SigEvent {
     void add(int signum) {
         uv_signal_start(ev_sig, SigEvent::sig_then, signum);
     }
+
+    void add_once(int signum) {
+        uv_signal_start_oneshot(ev_sig, SigEvent::sig_then, signum);
+    }
+
     void del() {
         uv_signal_stop(ev_sig);
     }

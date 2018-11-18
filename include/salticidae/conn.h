@@ -345,11 +345,14 @@ class ConnPool {
         if (!worker_running) return;
         worker_running = false;
         SALTICIDAE_LOG_INFO("stopping all threads...");
+        /* stop the dispatcher */
+        workers[0].stop();
+        workers[0].get_handle().join();
         /* stop all workers */
-        for (size_t i = 0; i < nworker; i++)
+        for (size_t i = 1; i < nworker; i++)
             workers[i].stop();
         /* join all worker threads */
-        for (size_t i = 0; i < nworker; i++)
+        for (size_t i = 1; i < nworker; i++)
             workers[i].get_handle().join();
     }
 
