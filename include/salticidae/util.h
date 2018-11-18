@@ -302,6 +302,7 @@ class Config {
     void update(Opt &opt, const char *optval);
 
     public:
+    Config() {}
     Config(const std::string &conf_fname):
             conf_fname(conf_fname),
             opt_val_conf(OptValConf::create(this)) {

@@ -111,7 +111,7 @@ struct MyNet: public MsgNetworkByteOp {
                 /* send the first message through this connection */
                 net->ev_period_send = Event(net->ec, -1,
                                             [net, conn = self()](int, short) {
-                    net->send_msg(MsgBytes(256), *conn);
+                    net->send_msg(MsgBytes(256), conn);
                     net->ev_period_send.add_with_timeout(0, 0);
                 });
                 net->ev_period_send.add_with_timeout(0, 0);
@@ -134,7 +134,7 @@ struct MyNet: public MsgNetworkByteOp {
         return new Conn();
     }
 
-    void on_receive_bytes(MsgBytes &&msg, Conn &conn) {
+    void on_receive_bytes(MsgBytes &&msg, const conn_t &conn) {
         nrecv++;
     }
 };

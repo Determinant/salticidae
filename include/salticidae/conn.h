@@ -63,7 +63,7 @@ class ConnPool {
     /** The handle to a bi-directional connection. */
     using conn_t = ArcObj<Conn>;
     /** The type of callback invoked when connection status is changed. */
-    using conn_callback_t = std::function<void(Conn &, bool)>;
+    using conn_callback_t = std::function<void(const conn_t &, bool)>;
     /** Abstraction for a bi-directional connection. */
     class Conn {
         friend ConnPool;
@@ -168,7 +168,7 @@ class ConnPool {
 
     void update_conn(const conn_t &conn, bool connected) {
         user_tcall->async_call([this, conn, connected](ThreadCall::Handle &) {
-            if (conn_cb) conn_cb(*conn, connected);
+            if (conn_cb) conn_cb(conn, connected);
         });
     }
 
@@ -391,9 +391,7 @@ class ConnPool {
     template<typename Func>
     void reg_conn_handler(Func cb) { conn_cb = cb; }
 
-    void terminate(Conn &_conn) {
-        auto conn = _conn.self();
-        if (!conn) return;
+    void terminate(const conn_t &conn) {
         disp_tcall->async_call([this, conn](ThreadCall::Handle &) {
             conn->disp_terminate();
         });
