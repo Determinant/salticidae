@@ -26,8 +26,8 @@ target_link_libraries(test_msg salticidae_static)
 add_executable(test_bits test_bits.cpp)
 target_link_libraries(test_bits salticidae_static)
 
-add_executable(test_network test_network.cpp)
-target_link_libraries(test_network salticidae_static)
+add_executable(test_msgnet test_msgnet.cpp)
+target_link_libraries(test_msgnet salticidae_static)
 
 add_executable(test_p2p test_p2p.cpp)
 target_link_libraries(test_p2p salticidae_static)

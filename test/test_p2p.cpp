@@ -82,25 +82,20 @@ std::vector<NetAddr> addrs = {
     NetAddr("127.0.0.1:12348")
 };
 
-void signal_handler(int) {
-    throw salticidae::SalticidaeError("got termination signal");
-}
+salticidae::EventContext ec;
+MyNet net(ec, MyNet::Config().conn_timeout(5).ping_period(2));
 
 int main(int argc, char **argv) {
-    signal(SIGTERM, signal_handler);
-    signal(SIGINT, signal_handler);
-
-    salticidae::EventContext ec;
-    /* test two nodes */
-    MyNet net(ec, MyNet::Config().conn_timeout(5).ping_period(2));
-
-    try {
-        int i;
-        net.start();
-        net.listen(addrs[i = atoi(argv[1])]);
-        for (int j = 0; j < addrs.size(); j++)
-            if (i != j) net.add_peer(addrs[j]);
-        ec.dispatch();
-    } catch (salticidae::SalticidaeError &e) {}
+    int i;
+    net.start();
+    net.listen(addrs[i = atoi(argv[1])]);
+    for (int j = 0; j < addrs.size(); j++)
+        if (i != j) net.add_peer(addrs[j]);
+    auto shutdown = [&](int) {ec.stop();};
+    salticidae::SigEvent ev_sigint(ec, shutdown);
+    salticidae::SigEvent ev_sigterm(ec, shutdown);
+    ev_sigint.add(SIGINT);
+    ev_sigterm.add(SIGTERM);
+    ec.dispatch();
     return 0;
 }

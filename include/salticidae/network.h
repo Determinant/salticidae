@@ -423,7 +423,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         this->reg_handler(generic_bind(&PeerNetwork::msg_pong, this, _1, _2));
     }
 
-    ~PeerNetwork() { this->stop(); }
+    ~PeerNetwork() { this->stop_workers(); }
 
     void add_peer(const NetAddr &paddr);
     const conn_t get_peer_conn(const NetAddr &paddr) const;

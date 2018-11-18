@@ -86,8 +86,8 @@ struct MyNet: public MsgNetworkByteOp {
             name(name),
             peer(peer) {
         /* message handler could be a bound method */
-        reg_handler(salticidae::generic_bind(
-            &MyNet::on_receive_hello, this, _1, _2));
+        reg_handler(
+            salticidae::generic_bind(&MyNet::on_receive_hello, this, _1, _2));
 
         reg_conn_handler([this](const ConnPool::conn_t &conn, bool connected) {
             if (connected)
@@ -128,19 +128,12 @@ void on_receive_ack(MsgAck &&msg, const MyNet::conn_t &conn) {
     printf("[%s] the peer knows\n", net->name.c_str());
 }
 
-salticidae::EventContext ec;
-NetAddr alice_addr("127.0.0.1:12345");
-NetAddr bob_addr("127.0.0.1:12346");
-
-void signal_handler(int) {
-    throw salticidae::SalticidaeError("got termination signal");
-}
-
 int main() {
-    signal(SIGTERM, signal_handler);
-    signal(SIGINT, signal_handler);
+    salticidae::EventContext ec;
+    NetAddr alice_addr("127.0.0.1:12345");
+    NetAddr bob_addr("127.0.0.1:12346");
 
-    /* test two nodes */
+    /* test two nodes in the same main loop */
     MyNet alice(ec, "Alice", bob_addr);
     MyNet bob(ec, "Bob", alice_addr);
 
@@ -148,18 +141,26 @@ int main() {
     alice.reg_handler(on_receive_ack);
     bob.reg_handler(on_receive_ack);
 
-    try {
-        alice.start();
-        bob.start();
+    /* start all threads */
+    alice.start();
+    bob.start();
 
-        alice.listen(alice_addr);
-        bob.listen(bob_addr);
+    /* accept incoming connections */
+    alice.listen(alice_addr);
+    bob.listen(bob_addr);
 
-        /* first attempt */
-        alice.connect(bob_addr);
-        bob.connect(alice_addr);
+    /* try to connect once */
+    alice.connect(bob_addr);
+    bob.connect(alice_addr);
 
-        ec.dispatch();
-    } catch (salticidae::SalticidaeError &e) {}
+    /* the main loop can be shutdown by ctrl-c or kill */
+    auto shutdown = [&](int) {ec.stop();};
+    salticidae::SigEvent ev_sigint(ec, shutdown);
+    salticidae::SigEvent ev_sigterm(ec, shutdown);
+    ev_sigint.add(SIGINT);
+    ev_sigterm.add(SIGTERM);
+
+    /* enter the main loop */
+    ec.dispatch();
     return 0;
 }

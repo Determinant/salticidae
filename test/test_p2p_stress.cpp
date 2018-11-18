@@ -44,6 +44,7 @@ using salticidae::bytearray_t;
 using salticidae::uint256_t;
 using salticidae::static_pointer_cast;
 using salticidae::Config;
+using salticidae::ThreadCall;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
@@ -159,15 +160,19 @@ int main(int argc, char **argv) {
     for (int i = 0; i < opt_npeers->get(); i++)
         addrs.push_back(NetAddr("127.0.0.1:" + std::to_string(12345 + i)));
     std::vector<std::thread> peers;
+    std::vector<salticidae::BoxObj<ThreadCall>> tcalls;
+    tcalls.resize(addrs.size());
+    size_t i = 0;
     for (auto &addr: addrs)
     {
-        peers.push_back(std::thread([&, addr]() {
+        peers.push_back(std::thread([&, addr, i]() {
             EventContext ec;
             std::unordered_map<NetAddr, TestContext> tc;
             MyNet net(ec, MyNet::Config(
                 salticidae::ConnPool::Config()
                     .nworker(opt_nworker->get()).seg_buff_size(seg_buff_size))
                         .conn_timeout(5).ping_period(2));
+            tcalls[i] = new ThreadCall(ec);
             if (!opt_no_msg->get())
                 install_proto(ec, net, tc, seg_buff_size);
             try {
@@ -178,7 +183,22 @@ int main(int argc, char **argv) {
                 ec.dispatch();
             } catch (salticidae::SalticidaeError &e) {}
         }));
+        i++;
     }
-    for (auto &t: peers) t.join();
+    
+    EventContext ec;
+    auto shutdown = [&](int) {
+        for (auto &tc: tcalls)
+            tc->async_call([ec=tc->get_ec()](ThreadCall::Handle &) {
+                ec.stop();
+            });
+        for (auto &t: peers) t.join();
+        ec.stop();
+    };
+    salticidae::SigEvent ev_sigint(ec, shutdown);
+    salticidae::SigEvent ev_sigterm(ec, shutdown);
+    ev_sigint.add(SIGINT);
+    ev_sigterm.add(SIGTERM);
+    ec.dispatch();
     return 0;
 }

@@ -1,6 +1,8 @@
 test_msg
 test_bits
-test_network
+test_msgnet
+test_p2p
+test_p2p_stress
 test_queue
 bench_network
 Makefile

@@ -238,6 +238,7 @@ class ConnPool {
     /* related to workers */
     size_t nworker;
     salticidae::BoxObj<Worker[]> workers;
+    bool worker_running;
 
     void accept_client(int, int);
     conn_t add_conn(const conn_t &conn);
@@ -319,7 +320,8 @@ class ConnPool {
             conn_server_timeout(config._conn_server_timeout),
             seg_buff_size(config._seg_buff_size),
             listen_fd(-1),
-            nworker(config._nworker) {
+            nworker(config._nworker),
+            worker_running(false) {
         workers = new Worker[nworker];
         user_tcall = new ThreadCall(ec);
         disp_ec = workers[0].get_ec();
@@ -327,27 +329,22 @@ class ConnPool {
         workers[0].set_dispatcher();
     }
 
-    ~ConnPool() {
-        stop();
-        for (auto it: pool)
-        {
-            conn_t conn = it.second;
-            conn->stop();
-            conn->self_ref = nullptr;
-        }
-        if (listen_fd != -1) close(listen_fd);
-    }
+    ~ConnPool() { stop(); }
 
     ConnPool(const ConnPool &) = delete;
     ConnPool(ConnPool &&) = delete;
 
     void start() {
+        if (worker_running) return;
         SALTICIDAE_LOG_INFO("starting all threads...");
         for (size_t i = 0; i < nworker; i++)
             workers[i].start();
+        worker_running = true;
     }
 
-    void stop() {
+    void stop_workers() {
+        if (!worker_running) return;
+        worker_running = false;
         SALTICIDAE_LOG_INFO("stopping all threads...");
         /* stop all workers */
         for (size_t i = 0; i < nworker; i++)
@@ -355,7 +352,21 @@ class ConnPool {
         /* join all worker threads */
         for (size_t i = 0; i < nworker; i++)
             workers[i].get_handle().join();
-        nworker = 0;
+    }
+
+    void stop() {
+        stop_workers();
+        for (auto it: pool)
+        {
+            conn_t conn = it.second;
+            conn->stop();
+            conn->self_ref = nullptr;
+        }
+        if (listen_fd != -1)
+        {
+            close(listen_fd);
+            listen_fd = -1;
+        }
     }
 
     /** Actively connect to remote addr. */
