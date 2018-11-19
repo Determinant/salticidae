@@ -243,7 +243,7 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
         MsgNet(ec, config) {}
 
     template<typename MsgType>
-    void send_msg(const MsgType &msg, const NetAddr &addr);
+    void send_msg(MsgType msg, const NetAddr &addr);
 };
 
 class PeerNetworkError: public ConnPoolError {
@@ -429,7 +429,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     const conn_t get_peer_conn(const NetAddr &paddr) const;
     using MsgNet::send_msg;
     template<typename MsgType>
-    void send_msg(const MsgType &msg, const NetAddr &paddr);
+    void send_msg(MsgType msg, const NetAddr &paddr);
     void listen(NetAddr listen_addr);
     bool has_peer(const NetAddr &paddr) const;
     conn_t connect(const NetAddr &addr) = delete;
@@ -708,8 +708,14 @@ bool PeerNetwork<O, _, __>::has_peer(const NetAddr &paddr) const {
 
 template<typename O, O _, O __>
 template<typename MsgType>
-void PeerNetwork<O, _, __>::send_msg(const MsgType &msg, const NetAddr &addr) {
-    send_msg(msg, *get_peer_conn(addr));
+void PeerNetwork<O, _, __>::send_msg(MsgType msg, const NetAddr &paddr) {
+    this->disp_tcall->async_call(
+                [this, msg=std::forward<MsgType>(msg), paddr](ThreadCall::Handle &h) {
+        auto it = id2peer.find(paddr);
+        if (it == id2peer.end())
+            throw PeerNetworkError("peer does not exist");
+        send_msg(msg, it->second->conn);
+    });
 }
 /* end: functions invoked by the user loop */
 
@@ -734,15 +740,14 @@ void ClientNetwork<OpcodeType>::Conn::on_teardown() {
 
 template<typename OpcodeType>
 template<typename MsgType>
-void ClientNetwork<OpcodeType>::send_msg(const MsgType &msg, const NetAddr &addr) {
-    auto ret = *(static_cast<conn_t *>(this->disp_tcall->call(
-                [this, addr](ThreadCall::Handle &h) {
+void ClientNetwork<OpcodeType>::send_msg(MsgType msg, const NetAddr &addr) {
+    this->disp_tcall->async_call(
+            [this, addr, msg=std::forward<MsgType>(msg)](ThreadCall::Handle &h) {
         auto it = addr2conn.find(addr);
         if (it == addr2conn.end())
             throw PeerNetworkError("client does not exist");
-        h.set_result(it->second->conn);
-    }).get()));
-    send_msg(msg, *ret);
+        send_msg(msg, it->second->conn);
+    });
 }
 
 template<typename O, O OPCODE_PING, O _>
