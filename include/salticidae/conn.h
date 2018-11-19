@@ -204,7 +204,7 @@ class ConnPool {
                         .get_queue()
                         .reg_handler(this->ec, [conn, client_fd]
                                     (MPSCWriteBuffer::queue_t &) {
-                    if (conn->ready_send && conn->self_ref)
+                    if (conn->ready_send)
                     {
                         conn->ev_socket.del();
                         conn->ev_socket.add(Event::READ | Event::WRITE);
