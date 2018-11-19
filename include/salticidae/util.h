@@ -101,6 +101,7 @@ class Logger {
     void debug(const char *fmt, ...);
     void warning(const char *fmt, ...);
     void error(const char *fmt, ...);
+    bool is_tty() { return isatty(output); }
 };
 
 extern Logger logger;

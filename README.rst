@@ -1,4 +1,4 @@
-Salticidae: Minimal C++ asynchronous network library.
+Salticidae: minimal C++ asynchronous network library.
 =======================================================
 
 .. image:: https://img.shields.io/badge/License-MIT-yellow.svg
@@ -9,7 +9,7 @@ Features
 --------
 
 - Simplicity. The library is self-contained, small in code base, and only
-  relies on libevent and libcrypo (OpenSSL, for SHA256 purpose).
+  relies on libuv and libcrypo (OpenSSL, for SHA256 purpose).
 
 - Clarity. With moderate use of C++ template and new features, the vast
   majority of the code is self-documenting.
@@ -17,11 +17,13 @@ Features
 - Layered design. You can use network abstraction from the lowest socket
   connection level to the highest P2P network level.
 
-- Performance. The implementation strives to incur very little overhead in processing
+- Performance. Based on a hybrid solution that combines both thread-based and
+  event-driven concurrency paradigms, it gets the best of both worlds.
+  The implementation strives to incur very little overhead in processing
   network I/O, and avoid unnecessary memory copies thanks to the move semantics.
 
 - Utilities. The library also provides with some useful gadgets, such as
-  command-line parser, libevent abstraction, etc.
+  command-line parser, libuv abstraction, etc.
 
 Functionalities
 ---------------
@@ -60,7 +62,7 @@ Dependencies
 
 - CMake >= 3.9
 - C++14
-- libevent
+- libuv
 - libcrypto
 
 Example (MsgNetwork layer)

@@ -147,11 +147,15 @@ int main(int argc, char **argv) {
     auto opt_npeers = Config::OptValInt::create(5);
     auto opt_seg_buff_size = Config::OptValInt::create(4096);
     auto opt_nworker = Config::OptValInt::create(2);
+    auto opt_conn_timeout = Config::OptValDouble::create(5);
+    auto opt_ping_peroid = Config::OptValDouble::create(5);
     auto opt_help = Config::OptValFlag::create(false);
     config.add_opt("no-msg", opt_no_msg, Config::SWITCH_ON);
     config.add_opt("npeers", opt_npeers, Config::SET_VAL);
     config.add_opt("seg-buff-size", opt_seg_buff_size, Config::SET_VAL);
     config.add_opt("nworker", opt_nworker, Config::SET_VAL);
+    config.add_opt("conn-timeout", opt_conn_timeout, Config::SET_VAL);
+    config.add_opt("ping-period", opt_ping_peroid, Config::SET_VAL);
     config.add_opt("help", opt_help, Config::SWITCH_ON, 'h', "show this help info");
     config.parse(argc, argv);
     if (opt_help->get())
@@ -171,8 +175,10 @@ int main(int argc, char **argv) {
         a.addr = addrs[i];
         a.net = new MyNet(a.ec, MyNet::Config(
                 salticidae::ConnPool::Config()
-                    .nworker(opt_nworker->get()).seg_buff_size(seg_buff_size))
-                        .conn_timeout(5).ping_period(2));
+                    .nworker(opt_nworker->get())
+                    .seg_buff_size(seg_buff_size))
+                        .conn_timeout(opt_conn_timeout->get())
+                        .ping_period(opt_ping_peroid->get()));
         a.tcall = new ThreadCall(a.ec);
         if (!opt_no_msg->get())
             install_proto(a.ec, *a.net, a.tc, seg_buff_size);

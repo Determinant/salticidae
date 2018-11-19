@@ -91,7 +91,7 @@ const std::string get_current_datetime() {
 SalticidaeError::SalticidaeError() : msg("unknown") {}
 
 void Logger::set_color() {
-    if (isatty(output))
+    if (is_tty())
     {
         color_info = TTY_COLOR_GREEN;
         color_debug = TTY_COLOR_BLUE;

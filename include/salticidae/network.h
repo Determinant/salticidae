@@ -601,8 +601,19 @@ bool PeerNetwork<O, _, __>::check_new_conn(const conn_t &conn, uint16_t port) {
     p->reset_ping_timer();
     p->send_ping();
     if (p->connected)
-        SALTICIDAE_LOG_INFO("PeerNetwork: established connection with %s via %s",
-            std::string(conn->peer_id).c_str(), std::string(*conn).c_str());
+    {
+        auto color_begin = "";
+        auto color_end = "";
+        if (logger.is_tty())
+        {
+            color_begin = TTY_COLOR_BLUE;
+            color_end = TTY_COLOR_RESET;
+        }
+        SALTICIDAE_LOG_INFO("%sPeerNetwork: established connection with %s via %s%s",
+            color_begin,
+            std::string(conn->peer_id).c_str(), std::string(*conn).c_str(),
+            color_end);
+    }
     return false;
 }
 
