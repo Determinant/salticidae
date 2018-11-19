@@ -187,6 +187,8 @@ class ConnPool {
         }
 
         void feed(const conn_t &conn, int client_fd) {
+            /* the caller should finalize all the preparation */
+            std::atomic_thread_fence(std::memory_order_release);
             tcall.async_call([this, conn, client_fd](ThreadCall::Handle &) {
                 if (conn->mode == Conn::ConnMode::DEAD)
                 {

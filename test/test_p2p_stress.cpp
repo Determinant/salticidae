@@ -45,6 +45,7 @@ using salticidae::uint256_t;
 using salticidae::static_pointer_cast;
 using salticidae::Config;
 using salticidae::ThreadCall;
+using salticidae::BoxObj;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
@@ -75,10 +76,6 @@ const uint8_t MsgAck::opcode;
 using MyNet = salticidae::PeerNetwork<uint8_t>;
 
 std::vector<NetAddr> addrs;
-
-void signal_handler(int) {
-    throw salticidae::SalticidaeError("got termination signal");
-}
 
 struct TestContext {
     Event timer;
@@ -136,9 +133,15 @@ void install_proto(EventContext &ec, MyNet &net,
     });
 }
 
+struct AppContext {
+    NetAddr addr;
+    EventContext ec;
+    BoxObj<MyNet> net;
+    BoxObj<ThreadCall> tcall;
+    std::unordered_map<NetAddr, TestContext> tc;
+};
+
 int main(int argc, char **argv) {
-    signal(SIGTERM, signal_handler);
-    signal(SIGINT, signal_handler);
     Config config;
     auto opt_no_msg = Config::OptValFlag::create(false);
     auto opt_npeers = Config::OptValInt::create(5);
@@ -159,40 +162,40 @@ int main(int argc, char **argv) {
     size_t seg_buff_size = opt_seg_buff_size->get();
     for (int i = 0; i < opt_npeers->get(); i++)
         addrs.push_back(NetAddr("127.0.0.1:" + std::to_string(12345 + i)));
-    std::vector<std::thread> peers;
-    std::vector<salticidae::BoxObj<ThreadCall>> tcalls;
-    tcalls.resize(addrs.size());
-    size_t i = 0;
-    for (auto &addr: addrs)
+    std::vector<AppContext> apps;
+    std::vector<std::thread> threads;
+    apps.resize(addrs.size());
+    for (size_t i = 0; i < apps.size(); i++)
     {
-        peers.push_back(std::thread([&, addr, i]() {
-            EventContext ec;
-            std::unordered_map<NetAddr, TestContext> tc;
-            MyNet net(ec, MyNet::Config(
+        auto &a = apps[i];
+        a.addr = addrs[i];
+        a.net = new MyNet(a.ec, MyNet::Config(
                 salticidae::ConnPool::Config()
                     .nworker(opt_nworker->get()).seg_buff_size(seg_buff_size))
                         .conn_timeout(5).ping_period(2));
-            tcalls[i] = new ThreadCall(ec);
-            if (!opt_no_msg->get())
-                install_proto(ec, net, tc, seg_buff_size);
-            try {
-                net.start();
-                net.listen(addr);
-                for (auto &paddr: addrs)
-                    if (paddr != addr) net.add_peer(paddr);
-                ec.dispatch();
-            } catch (salticidae::SalticidaeError &e) {}
-        }));
-        i++;
+        a.tcall = new ThreadCall(a.ec);
+        if (!opt_no_msg->get())
+            install_proto(a.ec, *a.net, a.tc, seg_buff_size);
+        a.net->start();
     }
+
+    for (auto &a: apps)
+        threads.push_back(std::thread([&]() {
+            a.net->listen(a.addr);
+            for (auto &paddr: addrs)
+                if (paddr != a.addr) a.net->add_peer(paddr);
+            a.ec.dispatch();}));
     
     EventContext ec;
     auto shutdown = [&](int) {
-        for (auto &tc: tcalls)
+        for (auto &a: apps)
+        {
+            auto &tc = a.tcall;
             tc->async_call([ec=tc->get_ec()](ThreadCall::Handle &) {
                 ec.stop();
             });
-        for (auto &t: peers) t.join();
+        }
+        for (auto &t: threads) t.join();
         ec.stop();
     };
     salticidae::SigEvent ev_sigint(ec, shutdown);
