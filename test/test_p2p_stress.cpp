@@ -135,8 +135,8 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
                 net.terminate(conn);
                 std::string s;
                 for (const auto &p: app.tc)
-                    s += salticidae::stringprintf(" %d(%d)", p.first.port, p.second.ncompleted);
-                SALTICIDAE_LOG_INFO("%d completed:%s", app.addr.port, s.c_str());
+                    s += salticidae::stringprintf(" %d(%d)", ntohs(p.first.port), p.second.ncompleted);
+                SALTICIDAE_LOG_INFO("%d completed:%s", ntohs(app.addr.port), s.c_str());
             });
             double t = salticidae::gen_rand_timeout(10);
             tc.timer.add_with_timeout(t, 0);

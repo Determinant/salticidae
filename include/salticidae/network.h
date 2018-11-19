@@ -492,7 +492,7 @@ void PeerNetwork<O, _, __>::tcall_reset_timeout(ConnPool::Worker *worker,
         if (!conn->ev_timeout) return;
         conn->ev_timeout.del();
         conn->ev_timeout.add_with_timeout(t, 0);
-        SALTICIDAE_LOG_INFO("reset timeout %.2f", t);
+        SALTICIDAE_LOG_DEBUG("reset connection timeout %.2f", t);
     });
 }
 
