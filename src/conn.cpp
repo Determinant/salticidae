@@ -145,26 +145,26 @@ void ConnPool::Conn::stop() {
 }
 
 void ConnPool::Conn::worker_terminate() {
+    auto conn = self();
+    if (!conn) return;
     stop();
     if (!worker->is_dispatcher())
         cpool->disp_tcall->async_call(
-                [cpool=this->cpool, fd=this->fd](ThreadCall::Handle &) {
-            cpool->remove_conn(fd);
+                [cpool=this->cpool, conn](ThreadCall::Handle &) {
+            cpool->del_conn(conn);
         });
-    else cpool->remove_conn(fd);
+    else cpool->del_conn(conn);
 }
 
 void ConnPool::Conn::disp_terminate() {
+    auto conn = self();
+    if (!conn) return;
     if (worker && !worker->is_dispatcher())
-    {
-        auto conn = self();
-        if (conn)
-            worker->get_tcall()->call([conn](ThreadCall::Handle &) {
-                conn->stop();
-            });
-    }
+        worker->get_tcall()->call([conn](ThreadCall::Handle &) {
+            conn->stop();
+        });
     else stop();
-    cpool->remove_conn(fd);
+    cpool->del_conn(conn);
 }
 
 void ConnPool::accept_client(int fd, int) {
@@ -201,6 +201,7 @@ void ConnPool::accept_client(int fd, int) {
 
 void ConnPool::Conn::conn_server(int fd, int events) {
     auto conn = self(); /* pin the connection */
+    if (!conn) return;
     if (send(fd, "", 0, MSG_NOSIGNAL) == 0)
     {
         ev_connect.clear();
@@ -290,8 +291,8 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
     return conn;
 }
 
-void ConnPool::remove_conn(int fd) {
-    auto it = pool.find(fd);
+void ConnPool::del_conn(const conn_t &conn) {
+    auto it = pool.find(conn->fd);
     if (it != pool.end())
     {
         /* temporarily pin the conn before it dies */
@@ -303,6 +304,7 @@ void ConnPool::remove_conn(int fd) {
         update_conn(conn, false);
         conn->release_self(); /* remove the self-cycle */
         ::close(conn->fd);
+        SALTICIDAE_LOG_INFO("remove_conn: %s", std::string(*conn).c_str());
         conn->fd = -1;
     }
 }

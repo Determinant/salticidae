@@ -196,6 +196,7 @@ class ConnPool {
                         std::this_thread::get_id());
                     return;
                 }
+                assert(conn->fd != -1);
                 SALTICIDAE_LOG_INFO("worker %x got %s",
                         std::this_thread::get_id(),
                         std::string(*conn).c_str());
@@ -243,7 +244,7 @@ class ConnPool {
 
     void accept_client(int, int);
     conn_t add_conn(const conn_t &conn);
-    void remove_conn(int fd);
+    void del_conn(const conn_t &conn);
 
     protected:
     conn_t _connect(const NetAddr &addr);

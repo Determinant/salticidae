@@ -83,7 +83,7 @@ struct MyNet: public MsgNetworkByteOp {
             name(name),
             peer(peer),
             ev_period_stat(ec, -1, [this, stat_timeout](int, short) {
-                printf("%.2f mps\n", nrecv / (double)stat_timeout);
+                SALTICIDAE_LOG_INFO("%.2f mps\n", nrecv / (double)stat_timeout);
                 nrecv = 0;
                 ev_period_stat.add_with_timeout(stat_timeout, 0);
             }),
@@ -154,10 +154,12 @@ int main() {
     sigaction(SIGINT, &sa, NULL);
     /* test two nodes */
     MyNet alice(ec, "Alice", bob_addr, 10);
+    alice.start();
     alice.listen(alice_addr);
     std::thread bob_thread([]() {
         salticidae::EventContext ec;
         MyNet bob(ec, "Bob", alice_addr);
+        bob.start();
         bob.connect(alice_addr);
         try {
             ec.dispatch();

@@ -81,12 +81,23 @@ struct TestContext {
     Event timer;
     int state;
     uint256_t hash;
+    size_t ncompleted;
+    TestContext(): ncompleted(0) {}
 };
 
-void install_proto(EventContext &ec, MyNet &net,
-                    std::unordered_map<NetAddr, TestContext> &_tc, const size_t &seg_buff_size) {
+struct AppContext {
+    NetAddr addr;
+    EventContext ec;
+    BoxObj<MyNet> net;
+    BoxObj<ThreadCall> tcall;
+    std::unordered_map<NetAddr, TestContext> tc;
+};
+
+void install_proto(AppContext &app, const size_t &seg_buff_size) {
+    auto &ec = app.ec;
+    auto &net = *app.net;
     auto send_rand = [&](int size, const MyNet::conn_t &conn) {
-        auto &tc = _tc[conn->get_addr()];
+        auto &tc = app.tc[conn->get_addr()];
         MsgRand msg(size);
         tc.hash = msg.serialized.get_hash();
         net.send_msg(std::move(msg), conn);
@@ -96,7 +107,7 @@ void install_proto(EventContext &ec, MyNet &net,
         {
             if (conn->get_mode() == ConnPool::Conn::ACTIVE)
             {
-                auto &tc = _tc[conn->get_addr()];
+                auto &tc = app.tc[conn->get_addr()];
                 tc.state = 1;
                 SALTICIDAE_LOG_INFO("increasing phase");
                 send_rand(tc.state, static_pointer_cast<MyNet::Conn>(conn));
@@ -108,7 +119,7 @@ void install_proto(EventContext &ec, MyNet &net,
         net.send_msg(MsgAck(hash), conn);
     });
     net.reg_handler([&, send_rand](MsgAck &&msg, const MyNet::conn_t &conn) {
-        auto &tc = _tc[conn->get_addr()];
+        auto &tc = app.tc[conn->get_addr()];
         if (msg.hash != tc.hash)
         {
             SALTICIDAE_LOG_ERROR("corrupted I/O!");
@@ -119,8 +130,13 @@ void install_proto(EventContext &ec, MyNet &net,
         {
             send_rand(tc.state, conn);
             tc.state = -1;
-            tc.timer = Event(ec, -1, [&net, conn](int, int) {
+            tc.timer = Event(ec, -1, [&, conn](int, int) {
+                tc.ncompleted++;
                 net.terminate(conn);
+                std::string s;
+                for (const auto &p: app.tc)
+                    s += salticidae::stringprintf(" %d(%d)", p.first.port, p.second.ncompleted);
+                SALTICIDAE_LOG_INFO("%d completed:%s", app.addr.port, s.c_str());
             });
             double t = salticidae::gen_rand_timeout(10);
             tc.timer.add_with_timeout(t, 0);
@@ -133,14 +149,6 @@ void install_proto(EventContext &ec, MyNet &net,
     });
 }
 
-struct AppContext {
-    NetAddr addr;
-    EventContext ec;
-    BoxObj<MyNet> net;
-    BoxObj<ThreadCall> tcall;
-    std::unordered_map<NetAddr, TestContext> tc;
-};
-
 int main(int argc, char **argv) {
     Config config;
     auto opt_no_msg = Config::OptValFlag::create(false);
@@ -148,7 +156,7 @@ int main(int argc, char **argv) {
     auto opt_seg_buff_size = Config::OptValInt::create(4096);
     auto opt_nworker = Config::OptValInt::create(2);
     auto opt_conn_timeout = Config::OptValDouble::create(5);
-    auto opt_ping_peroid = Config::OptValDouble::create(5);
+    auto opt_ping_peroid = Config::OptValDouble::create(2);
     auto opt_help = Config::OptValFlag::create(false);
     config.add_opt("no-msg", opt_no_msg, Config::SWITCH_ON);
     config.add_opt("npeers", opt_npeers, Config::SET_VAL);
@@ -181,7 +189,7 @@ int main(int argc, char **argv) {
                         .ping_period(opt_ping_peroid->get()));
         a.tcall = new ThreadCall(a.ec);
         if (!opt_no_msg->get())
-            install_proto(a.ec, *a.net, a.tc, seg_buff_size);
+            install_proto(a, seg_buff_size);
         a.net->start();
     }
 
@@ -197,7 +205,7 @@ int main(int argc, char **argv) {
         for (auto &a: apps)
         {
             auto &tc = a.tcall;
-            tc->async_call([ec=tc->get_ec()](ThreadCall::Handle &) {
+            tc->async_call([ec=a.ec](ThreadCall::Handle &) {
                 ec.stop();
             });
         }
