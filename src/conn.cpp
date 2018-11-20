@@ -304,7 +304,6 @@ void ConnPool::del_conn(const conn_t &conn) {
         update_conn(conn, false);
         conn->release_self(); /* remove the self-cycle */
         ::close(conn->fd);
-        SALTICIDAE_LOG_INFO("remove_conn: %s", std::string(*conn).c_str());
         conn->fd = -1;
     }
 }

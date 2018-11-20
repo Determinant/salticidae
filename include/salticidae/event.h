@@ -335,7 +335,7 @@ class ThreadCall {
                 notifier->notify(std::move(result));
         }
         template<typename T>
-        void set_result(T data) {
+        void set_result(T &&data) {
             result = Result(new T(std::forward<T>(data)),
                             [](void *ptr) {delete static_cast<T *>(ptr);});
         }

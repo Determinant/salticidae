@@ -192,7 +192,7 @@ class MsgNetwork: public ConnPool {
     }
 
     template<typename MsgType>
-    void send_msg(const MsgType &msg, const conn_t &conn);
+    void send_msg(MsgType &&msg, const conn_t &conn);
     using ConnPool::listen;
 #ifdef SALTICIDAE_MSG_STAT
     msg_stat_by_opcode_t &get_sent_by_opcode() const {
@@ -243,7 +243,7 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
         MsgNet(ec, config) {}
 
     template<typename MsgType>
-    void send_msg(MsgType msg, const NetAddr &addr);
+    void send_msg(MsgType &&msg, const NetAddr &addr);
 };
 
 class PeerNetworkError: public ConnPoolError {
@@ -429,7 +429,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     const conn_t get_peer_conn(const NetAddr &paddr) const;
     using MsgNet::send_msg;
     template<typename MsgType>
-    void send_msg(MsgType msg, const NetAddr &paddr);
+    void send_msg(MsgType &&msg, const NetAddr &paddr);
     void listen(NetAddr listen_addr);
     bool has_peer(const NetAddr &paddr) const;
     conn_t connect(const NetAddr &addr) = delete;
@@ -472,8 +472,8 @@ void MsgNetwork<OpcodeType>::Conn::on_read() {
 
 template<typename OpcodeType>
 template<typename MsgType>
-void MsgNetwork<OpcodeType>::send_msg(const MsgType &_msg, const conn_t &conn) {
-    Msg msg(_msg);
+void MsgNetwork<OpcodeType>::send_msg(MsgType &&_msg, const conn_t &conn) {
+    Msg msg(std::forward<MsgType>(_msg));
     bytearray_t msg_data = msg.serialize();
     SALTICIDAE_LOG_DEBUG("wrote message %s to %s",
                 std::string(msg).c_str(),
@@ -708,7 +708,7 @@ bool PeerNetwork<O, _, __>::has_peer(const NetAddr &paddr) const {
 
 template<typename O, O _, O __>
 template<typename MsgType>
-void PeerNetwork<O, _, __>::send_msg(MsgType msg, const NetAddr &paddr) {
+void PeerNetwork<O, _, __>::send_msg(MsgType &&msg, const NetAddr &paddr) {
     this->disp_tcall->async_call(
                 [this, msg=std::forward<MsgType>(msg), paddr](ThreadCall::Handle &h) {
         auto it = id2peer.find(paddr);
@@ -740,7 +740,7 @@ void ClientNetwork<OpcodeType>::Conn::on_teardown() {
 
 template<typename OpcodeType>
 template<typename MsgType>
-void ClientNetwork<OpcodeType>::send_msg(MsgType msg, const NetAddr &addr) {
+void ClientNetwork<OpcodeType>::send_msg(MsgType &&msg, const NetAddr &addr) {
     this->disp_tcall->async_call(
             [this, addr, msg=std::forward<MsgType>(msg)](ThreadCall::Handle &h) {
         auto it = addr2conn.find(addr);
