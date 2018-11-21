@@ -51,11 +51,13 @@ double gen_rand_timeout(double base_timeout, double alpha) {
     return base_timeout + rand() / (double)RAND_MAX * alpha * base_timeout;
 }
 
-std::string vstringprintf(const char *fmt, va_list ap) {
+std::string vstringprintf(const char *fmt, va_list _ap) {
     int guessed_size = 1024;
     std::string buff;
+    va_list ap;
+    va_copy(ap, _ap);
     buff.resize(guessed_size);
-    int nwrote = vsnprintf(&buff[0], guessed_size, fmt, ap);
+    int nwrote = vsnprintf(&buff[0], guessed_size, fmt, _ap);
     if (nwrote < 0) buff = "";
     else
     {
@@ -66,6 +68,7 @@ std::string vstringprintf(const char *fmt, va_list ap) {
                 buff = "";
         }
     }
+    va_end(ap);
     return std::move(buff);
 }
 

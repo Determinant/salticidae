@@ -4,6 +4,8 @@
 
 #include "salticidae/event.h"
 
+using salticidae::TimerEvent;
+
 void test_mpsc(int nproducers = 16, int nops = 100000, size_t burst_size = 128) {
     size_t total = nproducers * nops;
     salticidae::EventContext ec;
@@ -23,10 +25,10 @@ void test_mpsc(int nproducers = 16, int nops = 100000, size_t burst_size = 128) 
     });
     std::vector<std::thread> producers;
     std::thread consumer([&collected, total, &ec]() {
-        salticidae::Event timer(ec, -1, [&ec, &collected, total](int, short) {
+        TimerEvent timer(ec, [&ec, &collected, total](TimerEvent &) {
             if (collected.load() == total) ec.stop();
         });
-        timer.add_with_timeout(1, 0);
+        timer.add(1);
         ec.dispatch();
     });
     for (int i = 0; i < nproducers; i++)

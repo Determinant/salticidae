@@ -36,7 +36,7 @@ using salticidae::NetAddr;
 using salticidae::DataStream;
 using salticidae::MsgNetwork;
 using salticidae::ConnPool;
-using salticidae::Event;
+using salticidae::TimerEvent;
 using salticidae::EventContext;
 using salticidae::htole;
 using salticidae::letoh;
@@ -78,7 +78,7 @@ using MyNet = salticidae::PeerNetwork<uint8_t>;
 std::vector<NetAddr> addrs;
 
 struct TestContext {
-    Event timer;
+    TimerEvent timer;
     int state;
     uint256_t hash;
     size_t ncompleted;
@@ -130,7 +130,7 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
         {
             send_rand(tc.state, conn);
             tc.state = -1;
-            tc.timer = Event(ec, -1, [&, conn](int, int) {
+            tc.timer = TimerEvent(ec, [&, conn](TimerEvent &) {
                 tc.ncompleted++;
                 net.terminate(conn);
                 std::string s;
@@ -139,7 +139,7 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
                 SALTICIDAE_LOG_INFO("%d completed:%s", ntohs(app.addr.port), s.c_str());
             });
             double t = salticidae::gen_rand_timeout(10);
-            tc.timer.add_with_timeout(t, 0);
+            tc.timer.add(t);
             SALTICIDAE_LOG_INFO("rand-bomboard phase, ending in %.2f secs", t);
         }
         else if (tc.state == -1)

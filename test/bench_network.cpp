@@ -42,7 +42,7 @@ using salticidae::MsgNetwork;
 using salticidae::htole;
 using salticidae::letoh;
 using salticidae::bytearray_t;
-using salticidae::Event;
+using salticidae::TimerEvent;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using opcode_t = uint8_t;
@@ -71,8 +71,8 @@ using MsgNetworkByteOp = MsgNetwork<opcode_t>;
 struct MyNet: public MsgNetworkByteOp {
     const std::string name;
     const NetAddr peer;
-    Event ev_period_send;
-    Event ev_period_stat;
+    TimerEvent ev_period_send;
+    TimerEvent ev_period_stat;
     size_t nrecv;
 
     MyNet(const salticidae::EventContext &ec,
@@ -82,17 +82,17 @@ struct MyNet: public MsgNetworkByteOp {
             MsgNetworkByteOp(ec, MsgNetworkByteOp::Config()),
             name(name),
             peer(peer),
-            ev_period_stat(ec, -1, [this, stat_timeout](int, short) {
+            ev_period_stat(ec, [this, stat_timeout](TimerEvent &) {
                 SALTICIDAE_LOG_INFO("%.2f mps\n", nrecv / (double)stat_timeout);
                 nrecv = 0;
-                ev_period_stat.add_with_timeout(stat_timeout, 0);
+                ev_period_stat.add(stat_timeout);
             }),
             nrecv(0) {
         /* message handler could be a bound method */
         reg_handler(salticidae::generic_bind(
             &MyNet::on_receive_bytes, this, _1, _2));
         if (stat_timeout > 0)
-            ev_period_stat.add_with_timeout(0, 0);
+            ev_period_stat.add(0);
     }
 
     struct Conn: public MsgNetworkByteOp::Conn {
@@ -109,12 +109,12 @@ struct MyNet: public MsgNetworkByteOp {
                 printf("[%s] Connected, sending hello.\n",
                         net->name.c_str());
                 /* send the first message through this connection */
-                net->ev_period_send = Event(net->ec, -1,
-                                            [net, conn = self()](int, short) {
+                net->ev_period_send = TimerEvent(net->ec,
+                                            [net, conn = self()](TimerEvent &) {
                     net->send_msg(MsgBytes(256), conn);
-                    net->ev_period_send.add_with_timeout(0, 0);
+                    net->ev_period_send.add(0);
                 });
-                net->ev_period_send.add_with_timeout(0, 0);
+                net->ev_period_send.add(0);
 
             }
             else

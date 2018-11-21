@@ -68,102 +68,74 @@ class EventContext: public _event_context_ot {
     void stop() const { uv_stop(get()); }
 };
 
-class Event {
+static void _on_uv_handle_close(uv_handle_t *h) { delete h; }
+
+class FdEvent {
     public:
     using callback_t = std::function<void(int fd, int events)>;
     static const int READ = UV_READABLE;
     static const int WRITE = UV_WRITABLE;
     static const int ERROR = 1 << 30;
-    static const int TIMEOUT = 1 << 29;
 
-    private:
-    EventContext eb;
+    protected:
+    EventContext ec;
     int fd;
     uv_poll_t *ev_fd;
-    uv_timer_t *ev_timer;
     callback_t callback;
+
     static inline void fd_then(uv_poll_t *h, int status, int events) {
         if (status != 0)
             events |= ERROR;
-        auto event = static_cast<Event *>(h->data);
+        auto event = static_cast<FdEvent *>(h->data);
         event->callback(event->fd, events);
     }
 
-    static inline void timer_then(uv_timer_t *h) {
-        auto event = static_cast<Event *>(h->data);
-        if (event->ev_fd) uv_poll_stop(event->ev_fd);
-        event->callback(event->fd, TIMEOUT);
-    }
-
-    static void _on_handle_close(uv_handle_t *h) {
-        delete h;
-    }
-
     public:
-    Event(): eb(nullptr), ev_fd(nullptr), ev_timer(nullptr) {}
-    Event(const EventContext &eb, int fd, callback_t callback):
-            eb(eb), fd(fd),
-            ev_fd(nullptr),
-            ev_timer(new uv_timer_t()),
+    FdEvent(): ec(nullptr), ev_fd(nullptr) {}
+    FdEvent(const EventContext &ec, int fd, callback_t callback):
+            ec(ec), fd(fd), ev_fd(new uv_poll_t()),
             callback(callback) {
-        if (fd != -1)
-        {
-            ev_fd = new uv_poll_t();
-            uv_poll_init(eb.get(), ev_fd, fd);
-            ev_fd->data = this;
-        }
-        uv_timer_init(eb.get(), ev_timer);
-        ev_timer->data = this;
+        uv_poll_init(ec.get(), ev_fd, fd);
+        ev_fd->data = this;
     }
 
-    Event(const Event &) = delete;
-    Event(Event &&other):
-            eb(std::move(other.eb)), fd(other.fd),
-            ev_fd(other.ev_fd), ev_timer(other.ev_timer),
+    FdEvent(const FdEvent &) = delete;
+    FdEvent(FdEvent &&other):
+            ec(std::move(other.ec)), fd(other.fd), ev_fd(other.ev_fd),
             callback(std::move(other.callback)) {
-        other.del();
+        other.ev_fd = nullptr;
         if (ev_fd != nullptr)
-        {
-            other.ev_fd = nullptr;
             ev_fd->data = this;
-        }
-        other.ev_timer = nullptr;
-        ev_timer->data = this;
+    }
+    
+    void swap(FdEvent &other) {
+        std::swap(ec, other.ec);
+        std::swap(fd, other.fd);
+        std::swap(ev_fd, other.ev_fd);
+        std::swap(callback, other.callback);
+        if (ev_fd != nullptr)
+            ev_fd->data = this;
+        if (other.ev_fd != nullptr)
+            other.ev_fd->data = &other;
     }
 
-    Event &operator=(Event &&other) {
-        clear();
-        other.del();
-        eb = std::move(other.eb);
-        fd = other.fd;
-        ev_fd = other.ev_fd;
-        ev_timer = other.ev_timer;
-        callback = std::move(other.callback);
-
-        if (ev_fd != nullptr)
+    FdEvent &operator=(FdEvent &&other) {
+        if (this != &other)
         {
-            other.ev_fd = nullptr;
-            ev_fd->data = this;
+            FdEvent tmp(std::move(other));
+            tmp.swap(*this);
         }
-        other.ev_timer = nullptr;
-        ev_timer->data = this;
         return *this;
     }
 
-    ~Event() { clear(); }
+    ~FdEvent() { clear(); }
 
     void clear() {
         if (ev_fd != nullptr)
         {
             uv_poll_stop(ev_fd);
-            uv_close((uv_handle_t *)ev_fd, Event::_on_handle_close);
+            uv_close((uv_handle_t *)ev_fd, _on_uv_handle_close);
             ev_fd = nullptr;
-        }
-        if (ev_timer != nullptr)
-        {
-            uv_timer_stop(ev_timer);
-            uv_close((uv_handle_t *)ev_timer, Event::_on_handle_close);
-            ev_timer = nullptr;
         }
         callback = nullptr;
     }
@@ -173,27 +145,169 @@ class Event {
     }
 
     void add(int events) {
-        if (ev_fd) uv_poll_start(ev_fd, events, Event::fd_then);
-    }
-    void del() {
-        if (ev_fd) uv_poll_stop(ev_fd);
-        if (ev_timer == nullptr)
-            assert(ev_timer);
-        uv_timer_stop(ev_timer);
-    }
-    void add_with_timeout(double t_sec, int events) {
-        add(events);
-        uv_timer_start(ev_timer, Event::timer_then, uint64_t(t_sec * 1000), 0);
+        assert(ev_fd != nullptr);
+        uv_poll_start(ev_fd, events, FdEvent::fd_then);
     }
 
-    operator bool() const { return ev_fd != nullptr || ev_timer != nullptr; }
+    void del() {
+        if (ev_fd != nullptr) uv_poll_stop(ev_fd);
+    }
+
+    operator bool() const { return ev_fd != nullptr; }
+};
+
+
+class TimerEvent {
+    public:
+    using callback_t = std::function<void(TimerEvent &)>;
+
+    protected:
+    EventContext ec;
+    uv_timer_t *ev_timer;
+    callback_t callback;
+
+    static inline void timer_then(uv_timer_t *h) {
+        auto event = static_cast<TimerEvent *>(h->data);
+        event->callback(*event);
+    }
+
+    public:
+    TimerEvent(): ec(nullptr), ev_timer(nullptr) {}
+    TimerEvent(const EventContext &ec, callback_t callback):
+            ec(ec), ev_timer(new uv_timer_t()),
+            callback(callback) {
+        uv_timer_init(ec.get(), ev_timer);
+        ev_timer->data = this;
+    }
+
+    TimerEvent(const TimerEvent &) = delete;
+    TimerEvent(TimerEvent &&other):
+            ec(std::move(other.ec)), ev_timer(other.ev_timer),
+            callback(std::move(other.callback)) {
+        other.ev_timer = nullptr;
+        if (ev_timer != nullptr)
+            ev_timer->data = this;
+    }
+
+    void swap(TimerEvent &other) {
+        std::swap(ec, other.ec);
+        std::swap(ev_timer, other.ev_timer);
+        std::swap(callback, other.callback);
+        if (ev_timer != nullptr)
+            ev_timer->data = this;
+        if (other.ev_timer != nullptr)
+            other.ev_timer->data = &other;
+    }
+
+    TimerEvent &operator=(TimerEvent &&other) {
+        if (this != &other)
+        {
+            TimerEvent tmp(std::move(other));
+            tmp.swap(*this);
+        }
+        return *this;
+    }
+
+    ~TimerEvent() { clear(); }
+
+    void clear() {
+        if (ev_timer != nullptr)
+        {
+            uv_timer_stop(ev_timer);
+            uv_close((uv_handle_t *)ev_timer, _on_uv_handle_close);
+            ev_timer = nullptr;
+        }
+        callback = nullptr;
+    }
+
+    void set_callback(callback_t _callback) {
+        callback = _callback;
+    }
+
+    void add(double t_sec) {
+        assert(ev_timer != nullptr);
+        uv_timer_start(ev_timer, TimerEvent::timer_then, uint64_t(t_sec * 1000), 0);
+    }
+
+    void del() {
+        if (ev_timer != nullptr) uv_timer_stop(ev_timer);
+    }
+
+    operator bool() const { return ev_timer != nullptr; }
+};
+
+class TimedFdEvent: public FdEvent, public TimerEvent {
+    public:
+    static const int TIMEOUT = 1 << 29;
+
+    private:
+    static inline void timer_then(uv_timer_t *h) {
+        auto event = static_cast<TimedFdEvent *>(h->data);
+        event->FdEvent::del();
+        event->FdEvent::callback(event->fd, TIMEOUT);
+    }
+
+    public:
+    TimedFdEvent() = default;
+    TimedFdEvent(const EventContext &ec, int fd, FdEvent::callback_t callback):
+        FdEvent(ec, fd, callback),
+        TimerEvent(ec, TimerEvent::callback_t()) {
+        ev_timer->data = this;
+    }
+
+    TimedFdEvent(TimedFdEvent &&other):
+            FdEvent(static_cast<FdEvent &&>(other)),
+            TimerEvent(static_cast<TimerEvent &&>(other)) {
+        if (ev_timer != nullptr)
+            ev_timer->data = this;
+    }
+
+    void swap(TimedFdEvent &other) {
+        std::swap(static_cast<FdEvent &>(*this), static_cast<FdEvent &>(other));
+        std::swap(static_cast<TimerEvent &>(*this), static_cast<TimerEvent &>(other));
+        if (ev_timer != nullptr)
+            ev_timer->data = this;
+    }
+
+    TimedFdEvent &operator=(TimedFdEvent &&other) {
+        if (this != &other)
+        {
+            TimedFdEvent tmp(std::move(other));
+            tmp.swap(*this);
+        }
+        return *this;
+    }
+
+    void clear() {
+        TimerEvent::clear();
+        FdEvent::clear();
+    }
+
+    using FdEvent::set_callback;
+
+    void add(int events) = delete;
+    void add(double t_sec) = delete;
+
+    void add(int events, double t_sec) {
+        assert(ev_fd != nullptr && ev_timer != nullptr);
+        uv_timer_start(ev_timer, TimedFdEvent::timer_then,
+                        uint64_t(t_sec * 1000), 0);
+        FdEvent::add(events);
+    }
+
+    void del() {
+        TimerEvent::del();
+        FdEvent::del();
+    }
+
+    operator bool() const { return ev_fd != nullptr; }
 };
 
 class SigEvent {
     public:
     using callback_t = std::function<void(int signum)>;
     private:
-    EventContext eb;
+    EventContext ec;
     uv_signal_t *ev_sig;
     callback_t callback;
     static inline void sig_then(uv_signal_t *h, int signum) {
@@ -201,39 +315,40 @@ class SigEvent {
         event->callback(signum);
     }
 
-    static void _on_handle_close(uv_handle_t *h) {
-        delete h;
-    }
-
     public:
-    SigEvent(): eb(nullptr), ev_sig(nullptr) {}
-    SigEvent(const EventContext &eb, callback_t callback):
-            eb(eb),
-            ev_sig(new uv_signal_t()),
+    SigEvent(): ec(nullptr), ev_sig(nullptr) {}
+    SigEvent(const EventContext &ec, callback_t callback):
+            ec(ec), ev_sig(new uv_signal_t()),
             callback(callback) {
-        uv_signal_init(eb.get(), ev_sig);
+        uv_signal_init(ec.get(), ev_sig);
         ev_sig->data = this;
     }
 
     SigEvent(const SigEvent &) = delete;
     SigEvent(SigEvent &&other):
-            eb(std::move(other.eb)),
-            ev_sig(other.ev_sig),
+            ec(std::move(other.ec)), ev_sig(other.ev_sig),
             callback(std::move(other.callback)) {
-        other.del();
         other.ev_sig = nullptr;
-        ev_sig->data = this;
+        if (ev_sig != nullptr)
+            ev_sig->data = this;
+    }
+
+    void swap(SigEvent &other) {
+        std::swap(ec, other.ec);
+        std::swap(ev_sig, other.ev_sig);
+        std::swap(callback, other.callback);
+        if (ev_sig != nullptr)
+            ev_sig->data = this;
+        if (other.ev_sig != nullptr)
+            other.ev_sig->data = &other;
     }
 
     SigEvent &operator=(SigEvent &&other) {
-        clear();
-        other.del();
-        eb = std::move(other.eb);
-        ev_sig = other.ev_sig;
-        callback = std::move(other.callback);
-
-        other.ev_sig = nullptr;
-        ev_sig->data = this;
+        if (this != &other)
+        {
+            SigEvent tmp(std::move(other));
+            tmp.swap(*this);
+        }
         return *this;
     }
 
@@ -243,7 +358,7 @@ class SigEvent {
         if (ev_sig != nullptr)
         {
             uv_signal_stop(ev_sig);
-            uv_close((uv_handle_t *)ev_sig, SigEvent::_on_handle_close);
+            uv_close((uv_handle_t *)ev_sig, _on_uv_handle_close);
             ev_sig = nullptr;
         }
         callback = nullptr;
@@ -254,15 +369,17 @@ class SigEvent {
     }
 
     void add(int signum) {
+        assert(ev_sig != nullptr);
         uv_signal_start(ev_sig, SigEvent::sig_then, signum);
     }
 
     void add_once(int signum) {
+        assert(ev_sig != nullptr);
         uv_signal_start_oneshot(ev_sig, SigEvent::sig_then, signum);
     }
 
     void del() {
-        uv_signal_stop(ev_sig);
+        if (ev_sig != nullptr) uv_signal_stop(ev_sig);
     }
 
     operator bool() const { return ev_sig != nullptr; }
@@ -292,7 +409,7 @@ class ThreadNotifier {
 class ThreadCall {
     int ctl_fd[2];
     EventContext ec;
-    Event ev_listen;
+    FdEvent ev_listen;
 
     public:
     struct Result {
@@ -347,13 +464,13 @@ class ThreadCall {
     ThreadCall(EventContext ec): ec(ec) {
         if (pipe2(ctl_fd, O_NONBLOCK))
             throw SalticidaeError(std::string("ThreadCall: failed to create pipe"));
-        ev_listen = Event(ec, ctl_fd[0], [this](int fd, int) {
+        ev_listen = FdEvent(ec, ctl_fd[0], [this](int fd, int) {
             Handle *h;
             read(fd, &h, sizeof(h));
             h->exec();
             delete h;
         });
-        ev_listen.add(Event::READ);
+        ev_listen.add(FdEvent::READ);
     }
 
     ~ThreadCall() {
@@ -394,7 +511,7 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
     const uint64_t dummy = 1;
     std::atomic<bool> wait_sig;
     int fd;
-    Event ev;
+    FdEvent ev;
 
     public:
     MPSCQueueEventDriven(size_t capacity = 65536):
@@ -409,7 +526,7 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
 
     template<typename Func>
     void reg_handler(const EventContext &ec, Func &&func) {
-        ev = Event(ec, fd,
+        ev = FdEvent(ec, fd,
                     [this, func=std::forward<Func>(func)](int, int) {
                     //fprintf(stderr, "%x\n", std::this_thread::get_id());
                     uint64_t t;
@@ -424,7 +541,7 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
                     if (func(*this))
                         write(fd, &dummy, 8);
                 });
-        ev.add(Event::READ);
+        ev.add(FdEvent::READ);
     }
 
     void unreg_handler() { ev.clear(); }

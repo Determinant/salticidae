@@ -86,8 +86,8 @@ class ConnPool {
         MPSCWriteBuffer send_buffer;
         SegBuffer recv_buffer;
 
-        Event ev_connect;
-        Event ev_socket;
+        TimedFdEvent ev_connect;
+        FdEvent ev_socket;
         /** does not need to wait if true */
         bool ready_send;
     
@@ -161,7 +161,7 @@ class ConnPool {
     conn_callback_t conn_cb;
 
     /* owned by the dispatcher */
-    Event ev_listen;
+    FdEvent ev_listen;
     std::unordered_map<int, conn_t> pool;
     int listen_fd;  /**< for accepting new network connections */
 
@@ -207,18 +207,18 @@ class ConnPool {
                     if (conn->ready_send)
                     {
                         conn->ev_socket.del();
-                        conn->ev_socket.add(Event::READ | Event::WRITE);
-                        conn->send_data(client_fd, Event::WRITE);
+                        conn->ev_socket.add(FdEvent::READ | FdEvent::WRITE);
+                        conn->send_data(client_fd, FdEvent::WRITE);
                     }
                     return false;
                 });
-                conn->ev_socket = Event(ec, client_fd, [conn=conn](int fd, int what) {
-                    if (what & Event::READ)
+                conn->ev_socket = FdEvent(ec, client_fd, [conn=conn](int fd, int what) {
+                    if (what & FdEvent::READ)
                         conn->recv_data(fd, what);
                     else
                         conn->send_data(fd, what);
                 });
-                conn->ev_socket.add(Event::READ | Event::WRITE);
+                conn->ev_socket.add(FdEvent::READ | FdEvent::WRITE);
                 nconn++;
             });
         }

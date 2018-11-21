@@ -267,7 +267,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     class Conn: public MsgNet::Conn {
         friend PeerNetwork;
         NetAddr peer_id;
-        Event ev_timeout;
+        TimerEvent ev_timeout;
         void reset_timeout(double timeout);
 
         public:
@@ -297,8 +297,8 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         NetAddr addr;
         /** the underlying connection, may be invalid when connected = false */
         conn_t conn;
-        Event ev_ping_timer;
-        Event ev_retry_timer;
+        TimerEvent ev_ping_timer;
+        TimerEvent ev_retry_timer;
         bool ping_timer_ok;
         bool pong_msg_ok;
         bool connected;
@@ -307,13 +307,13 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         Peer(NetAddr addr, conn_t conn, const EventContext &ec):
             addr(addr), conn(conn),
             ev_ping_timer(
-                Event(ec, -1, std::bind(&Peer::ping_timer, this, _1, _2))),
+                TimerEvent(ec, std::bind(&Peer::ping_timer, this, _1))),
             connected(false) {}
         ~Peer() {}
         Peer &operator=(const Peer &) = delete;
         Peer(const Peer &) = delete;
 
-        void ping_timer(int, int);
+        void ping_timer(TimerEvent &);
         void reset_ping_timer();
         void send_ping();
         void clear_all_events() {
@@ -491,7 +491,7 @@ void PeerNetwork<O, _, __>::tcall_reset_timeout(ConnPool::Worker *worker,
     worker->get_tcall()->async_call([conn, t=timeout](ThreadCall::Handle &) {
         if (!conn->ev_timeout) return;
         conn->ev_timeout.del();
-        conn->ev_timeout.add_with_timeout(t, 0);
+        conn->ev_timeout.add(t);
         SALTICIDAE_LOG_DEBUG("reset connection timeout %.2f", t);
     });
 }
@@ -504,7 +504,7 @@ void PeerNetwork<O, _, __>::Conn::on_setup() {
     auto conn = static_pointer_cast<Conn>(this->self());
     auto worker = this->worker;
     assert(!ev_timeout);
-    ev_timeout = Event(worker->get_ec(), -1, [conn](int, int) {
+    ev_timeout = TimerEvent(worker->get_ec(), [conn](TimerEvent &) {
         SALTICIDAE_LOG_INFO("peer ping-pong timeout");
         conn->worker_terminate();
     });
@@ -526,11 +526,11 @@ void PeerNetwork<O, _, __>::Conn::on_teardown() {
     p->conn = nullptr;
     SALTICIDAE_LOG_INFO("connection lost: %s", std::string(*this).c_str());
     // try to reconnect
-    p->ev_retry_timer = Event(pn->disp_ec, -1,
-            [pn, peer_id = this->peer_id](int, int) {
+    p->ev_retry_timer = TimerEvent(pn->disp_ec,
+            [pn, peer_id = this->peer_id](TimerEvent &) {
         pn->start_active_conn(peer_id);
     });
-    p->ev_retry_timer.add_with_timeout(pn->gen_conn_timeout(), 0);
+    p->ev_retry_timer.add(pn->gen_conn_timeout());
 }
 
 template<typename O, O _, O __>
@@ -554,8 +554,7 @@ template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::Peer::reset_ping_timer() {
     assert(ev_ping_timer);
     ev_ping_timer.del();
-    ev_ping_timer.add_with_timeout(
-        gen_rand_timeout(conn->get_net()->ping_period), 0);
+    ev_ping_timer.add(gen_rand_timeout(conn->get_net()->ping_period));
 }
 
 template<typename O, O _, O __>
@@ -568,7 +567,7 @@ void PeerNetwork<O, _, __>::Peer::send_ping() {
 }
 
 template<typename O, O _, O __>
-void PeerNetwork<O, _, __>::Peer::ping_timer(int, int) {
+void PeerNetwork<O, _, __>::Peer::ping_timer(TimerEvent &) {
     ping_timer_ok = true;
     if (pong_msg_ok)
     {
