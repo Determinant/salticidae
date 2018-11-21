@@ -481,8 +481,9 @@ class ThreadCall {
         }
         template<typename T>
         void set_result(T &&data) {
-            result = Result(new T(std::forward<T>(data)),
-                            [](void *ptr) {delete static_cast<T *>(ptr);});
+            using _T = std::remove_reference_t<T>;
+            result = Result(new _T(std::forward<T>(data)),
+                            [](void *ptr) {delete static_cast<_T *>(ptr);});
         }
     };
 

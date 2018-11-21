@@ -105,17 +105,7 @@ class MsgNetwork: public ConnPool {
 
     using conn_t = ArcObj<Conn>;
 #ifdef SALTICIDAE_MSG_STAT
-    class msg_stat_by_opcode_t:
-            public std::unordered_map<typename Msg::opcode_t,
-                        std::pair<std::atomic<uint32_t>,
-                                std::atomic<size_t>>> {
-        public:
-        void add(const Msg &msg) {
-            auto &p = this->operator[](msg.get_opcode());
-            p.first++;
-            p.second += msg.get_length();
-        }
-    };
+    // TODO: a lock-free, thread-safe, fine-grained stat
 #endif
 
     private:
@@ -127,8 +117,6 @@ class MsgNetwork: public ConnPool {
 
     protected:
 #ifdef SALTICIDAE_MSG_STAT
-    mutable msg_stat_by_opcode_t sent_by_opcode;
-    mutable msg_stat_by_opcode_t recv_by_opcode;
 #endif
 
     ConnPool::Conn *create_conn() override { return new Conn(); }
@@ -171,7 +159,6 @@ class MsgNetwork: public ConnPool {
                     it->second(msg, conn);
 #ifdef SALTICIDAE_MSG_STAT
                     conn->nrecv++;
-                    recv_by_opcode.add(msg);
 #endif
                 }
                 if (++cnt == burst_size) return true;
@@ -195,12 +182,6 @@ class MsgNetwork: public ConnPool {
     void send_msg(MsgType &&msg, const conn_t &conn);
     using ConnPool::listen;
 #ifdef SALTICIDAE_MSG_STAT
-    msg_stat_by_opcode_t &get_sent_by_opcode() const {
-        return sent_by_opcode;
-    }
-    msg_stat_by_opcode_t &get_recv_by_opcode() const {
-        return recv_by_opcode;
-    }
 #endif
     conn_t connect(const NetAddr &addr) {
         return static_pointer_cast<Conn>(ConnPool::connect(addr));
@@ -239,9 +220,11 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
     ConnPool::Conn *create_conn() override { return new Conn(); }
 
     public:
+    using Config = typename MsgNet::Config;
     ClientNetwork(const EventContext &ec, const Config &config):
         MsgNet(ec, config) {}
 
+    using MsgNet::send_msg;
     template<typename MsgType>
     void send_msg(MsgType &&msg, const NetAddr &addr);
 };
@@ -481,7 +464,6 @@ void MsgNetwork<OpcodeType>::send_msg(MsgType &&_msg, const conn_t &conn) {
     conn->write(std::move(msg_data));
 #ifdef SALTICIDAE_MSG_STAT
     conn->nsent++;
-    sent_by_opcode.add(msg);
 #endif
 }
 
@@ -633,12 +615,11 @@ void PeerNetwork<O, _, __>::start_active_conn(const NetAddr &addr) {
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, const conn_t &conn) {
     uint16_t port = msg.port;
-    this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &msg) {
+    this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &) {
         if (conn->get_mode() == ConnPool::Conn::DEAD) return;
         SALTICIDAE_LOG_INFO("ping from %s, port %u",
                             std::string(*conn).c_str(), ntohs(port));
         if (check_new_conn(conn, port)) return;
-        auto p = id2peer.find(conn->peer_id)->second.get();
         send_msg(MsgPong(this->listen_port), conn);
     });
 }
@@ -646,7 +627,7 @@ void PeerNetwork<O, _, __>::msg_ping(MsgPing &&msg, const conn_t &conn) {
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::msg_pong(MsgPong &&msg, const conn_t &conn) {
     uint16_t port = msg.port;
-    this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &msg) {
+    this->disp_tcall->async_call([this, conn, port](ThreadCall::Handle &) {
         if (conn->get_mode() == ConnPool::Conn::DEAD) return;
         auto it = id2peer.find(conn->peer_id);
         if (it == id2peer.end())
@@ -667,7 +648,7 @@ void PeerNetwork<O, _, __>::msg_pong(MsgPong &&msg, const conn_t &conn) {
 
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::listen(NetAddr listen_addr) {
-    this->disp_tcall->call([this, listen_addr](ThreadCall::Handle &msg) {
+    this->disp_tcall->call([this, listen_addr](ThreadCall::Handle &) {
         MsgNet::_listen(listen_addr);
         listen_port = listen_addr.port;
     });
@@ -694,7 +675,7 @@ PeerNetwork<O, _, __>::get_peer_conn(const NetAddr &paddr) const {
             throw PeerNetworkError("peer does not exist");
         h.set_result(it->second->conn);
     }).get()));
-    return std::move(*ret);
+    return std::move(ret);
 }
 
 template<typename O, O _, O __>
@@ -709,7 +690,7 @@ template<typename O, O _, O __>
 template<typename MsgType>
 void PeerNetwork<O, _, __>::send_msg(MsgType &&msg, const NetAddr &paddr) {
     this->disp_tcall->async_call(
-                [this, msg=std::forward<MsgType>(msg), paddr](ThreadCall::Handle &h) {
+                [this, msg=std::forward<MsgType>(msg), paddr](ThreadCall::Handle &) {
         auto it = id2peer.find(paddr);
         if (it == id2peer.end())
             throw PeerNetworkError("peer does not exist");
@@ -741,11 +722,11 @@ template<typename OpcodeType>
 template<typename MsgType>
 void ClientNetwork<OpcodeType>::send_msg(MsgType &&msg, const NetAddr &addr) {
     this->disp_tcall->async_call(
-            [this, addr, msg=std::forward<MsgType>(msg)](ThreadCall::Handle &h) {
+            [this, addr, msg=std::forward<MsgType>(msg)](ThreadCall::Handle &) {
         auto it = addr2conn.find(addr);
         if (it == addr2conn.end())
             throw PeerNetworkError("client does not exist");
-        send_msg(msg, it->second->conn);
+        send_msg(msg, it->second);
     });
 }
 

@@ -144,7 +144,7 @@ void Logger::error(const char *fmt, ...) {
     va_end(ap);
 }
 
-Logger logger("salticidae");
+Logger logger("net");
 
 void ElapsedTime::start() {
     struct timezone tz;

@@ -68,7 +68,7 @@ extern const char *TTY_COLOR_RED;
 extern const char *TTY_COLOR_GREEN;
 extern const char *TTY_COLOR_YELLOW;
 extern const char *TTY_COLOR_BLUE;
-extern const char *TTY_COLOR_MAGENT;
+extern const char *TTY_COLOR_MAGENTA;
 extern const char *TTY_COLOR_CYAN;
 extern const char *TTY_COLOR_RESET;
 
