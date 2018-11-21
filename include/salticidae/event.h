@@ -94,7 +94,7 @@ class FdEvent {
     FdEvent(): ec(nullptr), ev_fd(nullptr) {}
     FdEvent(const EventContext &ec, int fd, callback_t callback):
             ec(ec), fd(fd), ev_fd(new uv_poll_t()),
-            callback(callback) {
+            callback(std::move(callback)) {
         uv_poll_init(ec.get(), ev_fd, fd);
         ev_fd->data = this;
     }
@@ -175,7 +175,7 @@ class TimerEvent {
     TimerEvent(): ec(nullptr), ev_timer(nullptr) {}
     TimerEvent(const EventContext &ec, callback_t callback):
             ec(ec), ev_timer(new uv_timer_t()),
-            callback(callback) {
+            callback(std::move(callback)) {
         uv_timer_init(ec.get(), ev_timer);
         ev_timer->data = this;
     }
@@ -241,32 +241,56 @@ class TimedFdEvent: public FdEvent, public TimerEvent {
     static const int TIMEOUT = 1 << 29;
 
     private:
+    FdEvent::callback_t callback;
+    uint64_t timeout;
+
     static inline void timer_then(uv_timer_t *h) {
         auto event = static_cast<TimedFdEvent *>(h->data);
         event->FdEvent::del();
-        event->FdEvent::callback(event->fd, TIMEOUT);
+        event->callback(event->fd, TIMEOUT);
+    }
+
+    static inline void fd_then(uv_poll_t *h, int status, int events) {
+        if (status != 0)
+            events |= ERROR;
+        auto event = static_cast<TimedFdEvent *>(h->data);
+        event->TimerEvent::del();
+        uv_timer_start(event->ev_timer, TimedFdEvent::timer_then,
+                        event->timeout, 0);
+        event->callback(event->fd, events);
     }
 
     public:
     TimedFdEvent() = default;
     TimedFdEvent(const EventContext &ec, int fd, FdEvent::callback_t callback):
-        FdEvent(ec, fd, callback),
-        TimerEvent(ec, TimerEvent::callback_t()) {
+            FdEvent(ec, fd, FdEvent::callback_t()),
+            TimerEvent(ec, TimerEvent::callback_t()),
+            callback(std::move(callback)) {
+        ev_fd->data = this;
         ev_timer->data = this;
     }
 
     TimedFdEvent(TimedFdEvent &&other):
             FdEvent(static_cast<FdEvent &&>(other)),
-            TimerEvent(static_cast<TimerEvent &&>(other)) {
-        if (ev_timer != nullptr)
+            TimerEvent(static_cast<TimerEvent &&>(other)),
+            callback(std::move(other.callback)),
+            timeout(other.timeout) {
+        if (ev_fd != nullptr)
+        {
             ev_timer->data = this;
+            ev_fd->data = this;
+        }
     }
 
     void swap(TimedFdEvent &other) {
         std::swap(static_cast<FdEvent &>(*this), static_cast<FdEvent &>(other));
         std::swap(static_cast<TimerEvent &>(*this), static_cast<TimerEvent &>(other));
-        if (ev_timer != nullptr)
-            ev_timer->data = this;
+        std::swap(callback, other.callback);
+        std::swap(timeout, other.timeout);
+        if (ev_fd != nullptr)
+            ev_fd->data = ev_timer->data = this;
+        if (other.ev_fd != nullptr)
+            other.ev_fd->data = other.ev_timer->data = &other;
     }
 
     TimedFdEvent &operator=(TimedFdEvent &&other) {
@@ -288,11 +312,15 @@ class TimedFdEvent: public FdEvent, public TimerEvent {
     void add(int events) = delete;
     void add(double t_sec) = delete;
 
+    void set_callback(FdEvent::callback_t _callback) {
+        callback = _callback;
+    }
+
     void add(int events, double t_sec) {
         assert(ev_fd != nullptr && ev_timer != nullptr);
         uv_timer_start(ev_timer, TimedFdEvent::timer_then,
-                        uint64_t(t_sec * 1000), 0);
-        FdEvent::add(events);
+                        timeout = uint64_t(t_sec * 1000), 0);
+        uv_poll_start(ev_fd, events, TimedFdEvent::fd_then);
     }
 
     void del() {
@@ -319,7 +347,7 @@ class SigEvent {
     SigEvent(): ec(nullptr), ev_sig(nullptr) {}
     SigEvent(const EventContext &ec, callback_t callback):
             ec(ec), ev_sig(new uv_signal_t()),
-            callback(callback) {
+            callback(std::move(callback)) {
         uv_signal_init(ec.get(), ev_sig);
         ev_sig->data = this;
     }
