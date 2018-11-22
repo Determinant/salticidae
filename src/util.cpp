@@ -236,6 +236,7 @@ bool Config::load(const std::string &fname) {
             }
             update(optname, optval.c_str());
         }
+        fclose(conf_f);
         return true;
     }
     else

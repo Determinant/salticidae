@@ -505,7 +505,7 @@ void PeerNetwork<O, _, __>::Conn::on_teardown() {
     if (this != p->conn.get()) return;
     p->ev_ping_timer.del();
     p->connected = false;
-    p->conn = nullptr;
+    //p->conn = nullptr;
     SALTICIDAE_LOG_INFO("connection lost: %s", std::string(*this).c_str());
     // try to reconnect
     p->ev_retry_timer = TimerEvent(pn->disp_ec,
@@ -603,7 +603,7 @@ void PeerNetwork<O, _, __>::start_active_conn(const NetAddr &addr) {
     auto p = id2peer.find(addr)->second.get();
     if (p->connected) return;
     auto conn = static_pointer_cast<Conn>(MsgNet::_connect(addr));
-    assert(p->conn == nullptr);
+    //assert(p->conn == nullptr);
     p->conn = conn;
     conn->peer_id = addr;
     if (id_mode == IP_BASED)
@@ -714,7 +714,6 @@ void ClientNetwork<OpcodeType>::Conn::on_setup() {
 template<typename OpcodeType>
 void ClientNetwork<OpcodeType>::Conn::on_teardown() {
     MsgNet::Conn::on_teardown();
-    assert(this->get_mode() == Conn::PASSIVE);
     get_net()->addr2conn.erase(this->get_addr());
 }
 
@@ -724,9 +723,8 @@ void ClientNetwork<OpcodeType>::send_msg(MsgType &&msg, const NetAddr &addr) {
     this->disp_tcall->async_call(
             [this, addr, msg=std::forward<MsgType>(msg)](ThreadCall::Handle &) {
         auto it = addr2conn.find(addr);
-        if (it == addr2conn.end())
-            throw PeerNetworkError("client does not exist");
-        send_msg(msg, it->second);
+        if (it != addr2conn.end())
+            send_msg(msg, it->second);
     });
 }
 
