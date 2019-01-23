@@ -694,7 +694,7 @@ void PeerNetwork<O, _, __>::send_msg(MsgType &&msg, const NetAddr &paddr) {
         auto it = id2peer.find(paddr);
         if (it == id2peer.end())
             throw PeerNetworkError("peer does not exist");
-        send_msg(msg, it->second->conn);
+        send_msg(std::move(msg), it->second->conn);
     });
 }
 /* end: functions invoked by the user loop */
@@ -724,7 +724,7 @@ void ClientNetwork<OpcodeType>::send_msg(MsgType &&msg, const NetAddr &addr) {
             [this, addr, msg=std::forward<MsgType>(msg)](ThreadCall::Handle &) {
         auto it = addr2conn.find(addr);
         if (it != addr2conn.end())
-            send_msg(msg, it->second);
+            send_msg(std::move(msg), it->second);
     });
 }
 
