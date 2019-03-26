@@ -481,6 +481,7 @@ class ThreadCall {
         }
         template<typename T>
         void set_result(T &&data) {
+            std::atomic_thread_fence(std::memory_order_release);
             using _T = std::remove_reference_t<T>;
             result = Result(new _T(std::forward<T>(data)),
                             [](void *ptr) {delete static_cast<_T *>(ptr);});
@@ -591,7 +592,7 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
     template<typename U>
     bool try_enqueue(U &&e) {
         static const uint64_t dummy = 1;
-        if (!MPMCQueue<T>::try_enqueue(std::forward<U>(e)))
+        if (!MPSCQueue<T>::try_enqueue(std::forward<U>(e)))
             return false;
         // memory barrier here, so any load/store in enqueue must be finialized
         if (wait_sig.exchange(false, std::memory_order_acq_rel))

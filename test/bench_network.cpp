@@ -48,7 +48,7 @@ using std::placeholders::_2;
 using opcode_t = uint8_t;
 
 struct MsgBytes {
-    static const opcode_t opcode = 0x0;
+    static const opcode_t opcode = 0xa;
     DataStream serialized;
     bytearray_t bytes;
     MsgBytes(size_t size) {
@@ -79,7 +79,7 @@ struct MyNet: public MsgNetworkByteOp {
             const std::string name,
             const NetAddr &peer,
             double stat_timeout = -1):
-            MsgNetworkByteOp(ec, MsgNetworkByteOp::Config()),
+            MsgNetworkByteOp(ec, MsgNetworkByteOp::Config().burst_size(1000)),
             name(name),
             peer(peer),
             ev_period_stat(ec, [this, stat_timeout](TimerEvent &) {
@@ -161,17 +161,17 @@ int main() {
         MyNet bob(ec, "Bob", alice_addr);
         bob.start();
         bob.connect(alice_addr);
-        try {
+        //try {
             ec.dispatch();
-        } catch (std::exception &) {}
-        SALTICIDAE_LOG_INFO("exiting");
+        //} catch (std::exception &) {}
+        //SALTICIDAE_LOG_INFO("exiting");
     });
-    try {
+    //try {
         ec.dispatch();
-    } catch (std::exception &e) {
-        pthread_kill(bob_thread.native_handle(), SIGTERM);
-        bob_thread.join();
-        SALTICIDAE_LOG_INFO("exception: %s", e.what());
-    }
+    //} catch (std::exception &e) {
+    //    pthread_kill(bob_thread.native_handle(), SIGTERM);
+    //    bob_thread.join();
+    //    SALTICIDAE_LOG_INFO("exception: %s", e.what());
+    //}
     return 0;
 }

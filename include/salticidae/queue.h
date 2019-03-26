@@ -104,7 +104,8 @@ class MPMCQueue {
     template<typename U>
     void _enqueue(Block *nblk, U &&e) {
         new (&(nblk->elem)) T(std::forward<U>(e));
-        nblk->next.store(nullptr, std::memory_order_release);
+        std::atomic_thread_fence(std::memory_order_release);
+        nblk->next.store(nullptr, std::memory_order_relaxed);
         auto prev = tail.exchange(nblk, std::memory_order_acq_rel);
         prev->next.store(nblk, std::memory_order_relaxed);
     }
@@ -158,6 +159,7 @@ class MPMCQueue {
                     blks.release_ref(h);
                     return false;
                 }
+                std::atomic_thread_fence(std::memory_order_acquire);
                 e = std::move(nh->elem);
                 auto hh = h;
                 if (head.compare_exchange_weak(hh, nh, std::memory_order_consume))
@@ -180,6 +182,7 @@ struct MPSCQueue: public MPMCQueue<T> {
         auto nh = h->next.load(std::memory_order_relaxed);
         if (nh == nullptr)
             return false;
+        std::atomic_thread_fence(std::memory_order_acquire);
         e = std::move(nh->elem);
         this->head.store(nh, std::memory_order_release);
         this->blks.push(h);
@@ -194,6 +197,7 @@ struct MPSCQueue: public MPMCQueue<T> {
         auto h = this->head.load(std::memory_order_acquire);
         nblk->next.store(h, std::memory_order_release);
         new (&(h->elem)) T(std::forward<U>(e));
+        std::atomic_thread_fence(std::memory_order_release);
         this->head.store(nblk, std::memory_order_release);
         return true;
     }
