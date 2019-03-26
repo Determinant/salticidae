@@ -578,14 +578,28 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
     template<typename U>
     bool enqueue(U &&e) {
         static const uint64_t dummy = 1;
-        bool ret = MPSCQueue<T>::enqueue(std::forward<U>(e));
+        MPSCQueue<T>::enqueue(std::forward<U>(e));
         // memory barrier here, so any load/store in enqueue must be finialized
         if (wait_sig.exchange(false, std::memory_order_acq_rel))
         {
             SALTICIDAE_LOG_DEBUG("mpsc notify");
             write(fd, &dummy, 8);
         }
-        return ret;
+        return true;
+    }
+
+    template<typename U>
+    bool try_enqueue(U &&e) {
+        static const uint64_t dummy = 1;
+        if (!MPMCQueue<T>::try_enqueue(std::forward<U>(e)))
+            return false;
+        // memory barrier here, so any load/store in enqueue must be finialized
+        if (wait_sig.exchange(false, std::memory_order_acq_rel))
+        {
+            SALTICIDAE_LOG_DEBUG("mpsc notify");
+            write(fd, &dummy, 8);
+        }
+        return true;
     }
 };
 
@@ -629,14 +643,14 @@ class MPMCQueueEventDriven: public MPMCQueue<T> {
     template<typename U>
     bool enqueue(U &&e) {
         static const uint64_t dummy = 1;
-        bool ret = MPMCQueue<T>::enqueue(std::forward<U>(e));
+        MPMCQueue<T>::enqueue(std::forward<U>(e));
         // memory barrier here, so any load/store in enqueue must be finialized
         if (wait_sig.exchange(false, std::memory_order_acq_rel))
         {
             SALTICIDAE_LOG_DEBUG("mpsc notify");
             write(fd, &dummy, 8);
         }
-        return ret;
+        return true;
     }
 };
 

@@ -131,7 +131,9 @@ struct MPSCWriteBuffer {
     }
   
     void push(bytearray_t &&data) {
-        buffer.enqueue(buffer_entry_t(std::move(data)));
+        buffer_entry_t d(std::move(data));
+        // TODO: better bounded buffer impl
+        while (!buffer.try_enqueue(d)) {}
     }
 
     bytearray_t move_pop() {
