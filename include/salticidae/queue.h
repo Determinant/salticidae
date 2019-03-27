@@ -148,7 +148,7 @@ class MPMCQueue {
     bool try_dequeue(T &e) {
         for (;;)
         {
-            auto h = head.load(std::memory_order_acquire);
+            auto h = head.load(std::memory_order_relaxed);
             auto t = h->refcnt.load(std::memory_order_relaxed);
             if (!t) continue;
             if (h->refcnt.compare_exchange_weak(t, t + 1, std::memory_order_consume))
@@ -178,13 +178,13 @@ template<typename T>
 struct MPSCQueue: public MPMCQueue<T> {
     using MPMCQueue<T>::MPMCQueue;
     bool try_dequeue(T &e) {
-        auto h = this->head.load(std::memory_order_acquire);
+        auto h = this->head.load(std::memory_order_relaxed);
         auto nh = h->next.load(std::memory_order_relaxed);
-        if (nh == nullptr)
-            return false;
         std::atomic_thread_fence(std::memory_order_acquire);
+        if (nh == nullptr) return false;
         e = std::move(nh->elem);
-        this->head.store(nh, std::memory_order_release);
+        std::atomic_thread_fence(std::memory_order_release);
+        this->head.store(nh, std::memory_order_relaxed);
         this->blks.push(h);
         return true;
     }

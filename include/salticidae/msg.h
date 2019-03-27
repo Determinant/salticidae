@@ -56,7 +56,7 @@ class MsgBase {
     mutable bool no_payload;
 
     public:
-    MsgBase(): magic(0x0), no_payload(true) {}
+    MsgBase(): magic(0x0), opcode(0xff), no_payload(true) {}
 
     template<typename MsgType,
             typename = typename std::enable_if<
