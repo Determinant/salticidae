@@ -426,7 +426,7 @@ class ThreadNotifier {
         cv.wait(ul, [this]{ return ready; });
         return std::move(data);
     }
-    void notify(T &&_data) { 
+    void notify(T &&_data) {
         mutex_lg_t _(mlock);
         ready = true;
         data = std::move(_data);
@@ -481,7 +481,6 @@ class ThreadCall {
         }
         template<typename T>
         void set_result(T &&data) {
-            std::atomic_thread_fence(std::memory_order_release);
             using _T = std::remove_reference_t<T>;
             result = Result(new _T(std::forward<T>(data)),
                             [](void *ptr) {delete static_cast<_T *>(ptr);});
@@ -497,6 +496,7 @@ class ThreadCall {
         ev_listen = FdEvent(ec, ctl_fd[0], [this](int fd, int) {
             Handle *h;
             read(fd, &h, sizeof(h));
+            std::atomic_thread_fence(std::memory_order_acquire);
             h->exec();
             delete h;
         });
@@ -567,7 +567,7 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
                     // get to write(fd). Then store(true) must happen after all exchange(false),
                     // since all enqueue operations are finalized, the dequeue should be able
                     // to see those enqueued values in func()
-                    wait_sig.store(true, std::memory_order_release);
+                    wait_sig.exchange(true, std::memory_order_acq_rel);
                     if (func(*this))
                         write(fd, &dummy, 8);
                 });
@@ -631,7 +631,7 @@ class MPMCQueueEventDriven: public MPMCQueue<T> {
             uint64_t t;
             if (read(fd, &t, 8) != 8) return;
             // only one consumer should be here a a time
-            wait_sig.store(true, std::memory_order_release);
+            wait_sig.exchange(true, std::memory_order_acq_rel);
             if (func(*this))
                 write(fd, &dummy, 8);
         });

@@ -83,7 +83,8 @@ struct MyNet: public MsgNetworkByteOp {
             name(name),
             peer(peer),
             ev_period_stat(ec, [this, stat_timeout](TimerEvent &) {
-                SALTICIDAE_LOG_INFO("%.2f mps\n", nrecv / (double)stat_timeout);
+                SALTICIDAE_LOG_INFO("%.2f mps", nrecv / (double)stat_timeout);
+                fflush(stderr);
                 nrecv = 0;
                 ev_period_stat.add(stat_timeout);
             }),
@@ -115,7 +116,6 @@ struct MyNet: public MsgNetworkByteOp {
                     net->ev_period_send.add(0);
                 });
                 net->ev_period_send.add(0);
-
             }
             else
                 printf("[%s] Passively connected, waiting for greetings.\n",
@@ -143,35 +143,33 @@ salticidae::EventContext ec;
 NetAddr alice_addr("127.0.0.1:1234");
 NetAddr bob_addr("127.0.0.1:1235");
 
-void signal_handler(int) {
-    throw salticidae::SalticidaeError("got terminal signal");
-}
-
 int main() {
-    struct sigaction sa;
-    sa.sa_handler = signal_handler;
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
-    /* test two nodes */
-    MyNet alice(ec, "Alice", bob_addr, 10);
-    alice.start();
-    alice.listen(alice_addr);
-    std::thread bob_thread([]() {
-        salticidae::EventContext ec;
-        MyNet bob(ec, "Bob", alice_addr);
+    salticidae::BoxObj<MyNet> alice = new MyNet(ec, "Alice", bob_addr, 10);
+    alice->start();
+    alice->listen(alice_addr);
+    salticidae::EventContext tec;
+    salticidae::BoxObj<salticidae::ThreadCall> tcall = new salticidae::ThreadCall(tec);
+    std::thread bob_thread([&tec]() {
+        MyNet bob(tec, "Bob", alice_addr);
         bob.start();
         bob.connect(alice_addr);
-        //try {
-            ec.dispatch();
-        //} catch (std::exception &) {}
-        //SALTICIDAE_LOG_INFO("exiting");
+        try {
+            tec.dispatch();
+        } catch (std::exception &) {}
+        SALTICIDAE_LOG_INFO("thread exiting");
     });
-    //try {
-        ec.dispatch();
-    //} catch (std::exception &e) {
-    //    pthread_kill(bob_thread.native_handle(), SIGTERM);
-    //    bob_thread.join();
-    //    SALTICIDAE_LOG_INFO("exception: %s", e.what());
-    //}
+    auto shutdown = [&](int) {
+        tcall->async_call([&](salticidae::ThreadCall::Handle &) {
+            tec.stop();
+        });
+        alice = nullptr;
+        //ec.stop();
+        //bob_thread.join();
+    };
+    salticidae::SigEvent ev_sigint(ec, shutdown);
+    salticidae::SigEvent ev_sigterm(ec, shutdown);
+    ev_sigint.add(SIGINT);
+    ev_sigterm.add(SIGTERM);
+    ec.dispatch();
     return 0;
 }

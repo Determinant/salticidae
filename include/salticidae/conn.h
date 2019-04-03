@@ -88,6 +88,7 @@ class ConnPool {
 
         TimedFdEvent ev_connect;
         FdEvent ev_socket;
+        TimerEvent ev_send_wait;
         /** does not need to wait if true */
         bool ready_send;
     
@@ -365,6 +366,7 @@ class ConnPool {
             conn_t conn = it.second;
             conn->stop();
             conn->self_ref = nullptr;
+            ::close(conn->fd);
         }
         if (listen_fd != -1)
         {
