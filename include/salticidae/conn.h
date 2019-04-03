@@ -129,8 +129,8 @@ class ConnPool {
 
         /** Write data to the connection (non-blocking). The data will be sent
          * whenever I/O is available. */
-        void write(bytearray_t &&data) {
-            send_buffer.push(std::move(data));
+        bool write(bytearray_t &&data) {
+            return send_buffer.push(std::move(data), !cpool->queue_capacity);
         }
 
         protected:
@@ -156,6 +156,7 @@ class ConnPool {
     const int max_listen_backlog;
     const double conn_server_timeout;
     const size_t seg_buff_size;
+    const size_t queue_capacity;
 
     /* owned by user loop */
     BoxObj<ThreadCall> user_tcall;
@@ -287,13 +288,15 @@ class ConnPool {
         double _conn_server_timeout;
         size_t _seg_buff_size;
         size_t _nworker;
+        size_t _queue_capacity;
 
         public:
         Config():
             _max_listen_backlog(10),
             _conn_server_timeout(2),
             _seg_buff_size(4096),
-            _nworker(1) {}
+            _nworker(1),
+            _queue_capacity(0) {}
 
         Config &max_listen_backlog(int x) {
             _max_listen_backlog = x;
@@ -314,6 +317,11 @@ class ConnPool {
             _nworker = std::max((size_t)1, x);
             return *this;
         }
+
+        Config &queue_capacity(size_t x) {
+            _queue_capacity = x;
+            return *this;
+        }
     };
 
     ConnPool(const EventContext &ec, const Config &config):
@@ -321,6 +329,7 @@ class ConnPool {
             max_listen_backlog(config._max_listen_backlog),
             conn_server_timeout(config._conn_server_timeout),
             seg_buff_size(config._seg_buff_size),
+            queue_capacity(config._queue_capacity),
             listen_fd(-1),
             nworker(config._nworker),
             worker_running(false) {

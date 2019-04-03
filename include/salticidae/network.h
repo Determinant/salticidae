@@ -140,6 +140,7 @@ class MsgNetwork: public ConnPool {
 
     MsgNetwork(const EventContext &ec, const Config &config):
             ConnPool(ec, config) {
+        incoming_msgs.set_capacity(65536);
         incoming_msgs.reg_handler(ec, [this, burst_size=config._burst_size](queue_t &q) {
             std::pair<Msg, conn_t> item;
             size_t cnt = 0;
@@ -179,7 +180,7 @@ class MsgNetwork: public ConnPool {
     }
 
     template<typename MsgType>
-    void send_msg(MsgType &&msg, const conn_t &conn);
+    bool send_msg(MsgType &&msg, const conn_t &conn);
     using ConnPool::listen;
 #ifdef SALTICIDAE_MSG_STAT
 #endif
@@ -413,6 +414,8 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     using MsgNet::send_msg;
     template<typename MsgType>
     void send_msg(MsgType &&msg, const NetAddr &paddr);
+    template<typename MsgType>
+    void multicast_msg(MsgType &&msg, const std::vector<NetAddr> &paddrs);
     void listen(NetAddr listen_addr);
     bool has_peer(const NetAddr &paddr) const;
     conn_t connect(const NetAddr &addr) = delete;
@@ -455,16 +458,16 @@ void MsgNetwork<OpcodeType>::Conn::on_read() {
 
 template<typename OpcodeType>
 template<typename MsgType>
-void MsgNetwork<OpcodeType>::send_msg(MsgType &&_msg, const conn_t &conn) {
+bool MsgNetwork<OpcodeType>::send_msg(MsgType &&_msg, const conn_t &conn) {
     Msg msg(std::forward<MsgType>(_msg));
     bytearray_t msg_data = msg.serialize();
     SALTICIDAE_LOG_DEBUG("wrote message %s to %s",
                 std::string(msg).c_str(),
                 std::string(*conn).c_str());
-    conn->write(std::move(msg_data));
 #ifdef SALTICIDAE_MSG_STAT
     conn->nsent++;
 #endif
+    return conn->write(std::move(msg_data));
 }
 
 template<typename O, O _, O __>
@@ -697,6 +700,22 @@ void PeerNetwork<O, _, __>::send_msg(MsgType &&msg, const NetAddr &paddr) {
         send_msg(std::move(msg), it->second->conn);
     });
 }
+
+template<typename O, O _, O __>
+template<typename MsgType>
+void PeerNetwork<O, _, __>::multicast_msg(MsgType &&msg, const std::vector<NetAddr> &paddrs) {
+    this->disp_tcall->async_call(
+                [this, msg=std::forward<MsgType>(msg), paddrs](ThreadCall::Handle &) {
+        for (auto &paddr: paddrs)
+        {
+            auto it = id2peer.find(paddr);
+            if (it == id2peer.end())
+                throw PeerNetworkError("peer does not exist");
+            send_msg(std::move(msg), it->second->conn);
+        }
+    });
+}
+
 /* end: functions invoked by the user loop */
 
 template<typename OpcodeType>

@@ -62,5 +62,5 @@ option(SALTICIDAE_NOCHECKSUM " disable checksum in messages" OFF)
 
 configure_file(src/config.h.in include/salticidae/config.h @ONLY)
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -W -Wall -Wextra -pedantic -Wsuggest-override")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -W -Wall -Wextra -pedantic -Wsuggest-override")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -faligned-new -W -Wall -Wextra -pedantic -Wsuggest-override")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -faligned-new -W -Wall -Wextra -pedantic -Wsuggest-override")

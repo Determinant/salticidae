@@ -434,10 +434,134 @@ class ThreadNotifier {
     }
 };
 
+template<typename T>
+class MPSCQueueEventDriven: public MPSCQueue<T> {
+    private:
+    const uint64_t dummy = 1;
+    std::atomic<bool> wait_sig;
+    int fd;
+    FdEvent ev;
+
+    public:
+    MPSCQueueEventDriven():
+        wait_sig(true),
+        fd(eventfd(0, EFD_NONBLOCK)) {}
+
+    ~MPSCQueueEventDriven() {
+        ev.clear();
+        close(fd);
+    }
+
+    template<typename Func>
+    void reg_handler(const EventContext &ec, Func &&func) {
+        ev = FdEvent(ec, fd,
+                    [this, func=std::forward<Func>(func)](int, int) {
+                    //fprintf(stderr, "%x\n", std::this_thread::get_id());
+                    uint64_t t;
+                    read(fd, &t, 8);
+                    // the only undesirable case is there are some new items
+                    // enqueued before recovering wait_sig to true, so the consumer
+                    // won't be notified. In this case, no enqueuing thread will
+                    // get to write(fd). Then store(true) must happen after all exchange(false),
+                    // since all enqueue operations are finalized, the dequeue should be able
+                    // to see those enqueued values in func()
+                    wait_sig.exchange(true, std::memory_order_acq_rel);
+                    if (func(*this))
+                        write(fd, &dummy, 8);
+                });
+        ev.add(FdEvent::READ);
+    }
+
+    void unreg_handler() { ev.clear(); }
+
+    template<typename U>
+    bool enqueue(U &&e, bool unbounded = true) {
+        static const uint64_t dummy = 1;
+        if (!MPSCQueue<T>::enqueue(std::forward<U>(e), unbounded))
+            return false;
+        // memory barrier here, so any load/store in enqueue must be finialized
+        if (wait_sig.exchange(false, std::memory_order_acq_rel))
+        {
+            SALTICIDAE_LOG_DEBUG("mpsc notify");
+            write(fd, &dummy, 8);
+        }
+        return true;
+    }
+
+    template<typename U>
+    bool try_enqueue(U &&e) {
+        static const uint64_t dummy = 1;
+        if (!MPSCQueue<T>::try_enqueue(std::forward<U>(e)))
+            return false;
+        // memory barrier here, so any load/store in enqueue must be finialized
+        if (wait_sig.exchange(false, std::memory_order_acq_rel))
+        {
+            SALTICIDAE_LOG_DEBUG("mpsc notify");
+            write(fd, &dummy, 8);
+        }
+        return true;
+    }
+};
+
+template<typename T>
+class MPMCQueueEventDriven: public MPMCQueue<T> {
+    private:
+    const uint64_t dummy = 1;
+    std::atomic<bool> wait_sig;
+    int fd;
+    std::vector<FdEvent> evs;
+
+    public:
+    MPMCQueueEventDriven():
+        wait_sig(true),
+        fd(eventfd(0, EFD_NONBLOCK)) {}
+
+    ~MPMCQueueEventDriven() {
+        evs.clear();
+        close(fd);
+    }
+
+    // this function is *NOT* thread-safe
+    template<typename Func>
+    void reg_handler(const EventContext &ec, Func &&func) {
+        FdEvent ev(ec, fd, [this, func=std::forward<Func>(func)](int, int) {
+            //fprintf(stderr, "%x\n", std::this_thread::get_id());
+            uint64_t t;
+            if (read(fd, &t, 8) != 8) return;
+            // only one consumer should be here a a time
+            wait_sig.exchange(true, std::memory_order_acq_rel);
+            if (func(*this))
+                write(fd, &dummy, 8);
+        });
+        ev.add(FdEvent::READ);
+        evs.push_back(std::move(ev));
+    }
+
+    void unreg_handlers() { evs.clear(); }
+
+    template<typename U>
+    bool enqueue(U &&e, bool unbounded = true) {
+        static const uint64_t dummy = 1;
+        if (!MPMCQueue<T>::enqueue(std::forward<U>(e), unbounded))
+            return false;
+        // memory barrier here, so any load/store in enqueue must be finialized
+        if (wait_sig.exchange(false, std::memory_order_acq_rel))
+        {
+            SALTICIDAE_LOG_DEBUG("mpsc notify");
+            write(fd, &dummy, 8);
+        }
+        return true;
+    }
+};
+
 class ThreadCall {
+    public: class Handle;
+    private:
     int ctl_fd[2];
     EventContext ec;
-    FdEvent ev_listen;
+    const size_t burst_size;
+    using queue_t = MPSCQueueEventDriven<Handle *>;
+    queue_t q;
 
     public:
     struct Result {
@@ -487,27 +611,26 @@ class ThreadCall {
         }
     };
 
-    ThreadCall() = default;
+    ThreadCall(size_t burst_size): burst_size(burst_size) {}
     ThreadCall(const ThreadCall &) = delete;
     ThreadCall(ThreadCall &&) = delete;
-    ThreadCall(EventContext ec): ec(ec) {
-        if (pipe2(ctl_fd, O_NONBLOCK))
-            throw SalticidaeError(std::string("ThreadCall: failed to create pipe"));
-        ev_listen = FdEvent(ec, ctl_fd[0], [this](int fd, int) {
+    ThreadCall(EventContext ec, size_t burst_size = 128): ec(ec), burst_size(burst_size) {
+        q.reg_handler(ec, [this, burst_size=burst_size](queue_t &q) {
+            size_t cnt = 0;
             Handle *h;
-            read(fd, &h, sizeof(h));
-            std::atomic_thread_fence(std::memory_order_acquire);
-            h->exec();
-            delete h;
+            while (q.try_dequeue(h))
+            {
+                h->exec();
+                delete h;
+                if (++cnt == burst_size) return true;
+            }
+            return false;
         });
-        ev_listen.add(FdEvent::READ);
     }
 
     ~ThreadCall() {
-        ev_listen.clear();
         Handle *h;
-        while (read(ctl_fd[0], &h, sizeof(h)) == sizeof(h))
-            delete h;
+        while (q.try_dequeue(h)) delete h;
         close(ctl_fd[0]);
         close(ctl_fd[1]);
     }
@@ -516,8 +639,7 @@ class ThreadCall {
     void async_call(Func callback) {
         auto h = new Handle();
         h->callback = callback;
-        std::atomic_thread_fence(std::memory_order_release);
-        write(ctl_fd[1], &h, sizeof(h));
+        q.enqueue(h);
     }
 
     template<typename Func>
@@ -526,133 +648,11 @@ class ThreadCall {
         h->callback = callback;
         ThreadNotifier<Result> notifier;
         h->notifier = &notifier;
-        std::atomic_thread_fence(std::memory_order_release);
-        write(ctl_fd[1], &h, sizeof(h));
+        q.enqueue(h);
         return notifier.wait();
     }
 
     const EventContext &get_ec() const { return ec; }
-};
-
-
-template<typename T>
-class MPSCQueueEventDriven: public MPSCQueue<T> {
-    private:
-    const uint64_t dummy = 1;
-    std::atomic<bool> wait_sig;
-    int fd;
-    FdEvent ev;
-
-    public:
-    MPSCQueueEventDriven(size_t capacity = 65536):
-        MPSCQueue<T>(capacity),
-        wait_sig(true),
-        fd(eventfd(0, EFD_NONBLOCK)) {}
-
-    ~MPSCQueueEventDriven() {
-        ev.clear();
-        close(fd);
-    }
-
-    template<typename Func>
-    void reg_handler(const EventContext &ec, Func &&func) {
-        ev = FdEvent(ec, fd,
-                    [this, func=std::forward<Func>(func)](int, int) {
-                    //fprintf(stderr, "%x\n", std::this_thread::get_id());
-                    uint64_t t;
-                    read(fd, &t, 8);
-                    // the only undesirable case is there are some new items
-                    // enqueued before recovering wait_sig to true, so the consumer
-                    // won't be notified. In this case, no enqueuing thread will
-                    // get to write(fd). Then store(true) must happen after all exchange(false),
-                    // since all enqueue operations are finalized, the dequeue should be able
-                    // to see those enqueued values in func()
-                    wait_sig.exchange(true, std::memory_order_acq_rel);
-                    if (func(*this))
-                        write(fd, &dummy, 8);
-                });
-        ev.add(FdEvent::READ);
-    }
-
-    void unreg_handler() { ev.clear(); }
-
-    template<typename U>
-    bool enqueue(U &&e) {
-        static const uint64_t dummy = 1;
-        MPSCQueue<T>::enqueue(std::forward<U>(e));
-        // memory barrier here, so any load/store in enqueue must be finialized
-        if (wait_sig.exchange(false, std::memory_order_acq_rel))
-        {
-            SALTICIDAE_LOG_DEBUG("mpsc notify");
-            write(fd, &dummy, 8);
-        }
-        return true;
-    }
-
-    template<typename U>
-    bool try_enqueue(U &&e) {
-        static const uint64_t dummy = 1;
-        if (!MPSCQueue<T>::try_enqueue(std::forward<U>(e)))
-            return false;
-        // memory barrier here, so any load/store in enqueue must be finialized
-        if (wait_sig.exchange(false, std::memory_order_acq_rel))
-        {
-            SALTICIDAE_LOG_DEBUG("mpsc notify");
-            write(fd, &dummy, 8);
-        }
-        return true;
-    }
-};
-
-template<typename T>
-class MPMCQueueEventDriven: public MPMCQueue<T> {
-    private:
-    const uint64_t dummy = 1;
-    std::atomic<bool> wait_sig;
-    int fd;
-    std::vector<FdEvent> evs;
-
-    public:
-    MPMCQueueEventDriven(size_t capacity = 65536):
-        MPMCQueue<T>(capacity),
-        wait_sig(true),
-        fd(eventfd(0, EFD_NONBLOCK)) {}
-
-    ~MPMCQueueEventDriven() {
-        evs.clear();
-        close(fd);
-    }
-
-    // this function is *NOT* thread-safe
-    template<typename Func>
-    void reg_handler(const EventContext &ec, Func &&func) {
-        FdEvent ev(ec, fd, [this, func=std::forward<Func>(func)](int, int) {
-            //fprintf(stderr, "%x\n", std::this_thread::get_id());
-            uint64_t t;
-            if (read(fd, &t, 8) != 8) return;
-            // only one consumer should be here a a time
-            wait_sig.exchange(true, std::memory_order_acq_rel);
-            if (func(*this))
-                write(fd, &dummy, 8);
-        });
-        ev.add(FdEvent::READ);
-        evs.push_back(std::move(ev));
-    }
-
-    void unreg_handlers() { evs.clear(); }
-
-    template<typename U>
-    bool enqueue(U &&e) {
-        static const uint64_t dummy = 1;
-        MPMCQueue<T>::enqueue(std::forward<U>(e));
-        // memory barrier here, so any load/store in enqueue must be finialized
-        if (wait_sig.exchange(false, std::memory_order_acq_rel))
-        {
-            SALTICIDAE_LOG_DEBUG("mpsc notify");
-            write(fd, &dummy, 8);
-        }
-        return true;
-    }
 };
 
 }

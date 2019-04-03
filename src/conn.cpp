@@ -185,6 +185,7 @@ void ConnPool::accept_client(int fd, int) {
         NetAddr addr((struct sockaddr_in *)&client_addr);
         conn_t conn = create_conn();
         conn->self_ref = conn;
+        conn->send_buffer.set_capacity(queue_capacity);
         conn->seg_buff_size = seg_buff_size;
         conn->fd = client_fd;
         conn->cpool = this;
@@ -264,6 +265,7 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
         throw ConnPoolError(std::string("unable to set nonblocking socket"));
     conn_t conn = create_conn();
     conn->self_ref = conn;
+    conn->send_buffer.set_capacity(queue_capacity);
     conn->seg_buff_size = seg_buff_size;
     conn->fd = fd;
     conn->cpool = this;

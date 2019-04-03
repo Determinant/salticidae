@@ -107,10 +107,8 @@ class MPMCQueue {
     MPMCQueue(const MPMCQueue &) = delete;
     MPMCQueue(MPMCQueue &&) = delete;
 
-    MPMCQueue(size_t capacity = 65536): head(new Block()), tail(head.load()) {
+    MPMCQueue(): head(new Block()), tail(head.load()) {
         head.load()->next = nullptr;
-        while (capacity--)
-            blks.push(new Block());
     }
 
     ~MPMCQueue() {
@@ -122,10 +120,18 @@ class MPMCQueue {
         }
     }
 
+    void set_capacity(size_t capacity = 0) {
+        while (capacity--) blks.push(new Block());
+    }
+
     template<typename U>
-    bool enqueue(U &&e) {
+    bool enqueue(U &&e, bool unbounded = true) {
         FreeList::Node * _nblk;
-        if (!blks.pop(_nblk)) _nblk = new Block();
+        if (!blks.pop(_nblk))
+        {
+            if (unbounded) _nblk = new Block();
+            else return false;
+        }
         _enqueue(static_cast<Block *>(_nblk), std::forward<U>(e));
         return true;
     }

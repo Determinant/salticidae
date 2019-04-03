@@ -126,14 +126,14 @@ struct MPSCWriteBuffer {
     MPSCWriteBuffer(const SegBuffer &other) = delete;
     MPSCWriteBuffer(SegBuffer &&other) = delete;
 
+    void set_capacity(size_t capacity) { buffer.set_capacity(capacity); }
+
     void rewind(bytearray_t &&data) {
         buffer.rewind(buffer_entry_t(std::move(data)));
     }
   
-    void push(bytearray_t &&data) {
-        buffer_entry_t d(std::move(data));
-        // TODO: better bounded buffer impl
-        while (!buffer.try_enqueue(d)) {}
+    bool push(bytearray_t &&data, bool unbounded) {
+        return buffer.enqueue(buffer_entry_t(std::move(data)), unbounded);
     }
 
     bytearray_t move_pop() {
