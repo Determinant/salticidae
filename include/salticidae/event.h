@@ -488,19 +488,7 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
         return true;
     }
 
-    template<typename U>
-    bool try_enqueue(U &&e) {
-        static const uint64_t dummy = 1;
-        if (!MPSCQueue<T>::try_enqueue(std::forward<U>(e)))
-            return false;
-        // memory barrier here, so any load/store in enqueue must be finialized
-        if (wait_sig.exchange(false, std::memory_order_acq_rel))
-        {
-            SALTICIDAE_LOG_DEBUG("mpsc notify");
-            write(fd, &dummy, 8);
-        }
-        return true;
-    }
+    template<typename U> bool try_enqueue(U &&e) = delete;
 };
 
 template<typename T>
@@ -552,6 +540,8 @@ class MPMCQueueEventDriven: public MPMCQueue<T> {
         }
         return true;
     }
+
+    template<typename U> bool try_enqueue(U &&e) = delete;
 };
 
 class ThreadCall {

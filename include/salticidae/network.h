@@ -451,7 +451,8 @@ void MsgNetwork<OpcodeType>::Conn::on_read() {
             }
 #endif
             auto conn = static_pointer_cast<Conn>(self());
-            while (!mn->incoming_msgs.try_enqueue(std::make_pair(msg, conn)));
+            while (!mn->incoming_msgs.enqueue(std::make_pair(msg, conn), false))
+                std::this_thread::yield();
         }
     }
 }
