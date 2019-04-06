@@ -105,7 +105,7 @@ class MPMCQueue {
     bool _enqueue(U &&e, bool unbounded = true) {
         for (;;)
         {
-            auto t = tail.load(std::memory_order_relaxed);
+            auto t = tail.load(std::memory_order_acquire);
             auto tcnt = t->refcnt.load(std::memory_order_relaxed);
             if (!tcnt) continue;
             if (!t->refcnt.compare_exchange_weak(tcnt, tcnt + 1, std::memory_order_relaxed))
@@ -188,7 +188,7 @@ class MPMCQueue {
     bool try_dequeue(T &e) {
         for (;;)
         {
-            auto h = this->head.load(std::memory_order_relaxed);
+            auto h = this->head.load(std::memory_order_acquire);
             auto hcnt = h->refcnt.load(std::memory_order_relaxed);
             if (!hcnt) continue;
             if (!h->refcnt.compare_exchange_weak(hcnt, hcnt + 1, std::memory_order_relaxed))
@@ -199,19 +199,21 @@ class MPMCQueue {
             if (hh >= tt)
             {
                 if (tt < MPMCQ_SIZE) { blks.release_ref(h); return false; }
-                auto hnext = h->next.load(std::memory_order_relaxed);
+                auto hnext = h->next.load(std::memory_order_acquire);
                 if (hnext == nullptr) { blks.release_ref(h); return false; }
-                if (this->head.compare_exchange_weak(h, hnext, std::memory_order_relaxed))
+                auto h2 = h;
+                if (this->head.compare_exchange_weak(h2, hnext, std::memory_order_acq_rel))
                     this->blks.push(h);
                 blks.release_ref(h);
                 continue;
             }
-            while (!h->avail[hh].load(std::memory_order_acquire))
-                std::this_thread::yield();
             auto hh2 = hh;
             if (h->head.compare_exchange_weak(hh2, hh2 + 1, std::memory_order_relaxed))
             {
+                while (!h->avail[hh].load(std::memory_order_acquire))
+                    std::this_thread::yield();
                 e = std::move(h->elem[hh]);
+                h->avail[hh].store(false, std::memory_order_relaxed);
                 blks.release_ref(h);
                 break;
             }
@@ -241,9 +243,9 @@ struct MPSCQueue: public MPMCQueue<T> {
                 this->blks.push(h);
                 continue;
             }
+            h->head.store(hh + 1, std::memory_order_relaxed);
             while (!h->avail[hh].load(std::memory_order_acquire))
                 std::this_thread::yield();
-            h->head.store(hh + 1, std::memory_order_relaxed);
             e = std::move(h->elem[hh]);
             h->avail[hh].store(false, std::memory_order_relaxed);
             break;

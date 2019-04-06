@@ -8,20 +8,25 @@
 using salticidae::TimerEvent;
 using salticidae::Config;
 
-void test_mpsc(int nproducers, int nops, size_t burst_size) {
+void test_mpsc(int nproducers, int nops, size_t burst_size, bool test_rewind) {
     size_t total = nproducers * nops;
     salticidae::EventContext ec;
     std::atomic<size_t> collected(0);
     using queue_t = salticidae::MPSCQueueEventDriven<int>;
     queue_t q;
     q.set_capacity(65536);
-    q.reg_handler(ec, [&collected, burst_size](queue_t &q) {
+    q.reg_handler(ec, [&collected, burst_size, test_rewind](queue_t &q) {
         size_t cnt = burst_size;
         int x;
         while (q.try_dequeue(x))
         {
-            printf("%d\n", x);
-            collected.fetch_add(1);
+            if (test_rewind && (rand() & 1))
+                q.rewind(x);
+            else
+            {
+                collected.fetch_add(1);
+                printf("%d\n", x);
+            }
             if (!--cnt) return true;
         }
         return false;
@@ -119,13 +124,16 @@ int main(int argc, char **argv) {
     auto opt_nops = Config::OptValInt::create(100000);
     auto opt_mpmc = Config::OptValFlag::create(false);
     auto opt_help = Config::OptValFlag::create(false);
+    auto opt_rewind = Config::OptValFlag::create(false);
     config.add_opt("nproducers", opt_nproducers, Config::SET_VAL);
     config.add_opt("nconsumers", opt_nconsumers, Config::SET_VAL);
     config.add_opt("burst-size", opt_burst_size, Config::SET_VAL);
     config.add_opt("nops", opt_nops, Config::SET_VAL);
     config.add_opt("mpmc", opt_mpmc, Config::SWITCH_ON);
+    config.add_opt("rewind", opt_rewind, Config::SWITCH_ON);
     config.add_opt("help", opt_help, Config::SWITCH_ON, 'h', "show this help info");
     config.parse(argc, argv);
+    srand(time(0));
     if (opt_help->get())
     {
         config.print_help();
@@ -136,7 +144,7 @@ int main(int argc, char **argv) {
     {
         SALTICIDAE_LOG_INFO("testing an MPSC queue...");
         test_mpsc(opt_nproducers->get(), opt_nops->get(),
-                opt_burst_size->get());
+                opt_burst_size->get(), opt_rewind->get());
     }
     else
     {
