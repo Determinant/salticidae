@@ -144,6 +144,8 @@ class MsgNetwork: public ConnPool {
         }
     };
 
+    ~MsgNetwork() { stop_workers(); }
+
     MsgNetwork(const EventContext &ec, const Config &config):
             ConnPool(ec, config) {
         incoming_msgs.set_capacity(65536);

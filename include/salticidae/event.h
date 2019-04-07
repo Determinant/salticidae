@@ -547,7 +547,6 @@ class MPMCQueueEventDriven: public MPMCQueue<T> {
 class ThreadCall {
     public: class Handle;
     private:
-    int ctl_fd[2];
     EventContext ec;
     const size_t burst_size;
     using queue_t = MPSCQueueEventDriven<Handle *>;
@@ -621,8 +620,6 @@ class ThreadCall {
     ~ThreadCall() {
         Handle *h;
         while (q.try_dequeue(h)) delete h;
-        close(ctl_fd[0]);
-        close(ctl_fd[1]);
     }
 
     template<typename Func>
