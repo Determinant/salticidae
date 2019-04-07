@@ -79,12 +79,14 @@ class MsgNetwork: public ConnPool {
 #ifdef SALTICIDAE_MSG_STAT
         mutable std::atomic<size_t> nsent;
         mutable std::atomic<size_t> nrecv;
+        mutable std::atomic<size_t> nsentb;
+        mutable std::atomic<size_t> nrecvb;
 #endif
 
         public:
         Conn(): msg_state(HEADER)
 #ifdef SALTICIDAE_MSG_STAT
-            , nsent(0), nrecv(0)
+            , nsent(0), nrecv(0), nsentb(0), nrecvb(0)
 #endif
         {}
 
@@ -95,8 +97,14 @@ class MsgNetwork: public ConnPool {
 #ifdef SALTICIDAE_MSG_STAT
         size_t get_nsent() const { return nsent; }
         size_t get_nrecv() const { return nrecv; }
-        void clear_nsent() const { nsent = 0; }
-        void clear_nrecv() const { nrecv = 0; }
+        size_t get_nsentb() const { return nsentb; }
+        size_t get_nrecvb() const { return nrecvb; }
+        void clear_msgstat() const {
+            nsent.store(0, std::memory_order_relaxed);
+            nrecv.store(0, std::memory_order_relaxed);
+            nsentb.store(0, std::memory_order_relaxed);
+            nrecvb.store(0, std::memory_order_relaxed);
+        }
 #endif
 
         protected:
@@ -116,8 +124,6 @@ class MsgNetwork: public ConnPool {
     queue_t incoming_msgs;
 
     protected:
-#ifdef SALTICIDAE_MSG_STAT
-#endif
 
     ConnPool::Conn *create_conn() override { return new Conn(); }
 
@@ -157,10 +163,11 @@ class MsgNetwork: public ConnPool {
                     SALTICIDAE_LOG_DEBUG("got message %s from %s",
                             std::string(msg).c_str(),
                             std::string(*conn).c_str());
-                    it->second(msg, conn);
 #ifdef SALTICIDAE_MSG_STAT
                     conn->nrecv++;
+                    conn->nrecvb += msg.get_length();
 #endif
+                    it->second(msg, conn);
                 }
                 if (++cnt == burst_size) return true;
             }
@@ -182,8 +189,6 @@ class MsgNetwork: public ConnPool {
     template<typename MsgType>
     bool send_msg(MsgType &&msg, const conn_t &conn);
     using ConnPool::listen;
-#ifdef SALTICIDAE_MSG_STAT
-#endif
     conn_t connect(const NetAddr &addr) {
         return static_pointer_cast<Conn>(ConnPool::connect(addr));
     }
@@ -467,6 +472,7 @@ bool MsgNetwork<OpcodeType>::send_msg(MsgType &&_msg, const conn_t &conn) {
                 std::string(*conn).c_str());
 #ifdef SALTICIDAE_MSG_STAT
     conn->nsent++;
+    conn->nsentb += msg.get_length();
 #endif
     return conn->write(std::move(msg_data));
 }
