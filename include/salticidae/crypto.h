@@ -72,6 +72,48 @@ class SHA256 {
     }
 };
 
+class SHA1 {
+    SHA_CTX ctx;
+
+    public:
+    SHA1() { reset(); }
+
+    void reset() {
+        if (!SHA1_Init(&ctx))
+            throw std::runtime_error("openssl SHA1 init error");
+    }
+
+    template<typename T>
+    void update(const T &data) {
+        update(reinterpret_cast<const uint8_t *>(&*data.begin()), data.size());
+    }
+
+    void update(const bytearray_t::const_iterator &it, size_t length) {
+        update(&*it, length);
+    }
+
+    void update(const uint8_t *ptr, size_t length) {
+        if (!SHA1_Update(&ctx, ptr, length))
+            throw std::runtime_error("openssl SHA1 update error");
+    }
+
+    void _digest(bytearray_t &md) {
+        if (!SHA1_Final(&*md.begin(), &ctx))
+            throw std::runtime_error("openssl SHA1 error");
+    }
+
+    void digest(bytearray_t &md) {
+        md.resize(32);
+        _digest(md);
+    }
+
+    bytearray_t digest() {
+        bytearray_t md(32);
+        _digest(md);
+        return std::move(md);
+    }
+};
+
 }
 
 #endif

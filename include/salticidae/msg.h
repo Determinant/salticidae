@@ -192,19 +192,19 @@ class MsgBase {
 
 #ifndef SALTICIDAE_NOCHECKSUM
     uint32_t get_checksum() const {
-        static thread_local class SHA256 sha256;
+        static thread_local class SHA1 sha1;
         uint32_t res;
         bytearray_t tmp;
 #ifndef SALTICIDAE_NOCHECK
         if (no_payload)
             throw std::runtime_error("payload not available");
 #endif
-        sha256.reset();
-        sha256.update(payload);
-        sha256.digest(tmp);
-        sha256.reset();
-        sha256.update(tmp);
-        sha256.digest(tmp);
+        sha1.reset();
+        sha1.update(payload);
+        sha1.digest(tmp);
+        //sha256.reset();
+        //sha256.update(tmp);
+        //sha256.digest(tmp);
         memmove(&res, &*tmp.begin(), 4);
         return res;
     }
