@@ -15,7 +15,8 @@ class FreeList {
     struct Node {
         std::atomic<Node *> next;
         std::atomic<size_t> refcnt;
-        Node(): next(nullptr), refcnt(1) {}
+        std::atomic<bool> freed;
+        Node(): next(nullptr), refcnt(1), freed(false) {}
     };
 
     private:
@@ -37,15 +38,16 @@ class FreeList {
             // the replacement is ok even if ABA happens
             if (top.compare_exchange_weak(t, u, std::memory_order_release))
             {
+                // must have seen freed == true
                 u->refcnt.store(1, std::memory_order_relaxed);
                 break;
             }
         }
     }
 
-    bool push(Node *u) {
+    inline void push(Node *u) {
+        u->freed.store(true, std::memory_order_relaxed);
         release_ref(u);
-        return true;
     }
 
     bool pop(Node *&r) {
@@ -110,6 +112,11 @@ class MPMCQueue {
             if (!tcnt) continue;
             if (!t->refcnt.compare_exchange_weak(tcnt, tcnt + 1, std::memory_order_relaxed))
                 continue;
+            if (t->freed.load(std::memory_order_relaxed))
+            {
+                blks.release_ref(t);
+                continue;
+            }
             auto tt = t->tail.load(std::memory_order_relaxed);
             if (tt >= MPMCQ_SIZE)
             {
@@ -130,9 +137,12 @@ class MPMCQueue {
                     nblk->next.store(nullptr, std::memory_order_relaxed);
                     Block *tnext = nullptr;
                     if (!t->next.compare_exchange_weak(tnext, nblk, std::memory_order_acq_rel))
-                        blks.push(_nblk);
+                        blks.push(nblk);
                     else
-                        tail.store(nblk, std::memory_order_relaxed);
+                    {
+                        tail.store(nblk, std::memory_order_release);
+                        nblk->freed.store(false, std::memory_order_release);
+                    }
                 }
                 blks.release_ref(t);
                 continue;

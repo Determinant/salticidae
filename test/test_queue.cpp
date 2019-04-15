@@ -69,7 +69,7 @@ void test_mpmc(int nproducers, int nconsumers, int nops, size_t burst_size) {
     std::vector<salticidae::EventContext> ecs;
     std::atomic<size_t> collected(0);
     ecs.resize(nconsumers);
-    q.set_capacity(65536 * nproducers);
+    q.set_capacity(65536);
     for (int i = 0; i < nconsumers; i++)
     {
         q.reg_handler(ecs[i], [&collected, burst_size](queue_t &q) {
