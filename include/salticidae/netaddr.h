@@ -34,10 +34,10 @@
 #include "salticidae/util.h"
 #include "salticidae/stream.h"
 
+#ifdef __cplusplus
 namespace salticidae {
 
 /* TODO: IPv6 support */
-
 struct NetAddr {
     uint32_t ip;
     uint16_t port;
@@ -122,6 +122,22 @@ namespace std {
             return k.ip ^ k.port;
         }
     };
+}
+
+using netaddr_t = salticidae::NetAddr;
+#else
+typedef struct netaddr_t netaddr_t;
+#endif
+
+extern "C" {
+
+netaddr_t *netaddr_new();
+netaddr_t *netaddr_new_from_ip_port(uint32_t ip, uint16_t port);
+netaddr_t *netaddr_new_from_sip_port(const char *ip, uint16_t port);
+netaddr_t *netaddr_new_from_sipport(const char *ip_port_addr);
+bool netaddr_is_eq(const netaddr_t *a, const netaddr_t *b);
+bool netaddr_is_null(const netaddr_t *self);
+
 }
 
 #endif

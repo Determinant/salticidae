@@ -35,6 +35,7 @@
 #include "salticidae/util.h"
 #include "salticidae/ref.h"
 
+#ifdef __cplusplus
 namespace salticidae {
 
 struct _event_context_deleter {
@@ -644,4 +645,9 @@ class ThreadCall {
 
 }
 
+using eventcontext_t = salticidae::EventContext;
+
+#else
+typedef struct eventcontext_t;
+#endif
 #endif

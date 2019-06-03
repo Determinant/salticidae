@@ -89,4 +89,10 @@ inline auto generic_bind(ReturnType(ClassType::* f)(Args...), FArgs&&... fargs) 
 
 }
 
+#ifdef SALTICIDAE_CBINDINGS_STR_OP
+using _opcode_t = std::string;
+#else
+using _opcode_t = uint8_t;
+#endif
+
 #endif

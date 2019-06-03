@@ -34,6 +34,7 @@
 #include "salticidae/stream.h"
 #include "salticidae/netaddr.h"
 
+#ifdef __cplusplus
 namespace salticidae {
 
 template<typename OpcodeType>
@@ -68,6 +69,14 @@ class MsgBase {
         set_payload(std::move(msg.serialized));
         set_checksum();
     }
+
+#ifdef SALTICIDAE_CBINDINGS
+    MsgBase(const OpcodeType &opcode, bytearray_t &&payload): magic(0x0) {
+        set_opcode(opcode);
+        set_payload(std::move(payload));
+        set_checksum();
+    }
+#endif
 
     MsgBase(const MsgBase &other):
             magic(other.magic),
@@ -256,6 +265,16 @@ const size_t MsgBase<OpcodeType>::header_size =
     sizeof(MsgBase<OpcodeType>::checksum) +
 #endif
     0;
+}
+
+using msg_t = salticidae::MsgBase<_opcode_t>;
+#else
+typedef struct msg_t msg_t;
+#endif
+
+extern "C" {
+
+void msg_new();
 }
 
 #endif

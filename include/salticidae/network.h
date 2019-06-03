@@ -30,8 +30,8 @@
 #include "salticidae/msg.h"
 #include "salticidae/conn.h"
 
+#ifdef __cplusplus
 namespace salticidae {
-
 /** Network of nodes who can send async messages.  */
 template<typename OpcodeType>
 class MsgNetwork: public ConnPool {
@@ -156,6 +156,9 @@ class MsgNetwork: public ConnPool {
             {
                 auto &msg = item.first;
                 auto &conn = item.second;
+#ifdef SALTICIDAE_CBINDINGS_INJECT_CALLBACK
+                salticidae_injected_msg_callback(&msg, conn.get());
+#else
                 auto it = handler_map.find(msg.get_opcode());
                 if (it == handler_map.end())
                     SALTICIDAE_LOG_WARN("unknown opcode: %s",
@@ -171,6 +174,7 @@ class MsgNetwork: public ConnPool {
 #endif
                     it->second(msg, conn);
                 }
+#endif
                 if (++cnt == burst_size) return true;
             }
             return false;
@@ -182,14 +186,23 @@ class MsgNetwork: public ConnPool {
         typename callback_traits<Func>::msg_type, DataStream &&>::value>::type
     reg_handler(Func handler) {
         using callback_t = callback_traits<Func>;
-        handler_map[callback_t::msg_type::opcode] = [handler](const Msg &msg, const conn_t &conn) {
+        set_handler(callback_t::msg_type::opcode,
+            [handler](const Msg &msg, const conn_t &conn) {
             handler(typename callback_t::msg_type(msg.get_payload()),
                     static_pointer_cast<typename callback_t::conn_type>(conn));
-        };
+        });
+    }
+
+    template<typename Func>
+    inline void set_handler(OpcodeType opcode, Func handler) {
+        handler_map[opcode] = handler;
     }
 
     template<typename MsgType>
     bool send_msg(MsgType &&msg, const conn_t &conn);
+#ifdef SALTICIDAE_CBINDINGS
+    inline bool send_msg(const Msg &msg, const conn_t &conn);
+#endif
     using ConnPool::listen;
     conn_t connect(const NetAddr &addr) {
         return static_pointer_cast<Conn>(ConnPool::connect(addr));
@@ -468,6 +481,11 @@ template<typename OpcodeType>
 template<typename MsgType>
 bool MsgNetwork<OpcodeType>::send_msg(MsgType &&_msg, const conn_t &conn) {
     Msg msg(std::forward<MsgType>(_msg));
+    return send_msg(msg, conn);
+}
+
+template<typename OpcodeType>
+inline bool MsgNetwork<OpcodeType>::send_msg(const Msg &msg, const conn_t &conn) {
     bytearray_t msg_data = msg.serialize();
     SALTICIDAE_LOG_DEBUG("wrote message %s to %s",
                 std::string(msg).c_str(),
@@ -762,6 +780,39 @@ const O PeerNetwork<O, OPCODE_PING, _>::MsgPing::opcode = OPCODE_PING;
 template<typename O, O _, O OPCODE_PONG>
 const O PeerNetwork<O, _, OPCODE_PONG>::MsgPong::opcode = OPCODE_PONG;
 
+}
+
+using msgnetwork_t = salticidae::MsgNetwork<_opcode_t>;
+using msgnetwork_config_t = msgnetwork_t::Config;
+using msgnetwork_conn_t = msgnetwork_t::conn_t;
+
+#else
+typedef struct msg_t;
+typedef struct msgnetwork_t;
+typedef struct msgnetwork_config_t;
+typedef struct msgnetwork_conn_t;
+#endif
+
+extern "C" {
+
+void salticidae_injected_msg_callback(const msg_t *msg, msgnetwork_conn_t *conn);
+
+msg_t _test_create_msg();
+msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config);
+
+bool msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_conn_t *conn);
+
+msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr);
+
+void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr);
+
+typedef void (*msgnetwork_msg_callback_t)(const msg_t *msg, const msgnetwork_conn_t *conn);
+
+#ifdef SALTICIDAE_CBINDINGS_STR_OP
+void msgnetwork_reg_handler(msgnetwork_t *self, const char *opcode, msgnetwork_msg_callback_t cb);
+#else
+void msgnetwork_reg_handler(msgnetwork_t *self, uint8_t opcode, msgnetwork_msg_callback_t cb);
+#endif
 }
 
 #endif

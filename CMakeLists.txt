@@ -32,7 +32,10 @@ include_directories(include)
 add_library(salticidae
     OBJECT
     src/util.cpp
-    src/conn.cpp)
+    src/conn.cpp
+    src/network.cpp
+    src/stream.cpp
+    src/netaddr.cpp)
 
 option(BUILD_SHARED "build shared library." OFF)
 if(BUILD_SHARED)
@@ -59,6 +62,7 @@ option(SALTICIDAE_NORMAL_LOG "enable regular log" ON)
 option(SALTICIDAE_MSG_STAT "enable message statistics" ON)
 option(SALTICIDAE_NOCHECK "disable the sanity check" OFF)
 option(SALTICIDAE_NOCHECKSUM " disable checksum in messages" OFF)
+option(SALTICIDAE_CBINDINGS "enable C bindings" OFF)
 
 configure_file(src/config.h.in include/salticidae/config.h @ONLY)
 
