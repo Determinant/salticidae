@@ -1,16 +1,11 @@
-#include "salticidae/network.h"
 #ifdef SALTICIDAE_CBINDINGS
+#include "salticidae/network.h"
 
 using namespace salticidae;
 
 extern "C" {
 
-msg_t _test_create_msg() {
-    return msg_t(0x0, bytearray_t());
-}
-
-
-msgnetwork_t *msgnetwork_new(const EventContext *ec, const msgnetwork_config_t *config) {
+msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config) {
     return new msgnetwork_t(*ec, *config);
 }
 
@@ -46,6 +41,19 @@ void msgnetwork_reg_handler(msgnetwork_t *self,
         });
 }
 #endif
+
+void msgnetwork_reg_conn_handler(msgnetwork_t *self, msgnetwork_conn_callback_t cb) {
+    self->reg_conn_handler([cb](const ConnPool::conn_t &_conn, bool connected) {
+        auto conn = salticidae::static_pointer_cast<msgnetwork_t::Conn>(_conn);
+        cb(&conn, connected);
+    });
+}
+
+msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn) {
+    return (*conn)->get_net();
+}
+
+void msgnetwork_start(msgnetwork_t *self) { self->start(); }
 
 }
 

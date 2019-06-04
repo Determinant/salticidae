@@ -467,14 +467,21 @@ namespace std {
     };
 }
 
+#ifdef SALTICIDAE_CBINDINGS
 using uint256_t = salticidae::uint256_t;
 using datastream_t = salticidae::DataStream;
+#endif
 
 #else
+
+#ifdef SALTICIDAE_CBINDINGS
 typedef struct datastream_t;
 typedef struct uint256_t;
 #endif
 
+#endif
+
+#ifdef SALTICIDAE_CBINDINGS
 extern "C" {
 
 uint256_t *uint256_new();
@@ -499,8 +506,17 @@ void datastream_put_i16(datastream_t *self, int16_t val);
 void datastream_put_i32(datastream_t *self, int32_t val);
 void datastream_put_data(datastream_t *self,
                         uint8_t *begin, uint8_t *end);
+
+uint8_t datastream_get_u8(datastream_t *self);
+uint16_t datastream_get_u16(datastream_t *self);
+uint32_t datastream_get_u32(datastream_t *self);
+int8_t datastream_get_i8(datastream_t *self);
+int16_t datastream_get_i16(datastream_t *self);
+int32_t datastream_get_i32(datastream_t *self);
 const uint8_t *datastream_get_data_inplace(datastream_t *self, size_t len);
 uint256_t *datastream_get_hash(const datastream_t *self);
 
 }
+#endif
+
 #endif

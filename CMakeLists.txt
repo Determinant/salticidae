@@ -31,11 +31,14 @@ find_package(OpenSSL REQUIRED)
 include_directories(include)
 add_library(salticidae
     OBJECT
+    src/type.cpp
     src/util.cpp
-    src/conn.cpp
-    src/network.cpp
+    src/event.cpp
     src/stream.cpp
-    src/netaddr.cpp)
+    src/msg.cpp
+    src/netaddr.cpp
+    src/conn.cpp
+    src/network.cpp)
 
 option(BUILD_SHARED "build shared library." OFF)
 if(BUILD_SHARED)

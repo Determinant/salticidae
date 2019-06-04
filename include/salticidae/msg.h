@@ -267,14 +267,27 @@ const size_t MsgBase<OpcodeType>::header_size =
     0;
 }
 
+#ifdef SALTICIDAE_CBINDINGS
 using msg_t = salticidae::MsgBase<_opcode_t>;
+#endif
+
 #else
+
+#ifdef SALTICIDAE_CBINDINGS
 typedef struct msg_t msg_t;
 #endif
 
+#endif
+
+#ifdef SALTICIDAE_CBINDINGS
 extern "C" {
 
-void msg_new();
+msg_t *msg_new(_opcode_t opcode, bytearray_t *_moved_payload);
+datastream_t *msg_get_payload(msg_t *msg);
+const _opcode_t &msg_get_opcode(const msg_t *msg);
+void msg_free(msg_t *msg);
+
 }
+#endif
 
 #endif

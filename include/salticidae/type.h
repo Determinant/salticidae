@@ -35,6 +35,9 @@
 #include <functional>
 #include <mutex>
 
+#include "config.h"
+
+#ifdef __cplusplus
 namespace salticidae {
 
 const auto _1 = std::placeholders::_1;
@@ -89,10 +92,32 @@ inline auto generic_bind(ReturnType(ClassType::* f)(Args...), FArgs&&... fargs) 
 
 }
 
+#ifdef SALTICIDAE_CBINDINGS
+using bytearray_t = salticidae::bytearray_t;
+#endif
+
+#else
+
+#ifdef SALTICIDAE_CBINDINGS
+typedef struct bytearray_t bytearray_t;
+#endif
+
+#endif
+
 #ifdef SALTICIDAE_CBINDINGS_STR_OP
-using _opcode_t = std::string;
+using _opcode_t = char *;
 #else
 using _opcode_t = uint8_t;
+#endif
+
+#ifdef SALTICIDAE_CBINDINGS
+extern "C" {
+
+uint8_t *bytearray_data(bytearray_t *arr);
+size_t bytearray_size(bytearray_t *arr);
+void bytearray_free();
+
+}
 #endif
 
 #endif

@@ -782,22 +782,28 @@ const O PeerNetwork<O, _, OPCODE_PONG>::MsgPong::opcode = OPCODE_PONG;
 
 }
 
+#ifdef SALTICIDAE_CBINDINGS
 using msgnetwork_t = salticidae::MsgNetwork<_opcode_t>;
 using msgnetwork_config_t = msgnetwork_t::Config;
 using msgnetwork_conn_t = msgnetwork_t::conn_t;
+#endif
 
 #else
+
+#ifdef SALTICIDAE_CBINDINGS
 typedef struct msg_t;
 typedef struct msgnetwork_t;
 typedef struct msgnetwork_config_t;
 typedef struct msgnetwork_conn_t;
 #endif
 
+#endif
+
+#ifdef SALTICIDAE_CBINDINGS
 extern "C" {
 
 void salticidae_injected_msg_callback(const msg_t *msg, msgnetwork_conn_t *conn);
 
-msg_t _test_create_msg();
 msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config);
 
 bool msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_conn_t *conn);
@@ -806,13 +812,21 @@ msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr)
 
 void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr);
 
-typedef void (*msgnetwork_msg_callback_t)(const msg_t *msg, const msgnetwork_conn_t *conn);
+typedef void (*msgnetwork_msg_callback_t)(const msg_t *, const msgnetwork_conn_t *);
 
 #ifdef SALTICIDAE_CBINDINGS_STR_OP
 void msgnetwork_reg_handler(msgnetwork_t *self, const char *opcode, msgnetwork_msg_callback_t cb);
 #else
 void msgnetwork_reg_handler(msgnetwork_t *self, uint8_t opcode, msgnetwork_msg_callback_t cb);
 #endif
+
+typedef void (*msgnetwork_conn_callback_t)(const msgnetwork_conn_t *, bool);
+
+void msgnetwork_reg_conn_handler(msgnetwork_t *self, msgnetwork_conn_callback_t cb);
+
+msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn);
+
 }
+#endif
 
 #endif

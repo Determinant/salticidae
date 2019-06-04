@@ -36,73 +36,81 @@ typedef struct MsgHello {
     const char *text;
 } MsgHello;
 /** Defines how to serialize the msg. */
-datastream_t msg_hello_serialize(const char *name, const char *text) {
-    datastream_t *serialized = msgnet_
+datastream_t *msg_hello_serialize(const char *name, const char *text) {
+    datastream_t *serialized = datastream_new();
     serialized << htole((uint32_t)name.length());
     serialized << name << text;
+    return serialized;
 }
 
 /** Defines how to parse the msg. */
-MsgHello MsgHello(DataStream &&s) {
+MsgHello msg_hello_unserialize(datastream_t *s) {
     MsgHello res;
     uint32_t len;
-    s >> len;
+    len = datastream_get_u32(s);
     len = letoh(len);
-    res.name = std::string((const char *)s.get_data_inplace(len), len);
-    len = s.size();
-    res.text = std::string((const char *)s.get_data_inplace(len), len);
+
+    const char *name = (const char *)malloc(len + 1);
+    memmove(name, datastream_get_data_inplace(s, len), len);
+    name[len] = 0;
+
+    len = datastream_size(s);
+    const char *text = (const char *)malloc(len + 1);
+    memmove(text, datastream_get_data_inplace(s, len), len);
+    text[len] = 0;
+
+    res.name = name;
+    res.text = text;
     return res;
 }
 
-/** Acknowledgement Message. */
-struct MsgAck {
-    static const uint8_t opcode = 0x1;
-    DataStream serialized;
-    MsgAck() {}
-    MsgAck(DataStream &&s) {}
-};
+datastream_t *msg_ack_serialize() { return datastream_new(); }
 
-const uint8_t MsgHello::opcode;
-const uint8_t MsgAck::opcode;
-
-using MsgNetworkByteOp = MsgNetwork<uint8_t>;
-
-typedef struct MyNet {
+struct MyNet {
     msgnetwork_t *net;
-    const std::string name;
+    const char *name;
     const NetAddr peer;
-} MyNet;
+} alice, bob;
 
-void msg_hello_handler(const msg_t *msg, const msgnetwork_conn_t *conn) {
+void on_receive_hello(const msg_t *msg, const msgnetwork_conn_t *conn) {
+    msgnetwork_t *net = msgnetwork_conn_get_net(conn);
 
+    printf("[%s] %s says %s\n", name, msg.name, msg.text);
+    msg_t *msg = msg_new(0x1, msg_ack_serialize());
+    /* send acknowledgement */
+    send_msg(msg, conn);
+    msg_free(msg);
 }
 
-void msg_ack_handler(const msg_t *msg, const msgnetwork_conn_t *conn) {
+void on_receive_ack(const msg_t *msg, const msgnetwork_conn_t *conn) {
+    auto net = static_cast<MyNet *>(conn->get_net());
+    printf("[%s] the peer knows\n", net->name.c_str());
 }
 
-void alice_conn_handler(const msgnetwork_conn_t *conn, bool connected) {
+void conn_handler(const msgnetwork_conn_t *conn, bool connected) {
+    msgnetwork_t *net = msgnetwork_conn_get_net(conn);
+    const char *name = net == alice.net ? alice.name : bob.name;
     if (connected)
     {
         if (conn->get_mode() == ConnPool::Conn::ACTIVE)
         {
-            puts("[alice] Connected, sending hello.");
+            puts("[%s] Connected, sending hello.", name);
             /* send the first message through this connection */
             msgnetwork_send_msg(alice,
                 msg_hello_serialize("alice", "Hello there!"), conn);
         }
         else
-            printf("[alice] Accepted, waiting for greetings.\n",
-                    this->name.c_str());
+            printf("[%s] Accepted, waiting for greetings.\n", name);
     }
     else
     {
-        printf("[alice] Disconnected, retrying.\n", this->name.c_str());
+        printf("[%s] Disconnected, retrying.\n", name);
         /* try to reconnect to the same address */
         connect(conn->get_addr());
     }
 }
 
-MyNet mynet_new(const salticidae::EventContext &ec,
+MyNet gen_mynet(const eventcontext_t *ec,
                 const char *name,
                 const netaddr_t *peer) {
     MyNet res;
@@ -110,62 +118,46 @@ MyNet mynet_new(const salticidae::EventContext &ec,
     res.net = msgnetwork_new(ec, netconfig);
     res.name = name;
     res.peer = peer;
-
-    /* message handler could be a bound method */
-    reg_handler(salticidae::generic_bind(&MyNet::on_receive_hello, this, _1, _2));
-
-    reg_conn_handler([this](const ConnPool::conn_t &conn, bool connected) {
-        });
-    }
-
-    void on_receive_hello(MsgHello &&msg, const MyNet::conn_t &conn) {
-        printf("[%s] %s says %s\n",
-                name.c_str(),
-                msg.name.c_str(), msg.text.c_str());
-        /* send acknowledgement */
-        send_msg(MsgAck(), conn);
-    }
 };
 
 
-void on_receive_ack(MsgAck &&msg, const MyNet::conn_t &conn) {
-    auto net = static_cast<MyNet *>(conn->get_net());
-    printf("[%s] the peer knows\n", net->name.c_str());
+void on_term_signal(int) {
+    ec.stop();
 }
 
 int main() {
-    salticidae::EventContext ec;
-    NetAddr alice_addr("127.0.0.1:12345");
-    NetAddr bob_addr("127.0.0.1:12346");
+    eventcontext_t *ec = eventcontext_new();
+    netaddr_t *alice_addr = netaddr_new_from_sipport("127.0.0.1:12345");
+    netaddr_t *bob_addr = netaddr_new_from_sipport("127.0.0.1:12346");
 
     /* test two nodes in the same main loop */
-    MyNet alice(ec, "Alice", bob_addr);
-    MyNet bob(ec, "Bob", alice_addr);
+    alice = gen_mynet(ec, "Alice", bob_addr);
+    bob = gen_mynet(ec, "Bob", alice_addr);
 
-    /* message handler could be a normal function */
-    alice.reg_handler(on_receive_ack);
-    bob.reg_handler(on_receive_ack);
+    msgnetwork_reg_handler(alice.net, MSG_OPCODE_HELLO, on_receive_hello);
+    msgnetwork_reg_handler(alice.net, MSG_OPCODE_HELLO, on_receive_hello);
+    msgnetwork_reg_handler(bob.net, MSG_OPCODE_HELLO, on_receive_hello);
+    msgnetwork_reg_handler(bob.net, MSG_OPCODE_HELLO, on_receive_hello);
 
     /* start all threads */
-    alice.start();
-    bob.start();
+    msgnetwork_start(alice.net);
+    msgnetwork_start(bob.net);
 
     /* accept incoming connections */
-    alice.listen(alice_addr);
-    bob.listen(bob_addr);
+    msgnetwork_listen(alice_addr);
+    msgnetwork_listen(bob_addr);
 
     /* try to connect once */
-    alice.connect(bob_addr);
-    bob.connect(alice_addr);
+    msgnetwork_connect(bob_addr);
+    msgnetwork_connect(alice_addr);
 
     /* the main loop can be shutdown by ctrl-c or kill */
-    auto shutdown = [&](int) {ec.stop();};
-    salticidae::SigEvent ev_sigint(ec, shutdown);
-    salticidae::SigEvent ev_sigterm(ec, shutdown);
-    ev_sigint.add(SIGINT);
-    ev_sigterm.add(SIGTERM);
+    sigev_t *ev_sigint = sigev_new(ec, on_term_signal);
+    sigev_t *ev_sigterm = sigev_new(ec, on_term_signal);
+    sigev_add(ev_sigint, SIGINT);
+    sigev_add(ev_sigterm, SIGTERM);
 
     /* enter the main loop */
-    ec.dispatch();
+    eventcontext_dispatch(ec);
     return 0;
 }

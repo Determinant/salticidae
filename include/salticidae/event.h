@@ -645,9 +645,34 @@ class ThreadCall {
 
 }
 
+#ifdef SALTICIDAE_CBINDINGS
 using eventcontext_t = salticidae::EventContext;
+using sigev_t = salticidae::SigEvent;
+#endif
 
 #else
+
+#ifdef SALTICIDAE_CBINDINGS
 typedef struct eventcontext_t;
+typedef struct sigevent_t;
 #endif
+
+#endif
+
+#ifdef SALTICIDAE_CBINDINGS
+extern "C" {
+
+eventcontext_t *eventcontext_new();
+void eventcontext_dispatch(eventcontext_t *self);
+void eventcontext_stop(eventcontext_t *self);
+void eventcontext_free(eventcontext_t *self);
+
+typedef void (*sigev_callback_t)(int fd, int events);
+sigev_t *sigev_new(const eventcontext_t *self, sigev_callback_t cb);
+void sigev_add(sigev_t *self, int sig);
+void sigev_free(sigev_t *self);
+
+}
+#endif
+
 #endif

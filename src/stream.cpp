@@ -1,8 +1,7 @@
+#ifdef SALTICIDAE_CBINDINGS
 #include "salticidae/stream.h"
 
 using namespace salticidae;
-
-#ifdef __cplusplus
 
 extern "C" {
 
@@ -54,6 +53,30 @@ void datastream_put_i32(datastream_t *self, int32_t val) { *self << val; }
 void datastream_put_data(datastream_t *self,
                         uint8_t *begin, uint8_t *end) {
     self->put_data(begin, end);
+}
+
+uint8_t datastream_get_u8(datastream_t *self) {
+    uint8_t val; *self >> val; return val;
+}
+
+uint16_t datastream_get_u16(datastream_t *self) {
+    uint16_t val; *self >> val; return val;
+}
+
+uint32_t datastream_get_u32(datastream_t *self) {
+    uint32_t val; *self >> val; return val;
+}
+
+int8_t datastream_get_i8(datastream_t *self) {
+    int8_t val; *self >> val; return val;
+}
+
+int16_t datastream_get_i16(datastream_t *self) {
+    int16_t val; *self >> val; return val;
+}
+
+int32_t datastream_get_i32(datastream_t *self) {
+    int32_t val; *self >> val; return val;
 }
 
 const uint8_t *datastream_get_data_inplace(datastream_t *self, size_t len) {
