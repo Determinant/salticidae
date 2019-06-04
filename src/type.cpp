@@ -3,6 +3,10 @@
 
 extern "C" {
 
+bytearray_t *bytearray_new() {
+    return new bytearray_t();
+}
+
 uint8_t *bytearray_data(bytearray_t *arr) {
     return &(*arr)[0];
 }

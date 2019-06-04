@@ -25,16 +25,16 @@
 #ifndef _SALTICIDAE_NETADDR_H
 #define _SALTICIDAE_NETADDR_H
 
+#include "salticidae/util.h"
+#include "salticidae/stream.h"
+
+#ifdef __cplusplus
 #include <string>
 #include <cstring>
 #include <cstdint>
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#include "salticidae/util.h"
-#include "salticidae/stream.h"
-
-#ifdef __cplusplus
 namespace salticidae {
 
 /* TODO: IPv6 support */
@@ -129,7 +129,10 @@ using netaddr_t = salticidae::NetAddr;
 typedef struct netaddr_t netaddr_t;
 #endif
 
+#ifdef SALTICIDAE_CBINDINGS
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 netaddr_t *netaddr_new();
 netaddr_t *netaddr_new_from_ip_port(uint32_t ip, uint16_t port);
@@ -138,6 +141,9 @@ netaddr_t *netaddr_new_from_sipport(const char *ip_port_addr);
 bool netaddr_is_eq(const netaddr_t *a, const netaddr_t *b);
 bool netaddr_is_null(const netaddr_t *self);
 
+#ifdef __cplusplus
 }
+#endif
+#endif
 
 #endif

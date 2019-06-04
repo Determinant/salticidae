@@ -25,6 +25,7 @@
 #ifndef _SALTICIDAE_EVENT_H
 #define _SALTICIDAE_EVENT_H
 
+#ifdef __cplusplus
 #include <condition_variable>
 #include <unistd.h>
 #include <uv.h>
@@ -35,7 +36,6 @@
 #include "salticidae/util.h"
 #include "salticidae/ref.h"
 
-#ifdef __cplusplus
 namespace salticidae {
 
 struct _event_context_deleter {
@@ -651,16 +651,18 @@ using sigev_t = salticidae::SigEvent;
 #endif
 
 #else
-
+#include "config.h"
 #ifdef SALTICIDAE_CBINDINGS
-typedef struct eventcontext_t;
-typedef struct sigevent_t;
+typedef struct eventcontext_t eventcontext_t;
+typedef struct sigev_t sigev_t;
 #endif
 
 #endif
 
 #ifdef SALTICIDAE_CBINDINGS
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 eventcontext_t *eventcontext_new();
 void eventcontext_dispatch(eventcontext_t *self);
@@ -672,7 +674,9 @@ sigev_t *sigev_new(const eventcontext_t *self, sigev_callback_t cb);
 void sigev_add(sigev_t *self, int sig);
 void sigev_free(sigev_t *self);
 
+#ifdef __cplusplus
 }
+#endif
 #endif
 
 #endif

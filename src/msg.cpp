@@ -8,7 +8,7 @@ msg_t *msg_new(_opcode_t opcode, bytearray_t *_moved_payload) {
     bytearray_free(payload);
 }
 
-datastream_t *msg_get_payload(msg_t *msg) {
+datastream_t *msg_get_payload(const msg_t *msg) {
     return new datastream_t(msg->get_payload());
 }
 

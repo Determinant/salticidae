@@ -24,6 +24,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "salticidae/event.h"
 #include "salticidae/network.h"
@@ -36,68 +37,76 @@ typedef struct MsgHello {
     const char *text;
 } MsgHello;
 /** Defines how to serialize the msg. */
-datastream_t *msg_hello_serialize(const char *name, const char *text) {
+msg_t *msg_hello_serialize(const char *name, const char *text) {
     datastream_t *serialized = datastream_new();
-    serialized << htole((uint32_t)name.length());
-    serialized << name << text;
-    return serialized;
+    size_t name_len = strlen(name);
+    datastream_put_i32(serialized, (uint32_t)htole32(name_len));
+    datastream_put_data(serialized, name, name + name_len);
+    datastream_put_data(serialized, text, text + strlen(text));
+    msg_t *msg = msg_new(msg_hello_opcode, datastream_to_bytearray(serialized));
+    return msg;
 }
 
 /** Defines how to parse the msg. */
-MsgHello msg_hello_unserialize(datastream_t *s) {
+MsgHello msg_hello_unserialize(const msg_t *msg) {
+    datastream_t *s = msg_get_payload(msg);
     MsgHello res;
     uint32_t len;
     len = datastream_get_u32(s);
-    len = letoh(len);
+    len = le32toh(len);
 
-    const char *name = (const char *)malloc(len + 1);
+    char *name = (char *)malloc(len + 1);
     memmove(name, datastream_get_data_inplace(s, len), len);
     name[len] = 0;
 
     len = datastream_size(s);
-    const char *text = (const char *)malloc(len + 1);
+    char *text = (char *)malloc(len + 1);
     memmove(text, datastream_get_data_inplace(s, len), len);
     text[len] = 0;
 
     res.name = name;
     res.text = text;
+    datastream_free(s);
     return res;
 }
 
-datastream_t *msg_ack_serialize() { return datastream_new(); }
+bytearray_t *msg_ack_serialize() { return bytearray_new(); }
 
-struct MyNet {
+typedef struct MyNet {
     msgnetwork_t *net;
     const char *name;
-    const NetAddr peer;
-} alice, bob;
+} MyNet;
+MyNet alice, bob;
 
-void on_receive_hello(const msg_t *msg, const msgnetwork_conn_t *conn) {
+void on_receive_hello(const msg_t *_msg, const msgnetwork_conn_t *conn) {
     msgnetwork_t *net = msgnetwork_conn_get_net(conn);
-
+    const char *name = net == alice.net ? alice.name : bob.name;
+    MsgHello msg = msg_hello_unserialize(_msg);
     printf("[%s] %s says %s\n", name, msg.name, msg.text);
-    msg_t *msg = msg_new(0x1, msg_ack_serialize());
+    msg_t *ack = msg_new(0x1, msg_ack_serialize());
     /* send acknowledgement */
-    send_msg(msg, conn);
-    msg_free(msg);
+    send_msg(ack, conn);
+    msg_free(ack);
 }
 
 void on_receive_ack(const msg_t *msg, const msgnetwork_conn_t *conn) {
-    auto net = static_cast<MyNet *>(conn->get_net());
-    printf("[%s] the peer knows\n", net->name.c_str());
+    msgnetwork_t *net = msgnetwork_conn_get_net(conn);
+    const char *name = net == alice.net ? alice.name : bob.name;
+    printf("[%s] the peer knows\n", name);
 }
 
 void conn_handler(const msgnetwork_conn_t *conn, bool connected) {
     msgnetwork_t *net = msgnetwork_conn_get_net(conn);
-    const char *name = net == alice.net ? alice.name : bob.name;
+    MyNet *n = net == alice.net ? &alice: &bob;
+    const char *name = n->name;
     if (connected)
     {
-        if (conn->get_mode() == ConnPool::Conn::ACTIVE)
+        if (msgnetwork_conn_get_mode(conn) == CONN_MODE_ACTIVE)
         {
-            puts("[%s] Connected, sending hello.", name);
+            printf("[%s] Connected, sending hello.", name);
             /* send the first message through this connection */
-            msgnetwork_send_msg(alice,
-                msg_hello_serialize("alice", "Hello there!"), conn);
+            msgnetwork_send_msg(n->net,
+                msg_hello_serialize(name, "Hello there!"), conn);
         }
         else
             printf("[%s] Accepted, waiting for greetings.\n", name);
@@ -106,18 +115,16 @@ void conn_handler(const msgnetwork_conn_t *conn, bool connected) {
     {
         printf("[%s] Disconnected, retrying.\n", name);
         /* try to reconnect to the same address */
-        connect(conn->get_addr());
+        connect(msgnetwork_conn_get_addr(conn));
     }
 }
 
 MyNet gen_mynet(const eventcontext_t *ec,
-                const char *name,
-                const netaddr_t *peer) {
+                const char *name) {
     MyNet res;
     const msgnetwork_config_t *netconfig = msgnetwork_config_new();
     res.net = msgnetwork_new(ec, netconfig);
     res.name = name;
-    res.peer = peer;
 };
 
 

@@ -51,7 +51,7 @@ void datastream_put_i16(datastream_t *self, int16_t val) { *self << val; }
 void datastream_put_i32(datastream_t *self, int32_t val) { *self << val; }
 
 void datastream_put_data(datastream_t *self,
-                        uint8_t *begin, uint8_t *end) {
+                        const uint8_t *begin, const uint8_t *end) {
     self->put_data(begin, end);
 }
 
@@ -85,6 +85,14 @@ const uint8_t *datastream_get_data_inplace(datastream_t *self, size_t len) {
 
 uint256_t *datastream_get_hash(const datastream_t *self) {
     return new uint256_t(self->get_hash());
+}
+
+void datastream_free(const datastream_t *self) { delete self; }
+
+bytearray_t *datastream_to_bytearray(datastream_t *self) {
+    auto res = new bytearray_t(std::move(*self));
+    delete self;
+    return res;
 }
 
 }

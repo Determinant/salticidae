@@ -25,6 +25,8 @@
 #ifndef _SALTICIDAE_COMMON_H
 #define _SALTICIDAE_COMMON_H
 
+#ifdef __cplusplus
+
 #include <string>
 #include <exception>
 #include <cstdarg>
@@ -324,5 +326,7 @@ class Config {
 };
 
 }
+
+#endif
 
 #endif

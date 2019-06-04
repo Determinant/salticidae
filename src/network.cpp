@@ -55,6 +55,14 @@ msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn) {
 
 void msgnetwork_start(msgnetwork_t *self) { self->start(); }
 
+msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn) {
+    return conn->get_mode();
+}
+
+netaddr_t msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn) {
+    return new netaddr_t(conn->get_addr());
+}
+
 }
 
 #endif

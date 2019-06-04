@@ -25,6 +25,9 @@
 #ifndef _SALTICIDAE_TYPE_H
 #define _SALTICIDAE_TYPE_H
 
+#include "config.h"
+
+#ifdef __cplusplus
 #include <vector>
 #include <string>
 #include <cstring>
@@ -35,9 +38,6 @@
 #include <functional>
 #include <mutex>
 
-#include "config.h"
-
-#ifdef __cplusplus
 namespace salticidae {
 
 const auto _1 = std::placeholders::_1;
@@ -98,6 +98,7 @@ using bytearray_t = salticidae::bytearray_t;
 
 #else
 
+#include <stdint.h>
 #ifdef SALTICIDAE_CBINDINGS
 typedef struct bytearray_t bytearray_t;
 #endif
@@ -105,19 +106,24 @@ typedef struct bytearray_t bytearray_t;
 #endif
 
 #ifdef SALTICIDAE_CBINDINGS_STR_OP
-using _opcode_t = char *;
+typedef char * _opcode_t;
 #else
-using _opcode_t = uint8_t;
+typedef uint8_t _opcode_t;
 #endif
 
 #ifdef SALTICIDAE_CBINDINGS
+#ifdef __cplusplus
 extern "C" {
+#endif
 
+bytearray_t *bytearray_new();
 uint8_t *bytearray_data(bytearray_t *arr);
 size_t bytearray_size(bytearray_t *arr);
 void bytearray_free();
 
+#ifdef __cplusplus
 }
+#endif
 #endif
 
 #endif

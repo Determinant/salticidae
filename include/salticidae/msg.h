@@ -25,16 +25,17 @@
 #ifndef _SALTICIDAE_MSG_H
 #define _SALTICIDAE_MSG_H
 
-#include <cstdint>
-#include <cstring>
-#include <string>
-#include <vector>
-
 #include "salticidae/type.h"
 #include "salticidae/stream.h"
 #include "salticidae/netaddr.h"
 
 #ifdef __cplusplus
+
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <vector>
+
 namespace salticidae {
 
 template<typename OpcodeType>
@@ -280,14 +281,18 @@ typedef struct msg_t msg_t;
 #endif
 
 #ifdef SALTICIDAE_CBINDINGS
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 msg_t *msg_new(_opcode_t opcode, bytearray_t *_moved_payload);
-datastream_t *msg_get_payload(msg_t *msg);
-const _opcode_t &msg_get_opcode(const msg_t *msg);
+datastream_t *msg_get_payload(const msg_t *msg);
+const _opcode_t msg_get_opcode(const msg_t *msg);
 void msg_free(msg_t *msg);
 
+#ifdef __cplusplus
 }
+#endif
 #endif
 
 #endif

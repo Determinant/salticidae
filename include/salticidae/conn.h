@@ -25,6 +25,7 @@
 #ifndef _SALTICIDAE_CONN_H
 #define _SALTICIDAE_CONN_H
 
+#ifdef __cplusplus
 #include <cassert>
 #include <cstdint>
 #include <arpa/inet.h>
@@ -424,5 +425,7 @@ class ConnPool {
 };
 
 }
+
+#endif
 
 #endif
