@@ -1,3 +1,4 @@
+#include "salticidae/config.h"
 #ifdef SALTICIDAE_CBINDINGS
 #include "salticidae/network.h"
 
@@ -56,12 +57,18 @@ msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn) {
 void msgnetwork_start(msgnetwork_t *self) { self->start(); }
 
 msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn) {
-    return conn->get_mode();
+    return (msgnetwork_conn_mode_t)(*conn)->get_mode();
 }
 
-netaddr_t msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn) {
-    return new netaddr_t(conn->get_addr());
+netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn) {
+    return new netaddr_t((*conn)->get_addr());
 }
+
+msgnetwork_config_t *msgnetwork_config_new() {
+    return new msgnetwork_config_t();
+}
+
+void msgnetwork_config_free(msgnetwork_config_t *self) { delete self; }
 
 }
 

@@ -794,16 +794,17 @@ using msgnetwork_conn_t = msgnetwork_t::conn_t;
 typedef struct msgnetwork_t msgnetwork_t;
 typedef struct msgnetwork_config_t msgnetwork_config_t;
 typedef struct msgnetwork_conn_t msgnetwork_conn_t;
-typedef enum msgnetwork_conn_mode_t {
-    CONN_MODE_ACTIVE,
-    CONN_MODE_PASSIVE,
-    CONN_MODE_DEAD
-} msgnetwork_conn_mode_t;
 #endif
 
 #endif
 
 #ifdef SALTICIDAE_CBINDINGS
+typedef enum msgnetwork_conn_mode_t {
+    CONN_MODE_ACTIVE,
+    CONN_MODE_PASSIVE,
+    CONN_MODE_DEAD
+} msgnetwork_conn_mode_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -833,6 +834,10 @@ void msgnetwork_reg_conn_handler(msgnetwork_t *self, msgnetwork_conn_callback_t 
 msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn);
 msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn);
 netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn);
+msgnetwork_config_t *msgnetwork_config_new();
+void msgnetwork_config_free(msgnetwork_config_t *self);
+void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr);
+void msgnetwork_start(msgnetwork_t *self);
 
 #ifdef __cplusplus
 }

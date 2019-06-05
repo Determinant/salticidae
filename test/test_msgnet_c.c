@@ -25,13 +25,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #include "salticidae/event.h"
 #include "salticidae/network.h"
 #include "salticidae/stream.h"
 
 /** Hello Message. */
-const uint8_t msg_hello_opcode = 0x0;
+const uint8_t MSG_OPCODE_HELLO = 0x0;
+const uint8_t MSG_OPCODE_ACK = 0x1;
 typedef struct MsgHello {
     const char *name;
     const char *text;
@@ -43,7 +45,7 @@ msg_t *msg_hello_serialize(const char *name, const char *text) {
     datastream_put_i32(serialized, (uint32_t)htole32(name_len));
     datastream_put_data(serialized, name, name + name_len);
     datastream_put_data(serialized, text, text + strlen(text));
-    msg_t *msg = msg_new(msg_hello_opcode, datastream_to_bytearray(serialized));
+    msg_t *msg = msg_new(MSG_OPCODE_HELLO, datastream_to_bytearray(serialized));
     return msg;
 }
 
@@ -83,9 +85,9 @@ void on_receive_hello(const msg_t *_msg, const msgnetwork_conn_t *conn) {
     const char *name = net == alice.net ? alice.name : bob.name;
     MsgHello msg = msg_hello_unserialize(_msg);
     printf("[%s] %s says %s\n", name, msg.name, msg.text);
-    msg_t *ack = msg_new(0x1, msg_ack_serialize());
+    msg_t *ack = msg_new(MSG_OPCODE_ACK, msg_ack_serialize());
     /* send acknowledgement */
-    send_msg(ack, conn);
+    msgnetwork_send_msg(net, ack, conn);
     msg_free(ack);
 }
 
@@ -115,7 +117,7 @@ void conn_handler(const msgnetwork_conn_t *conn, bool connected) {
     {
         printf("[%s] Disconnected, retrying.\n", name);
         /* try to reconnect to the same address */
-        connect(msgnetwork_conn_get_addr(conn));
+        msgnetwork_connect(net, msgnetwork_conn_get_addr(conn));
     }
 }
 
@@ -127,36 +129,37 @@ MyNet gen_mynet(const eventcontext_t *ec,
     res.name = name;
 };
 
+static eventcontext_t *ec;
 
-void on_term_signal(int) {
-    ec.stop();
+void on_term_signal(int sig) {
+    eventcontext_stop(ec);
 }
 
 int main() {
-    eventcontext_t *ec = eventcontext_new();
+    ec = eventcontext_new();
     netaddr_t *alice_addr = netaddr_new_from_sipport("127.0.0.1:12345");
     netaddr_t *bob_addr = netaddr_new_from_sipport("127.0.0.1:12346");
 
     /* test two nodes in the same main loop */
-    alice = gen_mynet(ec, "Alice", bob_addr);
-    bob = gen_mynet(ec, "Bob", alice_addr);
+    alice = gen_mynet(ec, "Alice");
+    bob = gen_mynet(ec, "Bob");
 
     msgnetwork_reg_handler(alice.net, MSG_OPCODE_HELLO, on_receive_hello);
-    msgnetwork_reg_handler(alice.net, MSG_OPCODE_HELLO, on_receive_hello);
+    msgnetwork_reg_handler(alice.net, MSG_OPCODE_ACK, on_receive_ack);
     msgnetwork_reg_handler(bob.net, MSG_OPCODE_HELLO, on_receive_hello);
-    msgnetwork_reg_handler(bob.net, MSG_OPCODE_HELLO, on_receive_hello);
+    msgnetwork_reg_handler(bob.net, MSG_OPCODE_ACK, on_receive_ack);
 
     /* start all threads */
     msgnetwork_start(alice.net);
     msgnetwork_start(bob.net);
 
     /* accept incoming connections */
-    msgnetwork_listen(alice_addr);
-    msgnetwork_listen(bob_addr);
+    msgnetwork_listen(alice.net, alice_addr);
+    msgnetwork_listen(bob.net, bob_addr);
 
     /* try to connect once */
-    msgnetwork_connect(bob_addr);
-    msgnetwork_connect(alice_addr);
+    msgnetwork_connect(alice.net, bob_addr);
+    msgnetwork_connect(bob.net, alice_addr);
 
     /* the main loop can be shutdown by ctrl-c or kill */
     sigev_t *ev_sigint = sigev_new(ec, on_term_signal);

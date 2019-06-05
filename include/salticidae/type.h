@@ -119,7 +119,7 @@ extern "C" {
 bytearray_t *bytearray_new();
 uint8_t *bytearray_data(bytearray_t *arr);
 size_t bytearray_size(bytearray_t *arr);
-void bytearray_free();
+void bytearray_free(bytearray_t *arr);
 
 #ifdef __cplusplus
 }

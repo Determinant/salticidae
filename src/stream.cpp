@@ -1,7 +1,6 @@
+#include "salticidae/config.h"
 #ifdef SALTICIDAE_CBINDINGS
 #include "salticidae/stream.h"
-
-using namespace salticidae;
 
 extern "C" {
 
@@ -23,9 +22,9 @@ void uint256_unserialize(uint256_t *self, datastream_t *s) {
     self->unserialize(*s);
 }
 
-datastream_t *datastream_new() { return new DataStream(); }
+datastream_t *datastream_new() { return new datastream_t(); }
 datastream_t *datastream_new_from_bytes(const uint8_t *begin, const uint8_t *end) {
-    return new DataStream(begin, end);
+    return new datastream_t(begin, end);
 }
 
 void datastream_assign_by_copy(datastream_t *dst, const datastream_t *src) {
