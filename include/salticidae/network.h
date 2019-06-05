@@ -200,9 +200,7 @@ class MsgNetwork: public ConnPool {
 
     template<typename MsgType>
     bool send_msg(MsgType &&msg, const conn_t &conn);
-#ifdef SALTICIDAE_CBINDINGS
-    inline bool send_msg(const Msg &msg, const conn_t &conn);
-#endif
+    inline bool _send_msg(const Msg &msg, const conn_t &conn);
     using ConnPool::listen;
     conn_t connect(const NetAddr &addr) {
         return static_pointer_cast<Conn>(ConnPool::connect(addr));
@@ -430,14 +428,18 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     ~PeerNetwork() { this->stop_workers(); }
 
     void add_peer(const NetAddr &paddr);
+    bool has_peer(const NetAddr &paddr) const;
     const conn_t get_peer_conn(const NetAddr &paddr) const;
     using MsgNet::send_msg;
     template<typename MsgType>
     void send_msg(MsgType &&msg, const NetAddr &paddr);
+    inline void _send_msg(Msg &&msg, const NetAddr &paddr);
+
     template<typename MsgType>
     void multicast_msg(MsgType &&msg, const std::vector<NetAddr> &paddrs);
+    inline void _multicast_msg(Msg &&msg, const NetAddr *paddrs, size_t npaddrs);
+
     void listen(NetAddr listen_addr);
-    bool has_peer(const NetAddr &paddr) const;
     conn_t connect(const NetAddr &addr) = delete;
 };
 
@@ -481,11 +483,11 @@ template<typename OpcodeType>
 template<typename MsgType>
 bool MsgNetwork<OpcodeType>::send_msg(MsgType &&_msg, const conn_t &conn) {
     Msg msg(std::forward<MsgType>(_msg));
-    return send_msg(msg, conn);
+    return _send_msg(msg, conn);
 }
 
 template<typename OpcodeType>
-inline bool MsgNetwork<OpcodeType>::send_msg(const Msg &msg, const conn_t &conn) {
+inline bool MsgNetwork<OpcodeType>::_send_msg(const Msg &msg, const conn_t &conn) {
     bytearray_t msg_data = msg.serialize();
     SALTICIDAE_LOG_DEBUG("wrote message %s to %s",
                 std::string(msg).c_str(),
@@ -719,8 +721,13 @@ bool PeerNetwork<O, _, __>::has_peer(const NetAddr &paddr) const {
 template<typename O, O _, O __>
 template<typename MsgType>
 void PeerNetwork<O, _, __>::send_msg(MsgType &&msg, const NetAddr &paddr) {
+    return _send_msg(MsgType(msg), paddr);
+}
+
+template<typename O, O _, O __>
+void PeerNetwork<O, _, __>::_send_msg(Msg &&msg, const NetAddr &paddr) {
     this->disp_tcall->async_call(
-                [this, msg=std::forward<MsgType>(msg), paddr](ThreadCall::Handle &) {
+                [this, msg=std::move(msg), paddr](ThreadCall::Handle &) {
         auto it = id2peer.find(paddr);
         if (it == id2peer.end())
             throw PeerNetworkError("peer does not exist");
@@ -731,11 +738,16 @@ void PeerNetwork<O, _, __>::send_msg(MsgType &&msg, const NetAddr &paddr) {
 template<typename O, O _, O __>
 template<typename MsgType>
 void PeerNetwork<O, _, __>::multicast_msg(MsgType &&msg, const std::vector<NetAddr> &paddrs) {
+    return _multicast_msg(MsgType(msg), &paddrs[0], paddrs.size());
+}
+
+template<typename O, O _, O __>
+void PeerNetwork<O, _, __>::_multicast_msg(Msg &&msg, const NetAddr *paddrs, size_t npaddrs) {
     this->disp_tcall->async_call(
-                [this, msg=std::forward<MsgType>(msg), paddrs](ThreadCall::Handle &) {
-        for (auto &paddr: paddrs)
+                [this, msg=std::move(msg), paddrs, npaddrs](ThreadCall::Handle &) {
+        for (size_t i = 0; i < npaddrs; i++)
         {
-            auto it = id2peer.find(paddr);
+            auto it = id2peer.find(paddrs[i]);
             if (it == id2peer.end())
                 throw PeerNetworkError("peer does not exist");
             send_msg(std::move(msg), it->second->conn);
@@ -786,6 +798,10 @@ const O PeerNetwork<O, _, OPCODE_PONG>::MsgPong::opcode = OPCODE_PONG;
 using msgnetwork_t = salticidae::MsgNetwork<_opcode_t>;
 using msgnetwork_config_t = msgnetwork_t::Config;
 using msgnetwork_conn_t = msgnetwork_t::conn_t;
+
+using peernetwork_t = salticidae::PeerNetwork<_opcode_t>;
+using peernetwork_config_t = peernetwork_t::Config;
+using peernetwork_conn_t = peernetwork_t::conn_t;
 #endif
 
 #else
@@ -794,6 +810,10 @@ using msgnetwork_conn_t = msgnetwork_t::conn_t;
 typedef struct msgnetwork_t msgnetwork_t;
 typedef struct msgnetwork_config_t msgnetwork_config_t;
 typedef struct msgnetwork_conn_t msgnetwork_conn_t;
+
+typedef struct peernetwork_t peernetwork_t;
+typedef struct peernetwork_config_t peernetwork_config_t;
+typedef struct peernetwork_conn_t peernetwork_conn_t;
 #endif
 
 #endif
@@ -811,6 +831,7 @@ extern "C" {
 
 void salticidae_injected_msg_callback(const msg_t *msg, msgnetwork_conn_t *conn);
 
+// MsgNetwork
 msgnetwork_config_t *msgnetwork_config_new();
 void msgnetwork_config_free(const msgnetwork_config_t *self);
 
@@ -830,6 +851,21 @@ void msgnetwork_reg_conn_handler(msgnetwork_t *self, msgnetwork_conn_callback_t 
 msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn);
 msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn);
 netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn);
+
+// PeerNetwork
+
+peernetwork_config_t *peernetwork_config_new();
+void peernetwork_config_free(const peernetwork_config_t *self);
+peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config);
+void peernetwork_free(const peernetwork_t *self);
+void peernetwork_add_peer(peernetwork_t *self, const netaddr_t *paddr);
+bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr);
+const peernetwork_conn_t *get_peer_conn(const peernetwork_t *self, const netaddr_t *paddr);
+msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self);
+msgnetwork_conn_t *peernetwork_conn_as_msgnetwork_conn(peernetwork_conn_t *self);
+void peernetwork_send_msg(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *paddr);
+void peernetwork_multicast_msg(peernetwork_t *self, msg_t *_moved_msg, const netaddr_t *paddrs, size_t npaddrs);
+void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr);
 
 #ifdef __cplusplus
 }

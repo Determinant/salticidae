@@ -6,6 +6,8 @@ using namespace salticidae;
 
 extern "C" {
 
+// MsgNetwork
+
 msgnetwork_config_t *msgnetwork_config_new() {
     return new msgnetwork_config_t();
 }
@@ -20,11 +22,11 @@ void msgnetwork_free(const msgnetwork_t *self) { delete self; }
 
 bool msgnetwork_send_msg(msgnetwork_t *self,
                         const msg_t *msg, const msgnetwork_conn_t *conn) {
-    return self->send_msg(*msg, *conn);
+    return self->_send_msg(*msg, *conn);
 }
 
 msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr) {
-    return new msgnetwork_t::conn_t(self->connect(*addr));
+    return new msgnetwork_conn_t(self->connect(*addr));
 }
 
 void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr) {
@@ -35,7 +37,7 @@ void msgnetwork_reg_handler(msgnetwork_t *self,
                             _opcode_t opcode,
                             msgnetwork_msg_callback_t cb) {
     self->set_handler(opcode,
-        [cb](const msgnetwork_t::Msg &msg, const msgnetwork_t::conn_t &conn) {
+        [cb](const msgnetwork_t::Msg &msg, const msgnetwork_conn_t &conn) {
             cb(&msg, &conn);
         });
 }
@@ -59,6 +61,56 @@ msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn) {
 
 netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn) {
     return new netaddr_t((*conn)->get_addr());
+}
+
+// PeerNetwork
+
+peernetwork_config_t *peernetwork_config_new() {
+    return new peernetwork_config_t();
+}
+
+void peernetwork_config_free(const peernetwork_config_t *self) { delete self; }
+
+peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config) {
+    return new peernetwork_t(*ec, *config);
+}
+
+void peernetwork_free(const peernetwork_t *self) { delete self; }
+
+void peernetwork_add_peer(peernetwork_t *self, const netaddr_t *paddr) {
+    self->add_peer(*paddr);
+}
+
+bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr) {
+    return self->has_peer(*paddr);
+}
+
+const peernetwork_conn_t *get_peer_conn(const peernetwork_t *self,
+                                        const netaddr_t *paddr) {
+    return new peernetwork_conn_t(self->get_peer_conn(*paddr));
+}
+
+msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self) { return self; }
+
+msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_conn_t *conn) {
+    return new msgnetwork_conn_t(*conn);
+}
+
+void peernetwork_send_msg(peernetwork_t *self,
+                        msg_t * _moved_msg, const netaddr_t *paddr) {
+    self->_send_msg(std::move(*_moved_msg), *paddr);
+    delete _moved_msg;
+}
+
+void peernetwork_multicast_msg(peernetwork_t *self,
+                                msg_t *_moved_msg,
+                                const netaddr_t *paddrs, size_t npaddrs) {
+    self->_multicast_msg(std::move(*_moved_msg), paddrs, npaddrs);
+    delete _moved_msg;
+}
+
+void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr) {
+    self->listen(*listen_addr);
 }
 
 }
