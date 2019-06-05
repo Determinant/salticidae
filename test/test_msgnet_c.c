@@ -132,6 +132,7 @@ MyNet gen_mynet(const eventcontext_t *ec,
     res.net = msgnetwork_new(ec, netconfig);
     msgnetwork_config_free(netconfig);
     res.name = name;
+    return res;
 };
 
 static eventcontext_t *ec;
@@ -153,6 +154,9 @@ int main() {
     msgnetwork_reg_handler(alice.net, MSG_OPCODE_ACK, on_receive_ack);
     msgnetwork_reg_handler(bob.net, MSG_OPCODE_HELLO, on_receive_hello);
     msgnetwork_reg_handler(bob.net, MSG_OPCODE_ACK, on_receive_ack);
+
+    msgnetwork_reg_conn_handler(alice.net, conn_handler);
+    msgnetwork_reg_conn_handler(bob.net, conn_handler);
 
     /* start all threads */
     msgnetwork_start(alice.net);

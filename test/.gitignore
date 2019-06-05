@@ -6,3 +6,4 @@ test_p2p_stress
 test_queue
 bench_network
 Makefile
+test_msgnet_c
