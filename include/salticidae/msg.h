@@ -286,9 +286,9 @@ extern "C" {
 #endif
 
 msg_t *msg_new(_opcode_t opcode, bytearray_t *_moved_payload);
-datastream_t *msg_get_payload(const msg_t *msg);
-const _opcode_t msg_get_opcode(const msg_t *msg);
 void msg_free(msg_t *msg);
+datastream_t *msg_get_payload(const msg_t *msg);
+_opcode_t msg_get_opcode(const msg_t *msg);
 
 #ifdef __cplusplus
 }

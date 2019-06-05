@@ -106,7 +106,7 @@ typedef struct bytearray_t bytearray_t;
 #endif
 
 #ifdef SALTICIDAE_CBINDINGS_STR_OP
-typedef char * _opcode_t;
+typedef const char * _opcode_t;
 #else
 typedef uint8_t _opcode_t;
 #endif

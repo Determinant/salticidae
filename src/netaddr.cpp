@@ -5,6 +5,9 @@
 extern "C" {
 
 netaddr_t *netaddr_new() { return new netaddr_t(); }
+
+void netaddr_free(const netaddr_t *self) { delete self; }
+
 netaddr_t *netaddr_new_from_ip_port(uint32_t ip, uint16_t port) {
     return new netaddr_t(ip, port);
 }

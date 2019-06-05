@@ -135,6 +135,7 @@ extern "C" {
 #endif
 
 netaddr_t *netaddr_new();
+void netaddr_free(const netaddr_t *self);
 netaddr_t *netaddr_new_from_ip_port(uint32_t ip, uint16_t port);
 netaddr_t *netaddr_new_from_sip_port(const char *ip, uint16_t port);
 netaddr_t *netaddr_new_from_sipport(const char *ip_port_addr);

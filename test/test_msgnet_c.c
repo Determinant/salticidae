@@ -72,7 +72,10 @@ MsgHello msg_hello_unserialize(const msg_t *msg) {
     return res;
 }
 
-bytearray_t *msg_ack_serialize() { return bytearray_new(); }
+msg_t *msg_ack_serialize() {
+    msg_t *msg = msg_new(MSG_OPCODE_ACK, bytearray_new());
+    return msg;
+}
 
 typedef struct MyNet {
     msgnetwork_t *net;
@@ -85,7 +88,7 @@ void on_receive_hello(const msg_t *_msg, const msgnetwork_conn_t *conn) {
     const char *name = net == alice.net ? alice.name : bob.name;
     MsgHello msg = msg_hello_unserialize(_msg);
     printf("[%s] %s says %s\n", name, msg.name, msg.text);
-    msg_t *ack = msg_new(MSG_OPCODE_ACK, msg_ack_serialize());
+    msg_t *ack = msg_ack_serialize();
     /* send acknowledgement */
     msgnetwork_send_msg(net, ack, conn);
     msg_free(ack);
@@ -107,8 +110,9 @@ void conn_handler(const msgnetwork_conn_t *conn, bool connected) {
         {
             printf("[%s] Connected, sending hello.", name);
             /* send the first message through this connection */
-            msgnetwork_send_msg(n->net,
-                msg_hello_serialize(name, "Hello there!"), conn);
+            msg_t *hello = msg_hello_serialize(name, "Hello there!");
+            msgnetwork_send_msg(n->net, hello, conn);
+            msg_free(hello);
         }
         else
             printf("[%s] Accepted, waiting for greetings.\n", name);
@@ -126,6 +130,7 @@ MyNet gen_mynet(const eventcontext_t *ec,
     MyNet res;
     const msgnetwork_config_t *netconfig = msgnetwork_config_new();
     res.net = msgnetwork_new(ec, netconfig);
+    msgnetwork_config_free(netconfig);
     res.name = name;
 };
 
@@ -161,6 +166,9 @@ int main() {
     msgnetwork_connect(alice.net, bob_addr);
     msgnetwork_connect(bob.net, alice_addr);
 
+    netaddr_free(alice_addr);
+    netaddr_free(bob_addr);
+
     /* the main loop can be shutdown by ctrl-c or kill */
     sigev_t *ev_sigint = sigev_new(ec, on_term_signal);
     sigev_t *ev_sigterm = sigev_new(ec, on_term_signal);
@@ -169,5 +177,11 @@ int main() {
 
     /* enter the main loop */
     eventcontext_dispatch(ec);
+
+    sigev_free(ev_sigint);
+    sigev_free(ev_sigterm);
+    msgnetwork_free(alice.net);
+    msgnetwork_free(bob.net);
+    eventcontext_free(ec);
     return 0;
 }

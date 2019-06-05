@@ -144,7 +144,7 @@ class MsgNetwork: public ConnPool {
         }
     };
 
-    ~MsgNetwork() { stop_workers(); }
+    virtual ~MsgNetwork() { stop_workers(); }
 
     MsgNetwork(const EventContext &ec, const Config &config):
             ConnPool(ec, config) {
@@ -811,33 +811,25 @@ extern "C" {
 
 void salticidae_injected_msg_callback(const msg_t *msg, msgnetwork_conn_t *conn);
 
+msgnetwork_config_t *msgnetwork_config_new();
+void msgnetwork_config_free(const msgnetwork_config_t *self);
+
 msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config);
-
+void msgnetwork_free(const msgnetwork_t *self);
 bool msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_conn_t *conn);
-
 msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr);
-
 void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr);
+void msgnetwork_start(msgnetwork_t *self);
 
 typedef void (*msgnetwork_msg_callback_t)(const msg_t *, const msgnetwork_conn_t *);
-
-#ifdef SALTICIDAE_CBINDINGS_STR_OP
-void msgnetwork_reg_handler(msgnetwork_t *self, const char *opcode, msgnetwork_msg_callback_t cb);
-#else
-void msgnetwork_reg_handler(msgnetwork_t *self, uint8_t opcode, msgnetwork_msg_callback_t cb);
-#endif
+void msgnetwork_reg_handler(msgnetwork_t *self, _opcode_t opcode, msgnetwork_msg_callback_t cb);
 
 typedef void (*msgnetwork_conn_callback_t)(const msgnetwork_conn_t *, bool);
-
 void msgnetwork_reg_conn_handler(msgnetwork_t *self, msgnetwork_conn_callback_t cb);
 
 msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn);
 msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn);
 netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn);
-msgnetwork_config_t *msgnetwork_config_new();
-void msgnetwork_config_free(msgnetwork_config_t *self);
-void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr);
-void msgnetwork_start(msgnetwork_t *self);
 
 #ifdef __cplusplus
 }
