@@ -85,7 +85,7 @@ bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr) {
     return self->has_peer(*paddr);
 }
 
-const peernetwork_conn_t *get_peer_conn(const peernetwork_t *self,
+const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self,
                                         const netaddr_t *paddr) {
     return new peernetwork_conn_t(self->get_peer_conn(*paddr));
 }

@@ -860,9 +860,9 @@ peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_confi
 void peernetwork_free(const peernetwork_t *self);
 void peernetwork_add_peer(peernetwork_t *self, const netaddr_t *paddr);
 bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr);
-const peernetwork_conn_t *get_peer_conn(const peernetwork_t *self, const netaddr_t *paddr);
+const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self, const netaddr_t *paddr);
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self);
-msgnetwork_conn_t *peernetwork_conn_as_msgnetwork_conn(peernetwork_conn_t *self);
+msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_conn_t *conn);
 void peernetwork_send_msg(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *paddr);
 void peernetwork_multicast_msg(peernetwork_t *self, msg_t *_moved_msg, const netaddr_t *paddrs, size_t npaddrs);
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr);
