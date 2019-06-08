@@ -77,9 +77,9 @@ uint256_t *datastream_get_hash(const datastream_t *self) {
     return new uint256_t(self->get_hash());
 }
 
-bytearray_t *datastream_to_bytearray(datastream_t *_moved_self) {
-    auto res = new bytearray_t(std::move(*_moved_self));
-    delete _moved_self;
+bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_src) {
+    auto res = new bytearray_t(std::move(*_moved_src));
+    delete _moved_src;
     return res;
 }
 

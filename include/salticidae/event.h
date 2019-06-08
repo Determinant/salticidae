@@ -647,14 +647,20 @@ class ThreadCall {
 
 #ifdef SALTICIDAE_CBINDINGS
 using eventcontext_t = salticidae::EventContext;
+using threadcall_t = salticidae::ThreadCall;
+using threadcall_handle_t = salticidae::ThreadCall::Handle;
 using sigev_t = salticidae::SigEvent;
+using timerev_t = salticidae::TimerEvent;
 #endif
 
 #else
 #include "config.h"
 #ifdef SALTICIDAE_CBINDINGS
 typedef struct eventcontext_t eventcontext_t;
+typedef struct threadcall_t threadcall_t;
+typedef struct threadcall_handle_t threadcall_handle_t;
 typedef struct sigev_t sigev_t;
+typedef struct timerev_t timerev_t;
 #endif
 
 #endif
@@ -669,10 +675,24 @@ void eventcontext_free(eventcontext_t *self);
 void eventcontext_dispatch(eventcontext_t *self);
 void eventcontext_stop(eventcontext_t *self);
 
+typedef void (*threadcall_callback_t)(threadcall_handle_t *handle, void *userdata);
+threadcall_t *threadcall_new(const eventcontext_t *ec);
+void threadcall_free(threadcall_t *self);
+void threadcall_async_call(threadcall_t *self, threadcall_callback_t callback, void *userdata);
+eventcontext_t *threadcall_get_ec(threadcall_t *self);
+
 typedef void (*sigev_callback_t)(int events);
 sigev_t *sigev_new(const eventcontext_t *ec, sigev_callback_t cb);
 void sigev_free(sigev_t *self);
 void sigev_add(sigev_t *self, int sig);
+
+typedef void (*timerev_callback_t)(timerev_t *);
+timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback);
+void timerev_set_callback(timerev_t *self, timerev_callback_t callback);
+void timerev_free(timerev_t *self);
+void timerev_add(timerev_t *self, double t_sec);
+void timerev_del(timerev_t *self);
+void timerev_clear(timerev_t *self);
 
 #ifdef __cplusplus
 }

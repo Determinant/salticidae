@@ -535,7 +535,7 @@ int64_t datastream_get_i64(datastream_t *self);
 
 const uint8_t *datastream_get_data_inplace(datastream_t *self, size_t len);
 uint256_t *datastream_get_hash(const datastream_t *self);
-bytearray_t *datastream_to_bytearray(datastream_t *_moved_self);
+bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_self);
 
 #ifdef __cplusplus
 }

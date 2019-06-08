@@ -99,6 +99,7 @@ using bytearray_t = salticidae::bytearray_t;
 #else
 
 #include <stdint.h>
+#include <stddef.h>
 #ifdef SALTICIDAE_CBINDINGS
 typedef struct bytearray_t bytearray_t;
 #endif

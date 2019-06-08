@@ -35,17 +35,20 @@ void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr) {
 
 void msgnetwork_reg_handler(msgnetwork_t *self,
                             _opcode_t opcode,
-                            msgnetwork_msg_callback_t cb) {
+                            msgnetwork_msg_callback_t cb,
+                            void *userdata) {
     self->set_handler(opcode,
-        [cb](const msgnetwork_t::Msg &msg, const msgnetwork_conn_t &conn) {
-            cb(&msg, &conn);
+        [=](const msgnetwork_t::Msg &msg, const msgnetwork_conn_t &conn) {
+            cb(&msg, &conn, userdata);
         });
 }
 
-void msgnetwork_reg_conn_handler(msgnetwork_t *self, msgnetwork_conn_callback_t cb) {
-    self->reg_conn_handler([cb](const ConnPool::conn_t &_conn, bool connected) {
+void msgnetwork_reg_conn_handler(msgnetwork_t *self,
+                                msgnetwork_conn_callback_t cb,
+                                void *userdata) {
+    self->reg_conn_handler([=](const ConnPool::conn_t &_conn, bool connected) {
         auto conn = salticidae::static_pointer_cast<msgnetwork_t::Conn>(_conn);
-        cb(&conn, connected);
+        cb(&conn, connected, userdata);
     });
 }
 

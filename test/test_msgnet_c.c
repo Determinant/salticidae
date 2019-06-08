@@ -45,7 +45,7 @@ msg_t *msg_hello_serialize(const char *name, const char *text) {
     datastream_put_i32(serialized, (uint32_t)htole32(name_len));
     datastream_put_data(serialized, name, name + name_len);
     datastream_put_data(serialized, text, text + strlen(text));
-    msg_t *msg = msg_new(MSG_OPCODE_HELLO, datastream_to_bytearray(serialized));
+    msg_t *msg = msg_new(MSG_OPCODE_HELLO, bytearray_new_moved_from_datastream(serialized));
     return msg;
 }
 
@@ -83,9 +83,9 @@ typedef struct MyNet {
 } MyNet;
 MyNet alice, bob;
 
-void on_receive_hello(const msg_t *_msg, const msgnetwork_conn_t *conn) {
+void on_receive_hello(const msg_t *_msg, const msgnetwork_conn_t *conn, void *userdata) {
     msgnetwork_t *net = msgnetwork_conn_get_net(conn);
-    const char *name = net == alice.net ? alice.name : bob.name;
+    const char *name = ((MyNet *)userdata)->name;
     MsgHello msg = msg_hello_unserialize(_msg);
     printf("[%s] %s says %s\n", name, msg.name, msg.text);
     msg_t *ack = msg_ack_serialize();
@@ -94,15 +94,14 @@ void on_receive_hello(const msg_t *_msg, const msgnetwork_conn_t *conn) {
     msg_free(ack);
 }
 
-void on_receive_ack(const msg_t *msg, const msgnetwork_conn_t *conn) {
-    msgnetwork_t *net = msgnetwork_conn_get_net(conn);
-    const char *name = net == alice.net ? alice.name : bob.name;
+void on_receive_ack(const msg_t *msg, const msgnetwork_conn_t *conn, void *userdata) {
+    const char *name = ((MyNet *)userdata)->name;
     printf("[%s] the peer knows\n", name);
 }
 
-void conn_handler(const msgnetwork_conn_t *conn, bool connected) {
+void conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata) {
     msgnetwork_t *net = msgnetwork_conn_get_net(conn);
-    MyNet *n = net == alice.net ? &alice: &bob;
+    MyNet *n = (MyNet *)userdata;
     const char *name = n->name;
     if (connected)
     {
@@ -150,13 +149,13 @@ int main() {
     alice = gen_mynet(ec, "Alice");
     bob = gen_mynet(ec, "Bob");
 
-    msgnetwork_reg_handler(alice.net, MSG_OPCODE_HELLO, on_receive_hello);
-    msgnetwork_reg_handler(alice.net, MSG_OPCODE_ACK, on_receive_ack);
-    msgnetwork_reg_handler(bob.net, MSG_OPCODE_HELLO, on_receive_hello);
-    msgnetwork_reg_handler(bob.net, MSG_OPCODE_ACK, on_receive_ack);
+    msgnetwork_reg_handler(alice.net, MSG_OPCODE_HELLO, on_receive_hello, &alice);
+    msgnetwork_reg_handler(alice.net, MSG_OPCODE_ACK, on_receive_ack, &alice);
+    msgnetwork_reg_handler(bob.net, MSG_OPCODE_HELLO, on_receive_hello, &bob);
+    msgnetwork_reg_handler(bob.net, MSG_OPCODE_ACK, on_receive_ack, &bob);
 
-    msgnetwork_reg_conn_handler(alice.net, conn_handler);
-    msgnetwork_reg_conn_handler(bob.net, conn_handler);
+    msgnetwork_reg_conn_handler(alice.net, conn_handler, &alice);
+    msgnetwork_reg_conn_handler(bob.net, conn_handler, &bob);
 
     /* start all threads */
     msgnetwork_start(alice.net);
