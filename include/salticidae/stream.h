@@ -506,7 +506,7 @@ datastream_t *datastream_new_from_bytes(const uint8_t *begin, const uint8_t *end
 void datastream_free(const datastream_t *self);
 
 void datastream_assign_by_copy(datastream_t *dst, const datastream_t *src);
-void datastream_assign_by_move(datastream_t *dst, datastream_t *src);
+void datastream_assign_by_move(datastream_t *dst, datastream_t *_moved_src);
 uint8_t *datastream_data(datastream_t *self);
 void datastream_clear(datastream_t *self);
 size_t datastream_size(const datastream_t *self);

@@ -33,8 +33,9 @@ void datastream_assign_by_copy(datastream_t *dst, const datastream_t *src) {
     *dst = *src;
 }
 
-void datastream_assign_by_move(datastream_t *dst, datastream_t *src) {
-    *dst = std::move(*src);
+void datastream_assign_by_move(datastream_t *dst, datastream_t *_moved_src) {
+    *dst = std::move(*_moved_src);
+    delete _moved_src;
 }
 
 uint8_t *datastream_data(datastream_t *self) { return self->data(); }

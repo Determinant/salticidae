@@ -670,7 +670,7 @@ void eventcontext_dispatch(eventcontext_t *self);
 void eventcontext_stop(eventcontext_t *self);
 
 typedef void (*sigev_callback_t)(int events);
-sigev_t *sigev_new(const eventcontext_t *self, sigev_callback_t cb);
+sigev_t *sigev_new(const eventcontext_t *ec, sigev_callback_t cb);
 void sigev_free(sigev_t *self);
 void sigev_add(sigev_t *self, int sig);
 
