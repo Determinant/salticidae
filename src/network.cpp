@@ -54,6 +54,10 @@ void msgnetwork_reg_conn_handler(msgnetwork_t *self,
 
 void msgnetwork_start(msgnetwork_t *self) { self->start(); }
 
+void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn) {
+    self->terminate(*conn);
+}
+
 msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn) {
     return (*conn)->get_net();
 }

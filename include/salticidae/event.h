@@ -686,9 +686,9 @@ sigev_t *sigev_new(const eventcontext_t *ec, sigev_callback_t cb);
 void sigev_free(sigev_t *self);
 void sigev_add(sigev_t *self, int sig);
 
-typedef void (*timerev_callback_t)(timerev_t *);
-timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback);
-void timerev_set_callback(timerev_t *self, timerev_callback_t callback);
+typedef void (*timerev_callback_t)(timerev_t *, void *);
+timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback, void *);
+void timerev_set_callback(timerev_t *self, timerev_callback_t callback, void *);
 void timerev_free(timerev_t *self);
 void timerev_add(timerev_t *self, double t_sec);
 void timerev_del(timerev_t *self);

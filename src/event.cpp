@@ -34,15 +34,15 @@ void sigev_free(sigev_t *self) { delete self; }
 
 void sigev_add(sigev_t *self, int sig) { self->add(sig); }
 
-timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback) {
-    return new timerev_t(*ec, [callback](salticidae::TimerEvent &ev) {
-        callback(&ev);
+timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback, void *userdata) {
+    return new timerev_t(*ec, [=](salticidae::TimerEvent &ev) {
+        callback(&ev, userdata);
     });
 }
 
-void timerev_set_callback(timerev_t *self, timerev_callback_t callback) {
-    self->set_callback([callback](salticidae::TimerEvent &ev) {
-        callback(&ev);
+void timerev_set_callback(timerev_t *self, timerev_callback_t callback, void *userdata) {
+    self->set_callback([=](salticidae::TimerEvent &ev) {
+        callback(&ev, userdata);
     });
 }
 

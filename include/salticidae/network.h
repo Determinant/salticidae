@@ -841,6 +841,7 @@ bool msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_
 msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr);
 void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr);
 void msgnetwork_start(msgnetwork_t *self);
+void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn);
 
 typedef void (*msgnetwork_msg_callback_t)(const msg_t *, const msgnetwork_conn_t *, void *userdata);
 void msgnetwork_reg_handler(msgnetwork_t *self, _opcode_t opcode, msgnetwork_msg_callback_t cb, void *userdata);
