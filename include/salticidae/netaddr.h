@@ -125,8 +125,10 @@ namespace std {
 }
 
 using netaddr_t = salticidae::NetAddr;
+using netaddr_array_t = std::vector<netaddr_t>;
 #else
 typedef struct netaddr_t netaddr_t;
+typedef struct netaddr_array_t netaddr_array_t;
 #endif
 
 #ifdef SALTICIDAE_CBINDINGS
@@ -143,6 +145,8 @@ bool netaddr_is_eq(const netaddr_t *a, const netaddr_t *b);
 bool netaddr_is_null(const netaddr_t *self);
 uint32_t netaddr_get_ip(const netaddr_t *self);
 uint16_t netaddr_get_port(const netaddr_t *self);
+netaddr_array_t *netaddr_array_new();
+netaddr_array_t *netaddr_array_new_from_addrs(const netaddr_t * const *paddrs, size_t naddrs);
 
 #ifdef __cplusplus
 }

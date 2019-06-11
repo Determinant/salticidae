@@ -24,8 +24,8 @@ void uint256_unserialize(uint256_t *self, datastream_t *s) {
 }
 
 datastream_t *datastream_new() { return new datastream_t(); }
-datastream_t *datastream_new_from_bytes(const uint8_t *begin, const uint8_t *end) {
-    return new datastream_t(begin, end);
+datastream_t *datastream_new_from_bytes(const uint8_t *base, size_t size) {
+    return new datastream_t(base, base + size);
 }
 void datastream_free(const datastream_t *self) { delete self; }
 
@@ -54,9 +54,8 @@ void datastream_put_i16(datastream_t *self, int16_t val) { *self << val; }
 void datastream_put_i32(datastream_t *self, int32_t val) { *self << val; }
 void datastream_put_i64(datastream_t *self, int64_t val) { *self << val; }
 
-void datastream_put_data(datastream_t *self,
-                        const uint8_t *begin, const uint8_t *end) {
-    self->put_data(begin, end);
+void datastream_put_data(datastream_t *self, const uint8_t *base, size_t size) {
+    self->put_data(base, base + size);
 }
 
 uint8_t datastream_get_u8(datastream_t *self) { uint8_t val; *self >> val; return val; }

@@ -111,8 +111,8 @@ void peernetwork_send_msg(peernetwork_t *self,
 
 void peernetwork_multicast_msg(peernetwork_t *self,
                                 msg_t *_moved_msg,
-                                const netaddr_t *paddrs, size_t npaddrs) {
-    self->_multicast_msg(std::move(*_moved_msg), paddrs, npaddrs);
+                                const netaddr_array_t *paddrs) {
+    self->multicast_msg(std::move(*_moved_msg), *paddrs);
     delete _moved_msg;
 }
 

@@ -437,7 +437,6 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
 
     template<typename MsgType>
     void multicast_msg(MsgType &&msg, const std::vector<NetAddr> &paddrs);
-    inline void _multicast_msg(Msg &&msg, const NetAddr *paddrs, size_t npaddrs);
 
     void listen(NetAddr listen_addr);
     conn_t connect(const NetAddr &addr) = delete;
@@ -738,16 +737,11 @@ void PeerNetwork<O, _, __>::_send_msg(Msg &&msg, const NetAddr &paddr) {
 template<typename O, O _, O __>
 template<typename MsgType>
 void PeerNetwork<O, _, __>::multicast_msg(MsgType &&msg, const std::vector<NetAddr> &paddrs) {
-    return _multicast_msg(MsgType(msg), &paddrs[0], paddrs.size());
-}
-
-template<typename O, O _, O __>
-void PeerNetwork<O, _, __>::_multicast_msg(Msg &&msg, const NetAddr *paddrs, size_t npaddrs) {
     this->disp_tcall->async_call(
-                [this, msg=std::move(msg), paddrs, npaddrs](ThreadCall::Handle &) {
-        for (size_t i = 0; i < npaddrs; i++)
+                [this, msg=std::move(msg), paddrs](ThreadCall::Handle &) {
+        for (auto &addr: paddrs)
         {
-            auto it = id2peer.find(paddrs[i]);
+            auto it = id2peer.find(addr);
             if (it == id2peer.end())
                 throw PeerNetworkError("peer does not exist");
             send_msg(std::move(msg), it->second->conn);
@@ -865,7 +859,7 @@ const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self, c
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self);
 msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_conn_t *conn);
 void peernetwork_send_msg(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *paddr);
-void peernetwork_multicast_msg(peernetwork_t *self, msg_t *_moved_msg, const netaddr_t *paddrs, size_t npaddrs);
+void peernetwork_multicast_msg(peernetwork_t *self, msg_t *_moved_msg, const netaddr_array_t *paddrs);
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr);
 
 #ifdef __cplusplus

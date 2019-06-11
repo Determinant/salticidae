@@ -502,7 +502,7 @@ void uint256_serialize(const uint256_t *self, datastream_t *s);
 void uint256_unserialize(uint256_t *self, datastream_t *s);
 
 datastream_t *datastream_new();
-datastream_t *datastream_new_from_bytes(const uint8_t *begin, const uint8_t *end);
+datastream_t *datastream_new_from_bytes(const uint8_t *base, size_t size);
 void datastream_free(const datastream_t *self);
 
 void datastream_assign_by_copy(datastream_t *dst, const datastream_t *src);
@@ -520,8 +520,7 @@ void datastream_put_i8(datastream_t *self, int8_t val);
 void datastream_put_i16(datastream_t *self, int16_t val);
 void datastream_put_i32(datastream_t *self, int32_t val);
 void datastream_put_i64(datastream_t *self, int64_t val);
-void datastream_put_data(datastream_t *self,
-                        const uint8_t *begin, const uint8_t *end);
+void datastream_put_data(datastream_t *self, const uint8_t *base, size_t size);
 
 uint8_t datastream_get_u8(datastream_t *self);
 uint16_t datastream_get_u16(datastream_t *self);
