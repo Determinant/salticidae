@@ -819,6 +819,11 @@ typedef enum msgnetwork_conn_mode_t {
     CONN_MODE_DEAD
 } msgnetwork_conn_mode_t;
 
+typedef enum peernetwork_id_mode_t {
+    ID_MODE_IP_BASED,
+    ID_MODE_IP_PORT_BASED
+} peernetwork_id_mode_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -828,6 +833,12 @@ void salticidae_injected_msg_callback(const msg_t *msg, msgnetwork_conn_t *conn)
 // MsgNetwork
 msgnetwork_config_t *msgnetwork_config_new();
 void msgnetwork_config_free(const msgnetwork_config_t *self);
+void msgnetwork_config_burst_size(msgnetwork_config_t *self, size_t burst_size);
+void msgnetwork_config_max_listen_backlog(msgnetwork_config_t *self, int backlog);
+void msgnetwork_config_conn_server_timeout(msgnetwork_config_t *self, double timeout);
+void msgnetwork_config_seg_buff_size(msgnetwork_config_t *self, size_t size);
+void msgnetwork_config_nworker(msgnetwork_config_t *self, size_t nworker);
+void msgnetwork_config_queue_capacity(msgnetwork_config_t *self, size_t cap);
 
 msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config);
 void msgnetwork_free(const msgnetwork_t *self);
@@ -851,6 +862,12 @@ netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn);
 
 peernetwork_config_t *peernetwork_config_new();
 void peernetwork_config_free(const peernetwork_config_t *self);
+void peernetwork_config_retry_conn_delay(peernetwork_config_t *self, double t);
+void peernetwork_config_ping_period(peernetwork_config_t *self, double t);
+void peernetwork_config_conn_timeout(peernetwork_config_t *self, double t);
+void peernetwork_config_id_mode(peernetwork_config_t *self, peernetwork_id_mode_t mode);
+msgnetwork_config_t *peernetwork_config_as_msgnetwork_config(peernetwork_config_t *self);
+
 peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config);
 void peernetwork_free(const peernetwork_t *self);
 void peernetwork_add_peer(peernetwork_t *self, const netaddr_t *paddr);
@@ -858,8 +875,8 @@ bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr);
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self, const netaddr_t *paddr);
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self);
 msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_conn_t *conn);
-void peernetwork_send_msg(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *paddr);
-void peernetwork_multicast_msg(peernetwork_t *self, msg_t *_moved_msg, const netaddr_array_t *paddrs);
+void peernetwork_send_msg_by_move(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *paddr);
+void peernetwork_multicast_msg_by_move(peernetwork_t *self, msg_t *_moved_msg, const netaddr_array_t *paddrs);
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr);
 
 #ifdef __cplusplus

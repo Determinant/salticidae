@@ -285,9 +285,9 @@ typedef struct msg_t msg_t;
 extern "C" {
 #endif
 
-msg_t *msg_new(_opcode_t opcode, bytearray_t *_moved_payload);
+msg_t *msg_new_moved_from_bytearray(_opcode_t opcode, bytearray_t *_moved_payload);
 void msg_free(msg_t *msg);
-datastream_t *msg_get_payload(const msg_t *msg);
+datastream_t *msg_consume_payload(const msg_t *msg);
 _opcode_t msg_get_opcode(const msg_t *msg);
 
 #ifdef __cplusplus

@@ -20,6 +20,30 @@ msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t
 
 void msgnetwork_free(const msgnetwork_t *self) { delete self; }
 
+void msgnetwork_config_burst_size(msgnetwork_config_t *self, size_t burst_size) {
+    self->burst_size(burst_size);
+}
+
+void msgnetwork_config_max_listen_backlog(msgnetwork_config_t *self, int backlog) {
+    self->max_listen_backlog(backlog);
+}
+
+void msgnetwork_config_conn_server_timeout(msgnetwork_config_t *self, double timeout) {
+    self->conn_server_timeout(timeout);
+}
+
+void msgnetwork_config_seg_buff_size(msgnetwork_config_t *self, size_t size) {
+    self->seg_buff_size(size);
+}
+
+void msgnetwork_config_nworker(msgnetwork_config_t *self, size_t nworker) {
+    self->nworker(nworker);
+}
+
+void msgnetwork_config_queue_capacity(msgnetwork_config_t *self, size_t cap) {
+    self->queue_capacity(cap);
+}
+
 bool msgnetwork_send_msg(msgnetwork_t *self,
                         const msg_t *msg, const msgnetwork_conn_t *conn) {
     return self->_send_msg(*msg, *conn);
@@ -78,6 +102,24 @@ peernetwork_config_t *peernetwork_config_new() {
 
 void peernetwork_config_free(const peernetwork_config_t *self) { delete self; }
 
+void peernetwork_config_retry_conn_delay(peernetwork_config_t *self, double t) {
+    self->retry_conn_delay(t);
+}
+
+void peernetwork_config_ping_period(peernetwork_config_t *self, double t) {
+    self->ping_period(t);
+}
+
+void peernetwork_config_conn_timeout(peernetwork_config_t *self, double t) {
+    self->conn_timeout(t);
+}
+
+void peernetwork_config_id_mode(peernetwork_config_t *self, peernetwork_id_mode_t mode) {
+    self->id_mode(peernetwork_t::IdentityMode(mode));
+}
+
+msgnetwork_config_t *peernetwork_config_as_msgnetwork_config(peernetwork_config_t *self) { return self; }
+
 peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config) {
     return new peernetwork_t(*ec, *config);
 }
@@ -103,13 +145,13 @@ msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_c
     return new msgnetwork_conn_t(*conn);
 }
 
-void peernetwork_send_msg(peernetwork_t *self,
-                        msg_t * _moved_msg, const netaddr_t *paddr) {
+void peernetwork_send_msg_by_move(peernetwork_t *self,
+                                msg_t * _moved_msg, const netaddr_t *paddr) {
     self->_send_msg(std::move(*_moved_msg), *paddr);
     delete _moved_msg;
 }
 
-void peernetwork_multicast_msg(peernetwork_t *self,
+void peernetwork_multicast_msg_by_move(peernetwork_t *self,
                                 msg_t *_moved_msg,
                                 const netaddr_array_t *paddrs) {
     self->multicast_msg(std::move(*_moved_msg), *paddrs);
