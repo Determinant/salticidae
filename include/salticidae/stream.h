@@ -537,6 +537,8 @@ const uint8_t *datastream_get_data_inplace(datastream_t *self, size_t len);
 uint256_t *datastream_get_hash(const datastream_t *self);
 bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_self);
 
+char *datastream_get_hex(datastream_t *self);
+
 #ifdef __cplusplus
 }
 #endif

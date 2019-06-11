@@ -83,6 +83,14 @@ bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_src) {
     return res;
 }
 
+char *datastream_get_hex(datastream_t *self) {
+    std::string tmp = self->get_hex();
+    auto res = (char *)malloc(tmp.length() + 1);
+    memmove(res, tmp.c_str(), tmp.length());
+    res[tmp.length()] = 0;
+    return res;
+}
+
 }
 
 #endif
