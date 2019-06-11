@@ -39,7 +39,6 @@
 #include <mutex>
 #include <thread>
 #include <fcntl.h>
-#include <event2/thread.h>
 
 #include "salticidae/type.h"
 #include "salticidae/ref.h"
