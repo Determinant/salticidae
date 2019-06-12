@@ -12,8 +12,10 @@ void eventcontext_dispatch(eventcontext_t *self) { return self->dispatch(); }
 
 void eventcontext_stop(eventcontext_t *self) { return self->stop(); }
 
-sigev_t *sigev_new(const eventcontext_t *self, sigev_callback_t callback) {
-    return new sigev_t(*self, callback);
+sigev_t *sigev_new(const eventcontext_t *self, sigev_callback_t callback, void *userdata) {
+    return new sigev_t(*self, [=](int signum) {
+        callback(signum, userdata);
+    });
 }
 
 threadcall_t *threadcall_new(const eventcontext_t *ec) { return new threadcall_t(*ec); }
@@ -32,7 +34,7 @@ eventcontext_t *threadcall_get_ec(threadcall_t *self) {
 
 void sigev_free(sigev_t *self) { delete self; }
 
-void sigev_add(sigev_t *self, int sig) { self->add(sig); }
+void sigev_add(sigev_t *self, int signum) { self->add(signum); }
 
 timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback, void *userdata) {
     return new timerev_t(*ec, [=](salticidae::TimerEvent &ev) {

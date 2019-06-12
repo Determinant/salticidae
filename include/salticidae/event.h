@@ -681,10 +681,10 @@ void threadcall_free(threadcall_t *self);
 void threadcall_async_call(threadcall_t *self, threadcall_callback_t callback, void *userdata);
 eventcontext_t *threadcall_get_ec(threadcall_t *self);
 
-typedef void (*sigev_callback_t)(int events);
-sigev_t *sigev_new(const eventcontext_t *ec, sigev_callback_t cb);
+typedef void (*sigev_callback_t)(int signum, void *);
+sigev_t *sigev_new(const eventcontext_t *ec, sigev_callback_t cb, void *userdata);
 void sigev_free(sigev_t *self);
-void sigev_add(sigev_t *self, int sig);
+void sigev_add(sigev_t *self, int signum);
 
 typedef void (*timerev_callback_t)(timerev_t *, void *);
 timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback, void *);
