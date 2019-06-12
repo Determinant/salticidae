@@ -30,6 +30,7 @@
 #include <string>
 #include <exception>
 #include <cstdarg>
+#include <cstring>
 #include <vector>
 #include <unordered_map>
 #include <functional>
@@ -52,18 +53,57 @@ std::vector<std::string> trim_all(const std::vector<std::string> &ss);
 std::string vstringprintf(const char *fmt, va_list ap);
 std::string stringprintf(const char *fmt, ...);
 
+enum SalticidaeErrorCode {
+    SALTI_NORMAL,
+    SALTI_ERROR_GENERIC,
+    SALTI_ERROR_ACCEPT,
+    SALTI_ERROR_LISTEN,
+    SALTI_ERROR_CONNECT,
+    SALTI_ERROR_PEER_ALREADY_EXISTS,
+    SALTI_ERROR_PEER_NOT_EXISTS,
+    SALTI_ERROR_NETADDR_INVALID,
+    SALTI_ERROR_OPTVAL_INVALID,
+    SALTI_ERROR_OPTNAME_ALREADY_EXISTS,
+    SALTI_ERROR_OPT_UNKNOWN_ACTION,
+    SALTI_ERROR_CONFIG_LINE_TOO_LONG,
+    SALTI_ERROR_OPT_INVALID
+};
+
+extern const char *SALTICIDAE_ERROR_STRINGS[];
+
 class SalticidaeError: public std::exception {
     std::string msg;
+    int code;
+    int oscode;
+
     public:
-    SalticidaeError();
+    SalticidaeError() : code(SALTI_NORMAL) {}
 
     template<typename... Args>
-    SalticidaeError(const std::string &fmt, Args... args) {
+    SalticidaeError(const std::string &fmt, Args... args): code(SALTI_ERROR_GENERIC) {
         msg = stringprintf(fmt.c_str(), args...);
+    }
+
+    SalticidaeError(int code, int oscode = 0): code(code), oscode(oscode) {
+        if (oscode)
+            msg = stringprintf("%s: %s", SALTICIDAE_ERROR_STRINGS[code], strerror(oscode));
+        else
+            msg = SALTICIDAE_ERROR_STRINGS[code];
     }
 
     operator std::string() const { return msg; }
     const char *what() const throw() override { return msg.c_str(); }
+    int get_code() const { return code; }
+    int get_oscode() const { return oscode; }
+};
+
+
+struct ConnPoolError: public SalticidaeError {
+    using SalticidaeError::SalticidaeError;
+};
+
+class PeerNetworkError: public ConnPoolError {
+    using ConnPoolError::ConnPoolError;
 };
 
 extern const char *TTY_COLOR_RED;
@@ -217,7 +257,7 @@ class Config {
             try {
                 val = stoi(strval, &idx);
             } catch (std::invalid_argument &) {
-                throw SalticidaeError("invalid integer");
+                throw SalticidaeError(SALTI_ERROR_OPTVAL_INVALID);
             }
         }
         int &get() { return val; }
@@ -237,7 +277,7 @@ class Config {
             try {
                 val = stod(strval, &idx);
             } catch (std::invalid_argument &) {
-                throw SalticidaeError("invalid double");
+                throw SalticidaeError(SALTI_ERROR_OPTVAL_INVALID);
             }
         }
         double &get() { return val; }

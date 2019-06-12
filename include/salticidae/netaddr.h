@@ -53,7 +53,7 @@ struct NetAddr {
     void set_by_ip_port(const std::string &_addr, uint16_t _port) {
         struct hostent *h;
         if ((h = gethostbyname(_addr.c_str())) == nullptr)
-            throw SalticidaeError("gethostbyname failed");
+            throw SalticidaeError(SALTI_ERROR_NETADDR_INVALID, errno);
         memmove(&ip, h->h_addr_list[0], sizeof(in_addr_t));
         port = htons(_port);
     }
@@ -61,19 +61,19 @@ struct NetAddr {
     NetAddr(const std::string &ip_port_addr) {
         size_t pos = ip_port_addr.find(":");
         if (pos == std::string::npos)
-            throw SalticidaeError("invalid port format");
+            throw SalticidaeError(SALTI_ERROR_NETADDR_INVALID);
         std::string ip_str = ip_port_addr.substr(0, pos);
         std::string port_str = ip_port_addr.substr(pos + 1);
         long port;
         try {
             port = std::stol(port_str.c_str());
         } catch (std::logic_error &) {
-            throw SalticidaeError("invalid port format");
+            throw SalticidaeError(SALTI_ERROR_NETADDR_INVALID);
         }
         if (port < 0)
-            throw SalticidaeError("negative port number");
+            throw SalticidaeError(SALTI_ERROR_NETADDR_INVALID);
         if (port > 0xffff)
-            throw SalticidaeError("port number greater than 0xffff");
+            throw SalticidaeError(SALTI_ERROR_NETADDR_INVALID);
         set_by_ip_port(ip_str, (uint16_t)port);
     }
     /* construct from unix socket format */

@@ -17,6 +17,7 @@ class FreeList {
         std::atomic<size_t> refcnt;
         std::atomic<bool> freed;
         Node(): next(nullptr), refcnt(1), freed(false) {}
+        virtual ~Node() {}
     };
 
     private:

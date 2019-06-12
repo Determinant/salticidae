@@ -34,6 +34,22 @@
 
 namespace salticidae {
 
+const char *SALTICIDAE_ERROR_STRINGS[] = {
+    "",
+    "generic",
+    "unable to accept",
+    "unable to listen",
+    "unable to connect",
+    "peer already exists",
+    "peer does not exist",
+    "invalid NetAddr format",
+    "invalid OptVal format",
+    "option name already exists",
+    "unknown action",
+    "configuration file line too long",
+    "invalid option format"
+};
+
 const char *TTY_COLOR_RED = "\x1b[31m";
 const char *TTY_COLOR_GREEN = "\x1b[32m";
 const char *TTY_COLOR_YELLOW = "\x1b[33m";
@@ -90,8 +106,6 @@ const std::string get_current_datetime() {
     snprintf(buf, sizeof buf, fmt, tv.tv_usec);
     return std::string(buf);
 }
-
-SalticidaeError::SalticidaeError() : msg("unknown") {}
 
 void Logger::set_color() {
     if (is_tty())
@@ -182,7 +196,7 @@ void Config::add_opt(const std::string &optname, const optval_t &optval, Action 
                     char short_opt,
                     const std::string &optdoc) {
     if (conf.count(optname))
-        throw SalticidaeError("option name already exists");
+        throw SalticidaeError(SALTI_ERROR_OPTNAME_ALREADY_EXISTS);
     opts.push_back(new Opt(optname, optdoc,
                             optval, action, short_opt,
                             opts.size()));
@@ -199,7 +213,7 @@ void Config::update(Opt &p, const char *optval) {
         case SET_VAL: p.optval->set_val(optval); break;
         case APPEND: p.optval->append(optval); break;
         default:
-            throw SalticidaeError("unknown action");
+            throw SalticidaeError(SALTI_ERROR_OPT_UNKNOWN_ACTION);
     }
 }
 
@@ -220,7 +234,7 @@ bool Config::load(const std::string &fname) {
             if (strlen(buff) == BUFF_SIZE - 1)
             {
                 fclose(conf_f);
-                throw SalticidaeError("configuration file line too long");
+                throw SalticidaeError(SALTI_ERROR_CONFIG_LINE_TOO_LONG);
             }
             std::string line(buff);
             size_t pos = line.find("=");
@@ -269,7 +283,7 @@ size_t Config::parse(int argc, char **argv) {
         if (id == -1)
             break;
         if (id == '?')
-            throw SalticidaeError("invalid option format");
+            throw SalticidaeError(SALTI_ERROR_OPT_INVALID);
         if (id >= 0x100)
             update(*(opts[id - 0x100]), optarg);
         else

@@ -467,8 +467,14 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
                     // since all enqueue operations are finalized, the dequeue should be able
                     // to see those enqueued values in func()
                     wait_sig.exchange(true, std::memory_order_acq_rel);
-                    if (func(*this))
+                    bool again;
+                    try {
+                        again = func(*this);
+                    } catch (SalticidaeError &err) {
                         write(fd, &dummy, 8);
+                        throw err;
+                    }
+                    if (again) write(fd, &dummy, 8);
                 });
         ev.add(FdEvent::READ);
     }
@@ -610,7 +616,12 @@ class ThreadCall {
             Handle *h;
             while (q.try_dequeue(h))
             {
-                h->exec();
+                try {
+                    h->exec();
+                } catch (SalticidaeError &err) {
+                    delete h;
+                    throw err;
+                }
                 delete h;
                 if (++cnt == burst_size) return true;
             }

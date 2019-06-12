@@ -170,34 +170,38 @@ void ConnPool::Conn::disp_terminate() {
 void ConnPool::accept_client(int fd, int) {
     int client_fd;
     struct sockaddr client_addr;
-    socklen_t addr_size = sizeof(struct sockaddr_in);
-    if ((client_fd = accept(fd, &client_addr, &addr_size)) < 0)
-        SALTICIDAE_LOG_ERROR("error while accepting the connection: %s",
-                            strerror(errno));
-    else
-    {
-        int one = 1;
-        if (setsockopt(client_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
-            throw ConnPoolError(std::string("setsockopt failed"));
-        if (fcntl(client_fd, F_SETFL, O_NONBLOCK) == -1)
-            throw ConnPoolError(std::string("unable to set nonblocking socket"));
+    try {
+        socklen_t addr_size = sizeof(struct sockaddr_in);
+        if ((client_fd = accept(fd, &client_addr, &addr_size)) < 0)
+            throw ConnPoolError(SALTI_ERROR_ACCEPT, errno);
+        else
+        {
+            int one = 1;
+            if (setsockopt(client_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
+                throw ConnPoolError(SALTI_ERROR_ACCEPT, errno);
+            if (fcntl(client_fd, F_SETFL, O_NONBLOCK) == -1)
+                throw ConnPoolError(SALTI_ERROR_ACCEPT, errno);
 
-        NetAddr addr((struct sockaddr_in *)&client_addr);
-        conn_t conn = create_conn();
-        conn->self_ref = conn;
-        conn->send_buffer.set_capacity(queue_capacity);
-        conn->seg_buff_size = seg_buff_size;
-        conn->fd = client_fd;
-        conn->cpool = this;
-        conn->mode = Conn::PASSIVE;
-        conn->addr = addr;
-        add_conn(conn);
-        SALTICIDAE_LOG_INFO("accepted %s", std::string(*conn).c_str());
-        auto &worker = select_worker();
-        conn->worker = &worker;
-        conn->on_setup();
-        update_conn(conn, true);
-        worker.feed(conn, client_fd);
+            NetAddr addr((struct sockaddr_in *)&client_addr);
+            conn_t conn = create_conn();
+            conn->self_ref = conn;
+            conn->send_buffer.set_capacity(queue_capacity);
+            conn->seg_buff_size = seg_buff_size;
+            conn->fd = client_fd;
+            conn->cpool = this;
+            conn->mode = Conn::PASSIVE;
+            conn->addr = addr;
+            add_conn(conn);
+            SALTICIDAE_LOG_INFO("accepted %s", std::string(*conn).c_str());
+            auto &worker = select_worker();
+            conn->worker = &worker;
+            conn->on_setup();
+            update_conn(conn, true);
+            worker.feed(conn, client_fd);
+        }
+    } catch (ConnPoolError &e) {
+        SALTICIDAE_LOG_ERROR("%s", e.what());
+        throw e;
     }
 }
 
@@ -229,24 +233,29 @@ void ConnPool::_listen(NetAddr listen_addr) {
         ev_listen.clear();
         close(listen_fd);
     }
-    if ((listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-        throw ConnPoolError(std::string("cannot create socket for listening"));
-    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
-        setsockopt(listen_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
-        throw ConnPoolError(std::string("setsockopt failed"));
-    if (fcntl(listen_fd, F_SETFL, O_NONBLOCK) == -1)
-        throw ConnPoolError(std::string("unable to set nonblocking socket"));
+    try {
+        if ((listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
+        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
+            setsockopt(listen_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
+            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
+        if (fcntl(listen_fd, F_SETFL, O_NONBLOCK) == -1)
+            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
 
-    struct sockaddr_in sockin;
-    memset(&sockin, 0, sizeof(struct sockaddr_in));
-    sockin.sin_family = AF_INET;
-    sockin.sin_addr.s_addr = INADDR_ANY;
-    sockin.sin_port = listen_addr.port;
+        struct sockaddr_in sockin;
+        memset(&sockin, 0, sizeof(struct sockaddr_in));
+        sockin.sin_family = AF_INET;
+        sockin.sin_addr.s_addr = INADDR_ANY;
+        sockin.sin_port = listen_addr.port;
 
-    if (bind(listen_fd, (struct sockaddr *)&sockin, sizeof(sockin)) < 0)
-        throw ConnPoolError(std::string("binding error"));
-    if (::listen(listen_fd, max_listen_backlog) < 0)
-        throw ConnPoolError(std::string("listen error"));
+        if (bind(listen_fd, (struct sockaddr *)&sockin, sizeof(sockin)) < 0)
+            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
+        if (::listen(listen_fd, max_listen_backlog) < 0)
+            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
+    } catch (ConnPoolError &e) {
+        SALTICIDAE_LOG_ERROR("%s", e.what());
+        throw e;
+    }
     ev_listen = FdEvent(disp_ec, listen_fd,
                     std::bind(&ConnPool::accept_client, this, _1, _2));
     ev_listen.add(FdEvent::READ);
@@ -256,13 +265,18 @@ void ConnPool::_listen(NetAddr listen_addr) {
 ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
     int fd;
     int one = 1;
-    if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-        throw ConnPoolError(std::string("cannot create socket for remote"));
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
-        setsockopt(fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
-        throw ConnPoolError(std::string("setsockopt failed"));
-    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
-        throw ConnPoolError(std::string("unable to set nonblocking socket"));
+    try {
+        if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+            throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
+        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
+            setsockopt(fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
+            throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
+        if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
+            throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
+    } catch (ConnPoolError &e) {
+        SALTICIDAE_LOG_ERROR("%s", e.what());
+        throw e;
+    }
     conn_t conn = create_conn();
     conn->self_ref = conn;
     conn->send_buffer.set_capacity(queue_capacity);
