@@ -844,6 +844,8 @@ msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t
 void msgnetwork_free(const msgnetwork_t *self);
 bool msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_conn_t *conn);
 msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr);
+msgnetwork_conn_t *msgnetwork_conn_copy(const msgnetwork_conn_t *self);
+void msgnetwork_conn_free(const msgnetwork_conn_t *self);
 void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr);
 void msgnetwork_start(msgnetwork_t *self);
 void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn);
@@ -875,6 +877,8 @@ bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr);
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self, const netaddr_t *paddr);
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self);
 msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_conn_t *conn);
+peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self);
+void peernetwork_conn_free(const peernetwork_conn_t *self);
 void peernetwork_send_msg_by_move(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *paddr);
 void peernetwork_multicast_msg_by_move(peernetwork_t *self, msg_t *_moved_msg, const netaddr_array_t *paddrs);
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr);
