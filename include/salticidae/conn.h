@@ -254,6 +254,7 @@ class ConnPool {
         void set_dispatcher() { disp_flag = true; }
         bool is_dispatcher() const { return disp_flag; }
         size_t get_nconn() { return nconn; }
+        void stop_tcall() { tcall.stop(); }
     };
 
     /* related to workers */
@@ -361,6 +362,8 @@ class ConnPool {
                     on_fatal_error(err);
                 }
             });
+            disp_ec.stop();
+            workers[0].stop_tcall();
         };
 
         worker_error_cb = [this](const std::exception_ptr err) {

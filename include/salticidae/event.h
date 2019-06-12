@@ -467,14 +467,8 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
                     // since all enqueue operations are finalized, the dequeue should be able
                     // to see those enqueued values in func()
                     wait_sig.exchange(true, std::memory_order_acq_rel);
-                    bool again;
-                    try {
-                        again = func(*this);
-                    } catch (SalticidaeError &err) {
+                    if (func(*this))
                         write(fd, &dummy, 8);
-                        throw err;
-                    }
-                    if (again) write(fd, &dummy, 8);
                 });
         ev.add(FdEvent::READ);
     }
@@ -558,6 +552,7 @@ class ThreadCall {
     const size_t burst_size;
     using queue_t = MPSCQueueEventDriven<Handle *>;
     queue_t q;
+    bool stopped;
 
     public:
     struct Result {
@@ -607,7 +602,7 @@ class ThreadCall {
         }
     };
 
-    ThreadCall(size_t burst_size): burst_size(burst_size) {}
+    ThreadCall(size_t burst_size): burst_size(burst_size), stopped(false) {}
     ThreadCall(const ThreadCall &) = delete;
     ThreadCall(ThreadCall &&) = delete;
     ThreadCall(EventContext ec, size_t burst_size = 128): ec(ec), burst_size(burst_size) {
@@ -616,12 +611,7 @@ class ThreadCall {
             Handle *h;
             while (q.try_dequeue(h))
             {
-                try {
-                    h->exec();
-                } catch (SalticidaeError &err) {
-                    delete h;
-                    throw err;
-                }
+                if (!stopped) h->exec();
                 delete h;
                 if (++cnt == burst_size) return true;
             }
@@ -652,6 +642,7 @@ class ThreadCall {
     }
 
     const EventContext &get_ec() const { return ec; }
+    void stop() { stopped = true; }
 };
 
 }
