@@ -266,7 +266,7 @@ class ConnPool {
     protected:
     conn_t _connect(const NetAddr &addr);
     void _listen(NetAddr listen_addr);
-    void recoverable_error(const std::exception_ptr err) {
+    void recoverable_error(const std::exception_ptr err) const {
         user_tcall->async_call([this, err](ThreadCall::Handle &) {
             if (error_cb) {
                 try {

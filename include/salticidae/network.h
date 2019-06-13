@@ -426,6 +426,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     ~PeerNetwork() { this->stop_workers(); }
 
     void add_peer(const NetAddr &paddr);
+    void del_peer(const NetAddr &paddr);
     bool has_peer(const NetAddr &paddr) const;
     const conn_t get_peer_conn(const NetAddr &paddr) const;
     using MsgNet::send_msg;
@@ -725,6 +726,23 @@ void PeerNetwork<O, _, __>::add_peer(const NetAddr &addr) {
                 throw PeerNetworkError(SALTI_ERROR_PEER_ALREADY_EXISTS);
             id2peer.insert(std::make_pair(addr, new Peer(addr, nullptr, this->disp_ec)));
             start_active_conn(addr);
+        } catch (const PeerNetworkError &) {
+            this->recoverable_error(std::current_exception());
+        } catch (...) { this->disp_error_cb(std::current_exception()); }
+    });
+}
+
+template<typename O, O _, O __>
+void PeerNetwork<O, _, __>::del_peer(const NetAddr &addr) {
+    this->disp_tcall->async_call([this, addr](ThreadCall::Handle &) {
+        try {
+            auto it = id2peer.find(addr);
+            if (it == id2peer.end())
+                throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
+            it->second->conn->disp_terminate();
+            id2peer.erase(it);
+        } catch (const PeerNetworkError &) {
+            this->recoverable_error(std::current_exception());
         } catch (...) { this->disp_error_cb(std::current_exception()); }
     });
 }
@@ -739,8 +757,10 @@ PeerNetwork<O, _, __>::get_peer_conn(const NetAddr &paddr) const {
         try {
             auto it = id2peer.find(paddr);
             if (it == id2peer.end())
-                throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXISTS);
+                throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
             conn = it->second->conn;
+        } catch (const PeerNetworkError &) {
+            this->recoverable_error(std::current_exception());
         } catch (...) {
             err = std::current_exception();
         }
@@ -771,8 +791,10 @@ void PeerNetwork<O, _, __>::_send_msg(Msg &&msg, const NetAddr &paddr) {
         try {
             auto it = id2peer.find(paddr);
             if (it == id2peer.end())
-                throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXISTS);
+                throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
             this->_send_msg_dispatcher(msg, it->second->conn);
+        } catch (const PeerNetworkError &) {
+            this->recoverable_error(std::current_exception());
         } catch (...) { this->recoverable_error(std::current_exception()); }
     });
 }
@@ -792,9 +814,11 @@ void PeerNetwork<O, _, __>::_multicast_msg(Msg &&msg, const std::vector<NetAddr>
             {
                 auto it = id2peer.find(addr);
                 if (it == id2peer.end())
-                    throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXISTS);
+                    throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
                 this->_send_msg_dispatcher(msg, it->second->conn);
             }
+        } catch (const PeerNetworkError &) {
+            this->recoverable_error(std::current_exception());
         } catch (...) { this->recoverable_error(std::current_exception()); }
     });
 }
@@ -925,6 +949,7 @@ msgnetwork_config_t *peernetwork_config_as_msgnetwork_config(peernetwork_config_
 peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config);
 void peernetwork_free(const peernetwork_t *self);
 void peernetwork_add_peer(peernetwork_t *self, const netaddr_t *paddr);
+void peernetwork_del_peer(peernetwork_t *self, const netaddr_t *paddr);
 bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr);
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self, const netaddr_t *paddr);
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self);

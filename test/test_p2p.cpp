@@ -49,24 +49,25 @@ struct Net {
     ThreadCall tc;
     std::thread th;
     PeerNetwork<uint8_t> *net;
+    const std::string listen_addr;
 
-    Net(uint64_t id, const std::string &listen_addr): id(id), tc(ec) {
+    Net(uint64_t id, uint16_t port): id(id), tc(ec), listen_addr("127.0.0.1:"+ std::to_string(port)) {
         net = new salticidae::PeerNetwork<uint8_t>(
             ec,
             salticidae::PeerNetwork<uint8_t>::Config().conn_timeout(5).ping_period(2));
         net->reg_error_handler([this](const std::exception &err, bool fatal) {
-            SALTICIDAE_LOG_WARN("net %lu: captured %s error: %s", this->id, fatal ? "fatal" : "recoverable", err.what());
+            fprintf(stdout, "net %lu: captured %s error during an async call: %s\n", this->id, fatal ? "fatal" : "recoverable", err.what());
         });
         th = std::thread([=](){
             try {
                 net->start();
                 net->listen(NetAddr(listen_addr));
-                SALTICIDAE_LOG_INFO("net %lu: listen to %s\n", id, listen_addr.c_str());
+                fprintf(stdout, "net %lu: listen to %s\n", id, listen_addr.c_str());
                 ec.dispatch();
             } catch (std::exception &err) {
-                SALTICIDAE_LOG_WARN("net %lu: got error during a sync call: %s", id, err.what());
+                fprintf(stdout, "net %lu: got error during a sync call: %s\n", id, err.what());
             }
-            SALTICIDAE_LOG_INFO("net %lu: main loop ended\n", id);
+            fprintf(stdout, "net %lu: main loop ended\n", id);
         });
     }
 
@@ -74,7 +75,15 @@ struct Net {
         try {
             net->add_peer(NetAddr(listen_addr));
         } catch (std::exception &err) {
-            fprintf(stderr, "net %lu: got error during a sync call: %s\n", id, err.what());
+            fprintf(stdout, "net %lu: got error during a sync call: %s\n", id, err.what());
+        }
+    }
+
+    void del_peer(const std::string &listen_addr) {
+        try {
+            net->del_peer(NetAddr(listen_addr));
+        } catch (std::exception &err) {
+            fprintf(stdout, "net %lu: got error during a sync call: %s\n", id, err.what());
         }
     }
 
@@ -96,15 +105,15 @@ int read_int(char *buff) {
         if (t < 0) throw std::invalid_argument("negative");
         return t;
     } catch (std::invalid_argument) {
-        fprintf(stderr, "expect a non-negative integer\n");
+        fprintf(stdout, "expect a non-negative integer\n");
         return -1;
     }
 }
 
 int main(int argc, char **argv) {
     int i;
-    fprintf(stderr, "p2p network library playground (type h for help)\n");
-    fprintf(stderr, "================================================\n");
+    fprintf(stdout, "p2p network library playground (type help for more info)\n");
+    fprintf(stdout, "========================================================\n");
 
     auto cmd_exit = [](char *) {
         for (auto &p: nets)
@@ -112,30 +121,36 @@ int main(int argc, char **argv) {
         exit(0);
     };
 
-    auto cmd_net = [](char *buff) {
+    auto cmd_add = [](char *buff) {
         int id = read_int(buff);
         if (id < 0) return;
         if (nets.count(id))
         {
-            fprintf(stderr, "net id already exists");
+            fprintf(stdout, "net id already exists\n");
             return;
         }
-        scanf("%64s", buff);
-        nets.insert(std::make_pair(id, new Net(id, buff)));
+        int port = read_int(buff);
+        if (port < 0) return;
+        if (port >= 65536)
+        {
+            fprintf(stdout, "port should be < 65536\n");
+            return;
+        }
+        nets.insert(std::make_pair(id, new Net(id, port)));
     };
 
     auto cmd_ls = [](char *) {
         for (auto &p: nets)
-            fprintf(stderr, "%d\n", p.first);
+            fprintf(stdout, "%d\n", p.first);
     };
 
-    auto cmd_rm = [](char *buff) {
+    auto cmd_del = [](char *buff) {
         int id = read_int(buff);
         if (id < 0) return;
         auto it = nets.find(id);
         if (it == nets.end())
         {
-            fprintf(stderr, "net id does not exist\n");
+            fprintf(stdout, "net id does not exist\n");
             return;
         }
         it->second->stop_join();
@@ -149,27 +164,68 @@ int main(int argc, char **argv) {
         auto it = nets.find(id);
         if (it == nets.end())
         {
-            fprintf(stderr, "net id does not exist\n");
+            fprintf(stdout, "net id does not exist\n");
             return;
         }
-        scanf("%64s", buff);
-        it->second->add_peer(buff);
+        int id2 = read_int(buff);
+        if (id2 < 0) return;
+        auto it2 = nets.find(id2);
+        if (it2 == nets.end())
+        {
+            fprintf(stdout, "net id does not exist\n");
+            return;
+        }
+        it->second->add_peer(it2->second->listen_addr);
     };
 
-    cmd_map.insert(std::make_pair("exit", cmd_exit));
-    cmd_map.insert(std::make_pair("net", cmd_net));
-    cmd_map.insert(std::make_pair("ls", cmd_ls));
-    cmd_map.insert(std::make_pair("rm", cmd_rm));
+    auto cmd_delpeer = [](char *buff) {
+        int id = read_int(buff);
+        if (id < 0) return;
+        auto it = nets.find(id);
+        if (it == nets.end())
+        {
+            fprintf(stdout, "net id does not exist\n");
+            return;
+        }
+        int id2 = read_int(buff);
+        if (id2 < 0) return;
+        auto it2 = nets.find(id2);
+        if (it2 == nets.end())
+        {
+            fprintf(stdout, "net id does not exist\n");
+            return;
+        }
+        it->second->del_peer(it2->second->listen_addr);
+    };
+
+    auto cmd_help = [](char *) {
+        fprintf(stdout,
+            "add <node-id> <port> -- start a node (create a PeerNetwork instance)\n"
+            "addpeer <node-id> <peer-id> -- add a peer to a given node\n"
+            "rmpeer <node-id> <peer-id> -- add a peer to a given node\n"
+            "rm <node-id> -- remove a node (destroy a PeerNetwork instance)\n"
+            "ls -- list all node ids\n"
+            "exit -- quit the program\n"
+            "help -- show this info\n"
+        );
+    };
+
+    cmd_map.insert(std::make_pair("add", cmd_add));
     cmd_map.insert(std::make_pair("addpeer", cmd_addpeer));
+    cmd_map.insert(std::make_pair("del", cmd_del));
+    cmd_map.insert(std::make_pair("delpeer", cmd_delpeer));
+    cmd_map.insert(std::make_pair("ls", cmd_ls));
+    cmd_map.insert(std::make_pair("exit", cmd_exit));
+    cmd_map.insert(std::make_pair("help", cmd_help));
 
     for (;;)
     {
-        fprintf(stderr, "> ");
+        fprintf(stdout, "> ");
         char buff[128];
         if (scanf("%64s", buff) == EOF) break;
         auto it = cmd_map.find(buff);
         if (it == cmd_map.end())
-            fprintf(stderr, "invalid comand \"%s\"\n", buff);
+            fprintf(stdout, "invalid comand \"%s\"\n", buff);
         else
             (it->second)(buff);
     }
