@@ -598,7 +598,13 @@ bool PeerNetwork<O, _, __>::check_new_conn(const conn_t &conn, uint16_t port) {
         conn->peer_id.ip = conn->get_addr().ip;
         conn->peer_id.port = port;
     }
-    auto p = id2peer.find(conn->peer_id)->second.get();
+    auto it = id2peer.find(conn->peer_id);
+    if (it == id2peer.end())
+    {
+        conn->disp_terminate();
+        return true;
+    }
+    auto p = it->second.get();
     if (p->connected)
     {
         if (conn != p->conn)
