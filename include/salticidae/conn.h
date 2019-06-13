@@ -160,7 +160,10 @@ class ConnPool {
     const size_t queue_capacity;
 
     /* owned by user loop */
+    protected:
     BoxObj<ThreadCall> user_tcall;
+
+    private:
     conn_callback_t conn_cb;
     error_callback_t error_cb;
 

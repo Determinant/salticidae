@@ -58,6 +58,9 @@ struct Net {
         net->reg_error_handler([this](const std::exception &err, bool fatal) {
             fprintf(stdout, "net %lu: captured %s error during an async call: %s\n", this->id, fatal ? "fatal" : "recoverable", err.what());
         });
+        net->reg_unknown_peer_handler([this](const NetAddr &addr) {
+            fprintf(stdout, "net %lu: unknown peer attempts to connnect %s\n", this->id, std::string(addr).c_str());
+        });
         th = std::thread([=](){
             try {
                 net->start();
@@ -117,7 +120,10 @@ int main(int argc, char **argv) {
 
     auto cmd_exit = [](char *) {
         for (auto &p: nets)
+        {
             p.second->stop_join();
+            delete p.second;
+        }
         exit(0);
     };
 
@@ -141,7 +147,7 @@ int main(int argc, char **argv) {
 
     auto cmd_ls = [](char *) {
         for (auto &p: nets)
-            fprintf(stdout, "%d\n", p.first);
+            fprintf(stdout, "%d -> %s\n", p.first, p.second->listen_addr.c_str());
     };
 
     auto cmd_del = [](char *buff) {
