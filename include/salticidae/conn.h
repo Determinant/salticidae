@@ -148,9 +148,9 @@ class ConnPool {
     ThreadCall* disp_tcall;
     /** Should be implemented by derived class to return a new Conn object. */
     virtual Conn *create_conn() = 0;
-    using _error_callback_t = std::function<void(const std::exception_ptr err)>;
-    _error_callback_t disp_error_cb;
-    _error_callback_t worker_error_cb;
+    using worker_error_callback_t = std::function<void(const std::exception_ptr err)>;
+    worker_error_callback_t disp_error_cb;
+    worker_error_callback_t worker_error_cb;
 
 
     private:
@@ -176,20 +176,17 @@ class ConnPool {
     }
 
     class Worker {
-        public:
-
-        private:
         EventContext ec;
         ThreadCall tcall;
         std::thread handle;
         bool disp_flag;
         std::atomic<size_t> nconn;
-        ConnPool::_error_callback_t on_fatal_error;
+        ConnPool::worker_error_callback_t on_fatal_error;
 
         public:
         Worker(): tcall(ec), disp_flag(false), nconn(0) {}
 
-        void set_error_callback(ConnPool::_error_callback_t _on_error) {
+        void set_error_callback(ConnPool::worker_error_callback_t _on_error) {
             on_fatal_error = std::move(_on_error);
         }
 
@@ -269,6 +266,17 @@ class ConnPool {
     protected:
     conn_t _connect(const NetAddr &addr);
     void _listen(NetAddr listen_addr);
+    void recoverable_error(const std::exception_ptr err) {
+        user_tcall->async_call([this, err](ThreadCall::Handle &) {
+            if (error_cb) {
+                try {
+                    std::rethrow_exception(err);
+                } catch (const std::exception &e) {
+                    error_cb(e, false);
+                }
+            }
+        });
+    }
 
     private:
 
@@ -285,15 +293,6 @@ class ConnPool {
             }
         }
         return workers[idx];
-    }
-
-    void on_fatal_error(const std::exception &error) {
-        stop_workers();
-        if (error_cb) error_cb(error, true);
-    }
-
-    void on_recoverable_error(const std::exception &error) {
-        if (error_cb) error_cb(error, false);
     }
 
     public:
@@ -359,7 +358,8 @@ class ConnPool {
                 try {
                     std::rethrow_exception(_err);
                 } catch (const std::exception &err) {
-                    on_fatal_error(err);
+                    stop_workers();
+                    if (error_cb) error_cb(err, true);
                 }
             });
             disp_ec.stop();
@@ -430,8 +430,8 @@ class ConnPool {
     conn_t connect(const NetAddr &addr, bool blocking = true) {
         if (blocking)
         {
-            auto ret = *(static_cast<std::pair<conn_t, std::exception_ptr> *>(disp_tcall->call(
-                        [this, addr](ThreadCall::Handle &h) {
+            auto ret = *(static_cast<std::pair<conn_t, std::exception_ptr> *>(
+                        disp_tcall->call([this, addr](ThreadCall::Handle &h) {
                 conn_t conn;
                 std::exception_ptr err = nullptr;
                 try {

@@ -117,7 +117,6 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
     net.reg_error_handler([ec](const std::exception &err, bool fatal) {
         SALTICIDAE_LOG_WARN("main thread captured %s error: %s",
             fatal ? "fatal" : "recoverable", err.what());
-        ec.stop();
     });
     net.reg_handler([&](MsgRand &&msg, const MyNet::conn_t &conn) {
         uint256_t hash = salticidae::get_hash(msg.bytes);

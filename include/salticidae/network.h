@@ -488,22 +488,8 @@ inline void MsgNetwork<OpcodeType>::_send_msg(Msg &&msg, const conn_t &conn) {
             [this, msg=std::move(msg), conn](ThreadCall::Handle &) {
         try {
             this->_send_msg_dispatcher(msg, conn);
-            throw SalticidaeError("wow");
-        } catch (...) { this->disp_error_cb(std::current_exception()); }
+        } catch (...) { this->recoverable_error(std::current_exception()); }
     });
-}
-
-template<typename OpcodeType>
-inline void MsgNetwork<OpcodeType>::_send_msg_dispatcher(const Msg &msg, const conn_t &conn) {
-    bytearray_t msg_data = msg.serialize();
-    SALTICIDAE_LOG_DEBUG("wrote message %s to %s",
-                std::string(msg).c_str(),
-                std::string(*conn).c_str());
-#ifdef SALTICIDAE_MSG_STAT
-    conn->nsent++;
-    conn->nsentb += msg.get_length();
-#endif
-    conn->write(std::move(msg_data));
 }
 
 template<typename O, O _, O __>
@@ -654,6 +640,19 @@ void PeerNetwork<O, _, __>::start_active_conn(const NetAddr &addr) {
     if (id_mode == IP_BASED)
         conn->peer_id.port = 0;
 }
+
+template<typename OpcodeType>
+inline void MsgNetwork<OpcodeType>::_send_msg_dispatcher(const Msg &msg, const conn_t &conn) {
+    bytearray_t msg_data = msg.serialize();
+    SALTICIDAE_LOG_DEBUG("wrote message %s to %s",
+                std::string(msg).c_str(),
+                std::string(*conn).c_str());
+#ifdef SALTICIDAE_MSG_STAT
+    conn->nsent++;
+    conn->nsentb += msg.get_length();
+#endif
+    conn->write(std::move(msg_data));
+}
 /* end: functions invoked by the dispatcher */
 
 /* begin: functions invoked by the user loop */
@@ -697,18 +696,18 @@ void PeerNetwork<O, _, __>::msg_pong(MsgPong &&msg, const conn_t &conn) {
 
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::listen(NetAddr listen_addr) {
-    auto ret = *(static_cast<SalticidaeError *>(
+    auto ret = *(static_cast<std::exception_ptr *>(
             this->disp_tcall->call([this, listen_addr](ThreadCall::Handle &h) {
-        SalticidaeError err;
+        std::exception_ptr err = nullptr;
         try {
             MsgNet::_listen(listen_addr);
             listen_port = listen_addr.port;
-        } catch (SalticidaeError &e) {
-            err = e;
+        } catch (...) {
+            err = std::current_exception();
         }
         h.set_result(std::move(err));
     }).get()));
-    if (ret.get_code()) throw ret;
+    if (ret) std::rethrow_exception(ret);
 }
 
 template<typename O, O _, O __>
@@ -727,21 +726,21 @@ void PeerNetwork<O, _, __>::add_peer(const NetAddr &addr) {
 template<typename O, O _, O __>
 const typename PeerNetwork<O, _, __>::conn_t
 PeerNetwork<O, _, __>::get_peer_conn(const NetAddr &paddr) const {
-    auto ret = *(static_cast<std::pair<conn_t, SalticidaeError> *>(
+    auto ret = *(static_cast<std::pair<conn_t, std::exception_ptr> *>(
             this->disp_tcall->call([this, paddr](ThreadCall::Handle &h) {
         conn_t conn;
-        SalticidaeError err;
+        std::exception_ptr err = nullptr;
         try {
             auto it = id2peer.find(paddr);
             if (it == id2peer.end())
                 throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXISTS);
             conn = it->second->conn;
-        } catch (SalticidaeError &e) {
-            err = e;
+        } catch (...) {
+            err = std::current_exception();
         }
-        h.set_result(std::make_pair(std::move(conn), std::move(err)));
+        h.set_result(std::make_pair(std::move(conn), err));
     }).get()));
-    if (ret.second.get_code()) throw ret.second;
+    if (ret.second) std::rethrow_exception(ret.second);
     return std::move(ret.first);
 }
 
@@ -768,7 +767,7 @@ void PeerNetwork<O, _, __>::_send_msg(Msg &&msg, const NetAddr &paddr) {
             if (it == id2peer.end())
                 throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXISTS);
             this->_send_msg_dispatcher(msg, it->second->conn);
-        } catch (...) { this->disp_error_cb(std::current_exception()); }
+        } catch (...) { this->recoverable_error(std::current_exception()); }
     });
 }
 
@@ -790,7 +789,7 @@ void PeerNetwork<O, _, __>::_multicast_msg(Msg &&msg, const std::vector<NetAddr>
                     throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXISTS);
                 this->_send_msg_dispatcher(msg, it->second->conn);
             }
-        } catch (...) { this->disp_error_cb(std::current_exception()); }
+        } catch (...) { this->recoverable_error(std::current_exception()); }
     });
 }
 
