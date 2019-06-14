@@ -620,7 +620,7 @@ bool PeerNetwork<O, _, __>::check_new_conn(const conn_t &conn, uint16_t port) {
     {   /* found an unknown peer */
         const auto &addr = conn->get_addr();
         this->user_tcall->async_call([this, id](ThreadCall::Handle &) {
-            unknown_peer_cb(id);
+            if (unknown_peer_cb) unknown_peer_cb(id);
         });
         if (allow_unknown_peer)
         {
