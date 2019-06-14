@@ -59,7 +59,7 @@ class ConnPool {
     using conn_t = ArcObj<Conn>;
     /** The type of callback invoked when connection status is changed. */
     using conn_callback_t = std::function<void(const conn_t &, bool)>;
-    using error_callback_t = std::function<void(const std::exception &, bool)>;
+    using error_callback_t = std::function<void(const std::exception_ptr, bool)>;
     /** Abstraction for a bi-directional connection. */
     class Conn {
         friend ConnPool;
@@ -271,13 +271,7 @@ class ConnPool {
     void _listen(NetAddr listen_addr);
     void recoverable_error(const std::exception_ptr err) const {
         user_tcall->async_call([this, err](ThreadCall::Handle &) {
-            if (error_cb) {
-                try {
-                    std::rethrow_exception(err);
-                } catch (const std::exception &e) {
-                    error_cb(e, false);
-                }
-            }
+            if (error_cb) error_cb(err, false);
         });
     }
 
@@ -356,14 +350,10 @@ class ConnPool {
         disp_ec = workers[0].get_ec();
         disp_tcall = workers[0].get_tcall();
         workers[0].set_dispatcher();
-        disp_error_cb = [this](const std::exception_ptr _err) {
-            user_tcall->async_call([this, _err](ThreadCall::Handle &) {
-                try {
-                    std::rethrow_exception(_err);
-                } catch (const std::exception &err) {
-                    stop_workers();
-                    if (error_cb) error_cb(err, true);
-                }
+        disp_error_cb = [this](const std::exception_ptr err) {
+            user_tcall->async_call([this, err](ThreadCall::Handle &) {
+                stop_workers();
+                if (error_cb) error_cb(err, true);
             });
             disp_ec.stop();
             workers[0].stop_tcall();

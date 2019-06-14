@@ -974,8 +974,12 @@ void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn);
 typedef void (*msgnetwork_msg_callback_t)(const msg_t *, const msgnetwork_conn_t *, void *userdata);
 void msgnetwork_reg_handler(msgnetwork_t *self, _opcode_t opcode, msgnetwork_msg_callback_t cb, void *userdata);
 
-typedef void (*msgnetwork_conn_callback_t)(const msgnetwork_conn_t *, bool, void *userdata);
+typedef void (*msgnetwork_conn_callback_t)(const msgnetwork_conn_t *, bool connected, void *userdata);
 void msgnetwork_reg_conn_handler(msgnetwork_t *self, msgnetwork_conn_callback_t cb, void *userdata);
+
+
+typedef void (*msgnetwork_error_callback_t)(const SalticidaeCError *, bool fatal, void *userdata);
+void msgnetwork_reg_error_handler(msgnetwork_t *self, msgnetwork_error_callback_t cb, void *userdata);
 
 msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn);
 msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn);

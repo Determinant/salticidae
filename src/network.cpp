@@ -100,6 +100,22 @@ void msgnetwork_reg_conn_handler(msgnetwork_t *self,
     });
 }
 
+void msgnetwork_reg_error_handler(msgnetwork_t *self,
+                                msgnetwork_error_callback_t cb,
+                                void *userdata) {
+    self->reg_error_handler([=](const std::exception_ptr _err, bool fatal) {
+        SalticidaeCError cerror;
+        try {
+            std::rethrow_exception(_err);
+        } catch (SalticidaeError &err) {
+            cerror = err.get_cerr();
+        } catch (...) {
+            cerror = salticidae_cerror_unknown();
+        }
+        cb(&cerror, fatal, userdata);
+    });
+}
+
 void msgnetwork_start(msgnetwork_t *self) { self->start(); }
 
 void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn) {

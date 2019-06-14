@@ -139,6 +139,13 @@ void conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata)
     }
 }
 
+void error_handler(const SalticidaeCError *err, bool fatal, void *userdata) {
+    MyNet *n = (MyNet *)userdata;
+    printf("[%s] Captured %s error during an async call: %s\n",
+        n->name, fatal ? "fatal" : "recoverable",
+        salticidae_strerror(err->code));
+}
+
 MyNet gen_mynet(const eventcontext_t *ec,
                 const char *name) {
     MyNet res;

@@ -79,8 +79,13 @@ struct Net {
         net->reg_handler([this](const MsgText &msg, const PeerNetwork::conn_t &) {
             fprintf(stdout, "net %lu: peer %lu says %s\n", this->id, msg.id, msg.text.c_str());
         });
-        net->reg_error_handler([this](const std::exception &err, bool fatal) {
-            fprintf(stdout, "net %lu: captured %s error during an async call: %s\n", this->id, fatal ? "fatal" : "recoverable", err.what());
+        net->reg_error_handler([this](const std::exception_ptr _err, bool fatal) {
+            try {
+                std::rethrow_exception(_err);
+            } catch (const std::exception &err) {
+                fprintf(stdout, "net %lu: captured %s error during an async call: %s\n",
+                        this->id, fatal ? "fatal" : "recoverable", err.what());
+            }
         });
         net->reg_unknown_peer_handler([this](const NetAddr &addr) {
             fprintf(stdout, "net %lu: unknown peer attempts to connnect %s\n", this->id, std::string(addr).c_str());
