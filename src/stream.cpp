@@ -79,15 +79,15 @@ bool datastream_put_data(datastream_t *self, const uint8_t *base, size_t size) {
     return true;
 }
 
-uint8_t datastream_get_u8(datastream_t *self, bool *succ) { uint8_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
-uint16_t datastream_get_u16(datastream_t *self, bool *succ) { uint16_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
-uint32_t datastream_get_u32(datastream_t *self, bool *succ) { uint32_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
-uint64_t datastream_get_u64(datastream_t *self, bool *succ) { uint64_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+uint8_t datastream_get_u8(datastream_t *self, bool *succ) { uint8_t val = 0; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+uint16_t datastream_get_u16(datastream_t *self, bool *succ) { uint16_t val = 0; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+uint32_t datastream_get_u32(datastream_t *self, bool *succ) { uint32_t val = 0; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+uint64_t datastream_get_u64(datastream_t *self, bool *succ) { uint64_t val = 0; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
 
-int8_t datastream_get_i8(datastream_t *self, bool *succ) {int8_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
-int16_t datastream_get_i16(datastream_t *self, bool *succ) {int16_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
-int32_t datastream_get_i32(datastream_t *self, bool *succ) {int32_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
-int64_t datastream_get_i64(datastream_t *self, bool *succ) {int64_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+int8_t datastream_get_i8(datastream_t *self, bool *succ) {int8_t val = 0; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+int16_t datastream_get_i16(datastream_t *self, bool *succ) {int16_t val = 0; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+int32_t datastream_get_i32(datastream_t *self, bool *succ) {int32_t val = 0; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+int64_t datastream_get_i64(datastream_t *self, bool *succ) {int64_t val = 0; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
 
 const uint8_t *datastream_get_data_inplace(datastream_t *self, size_t len) {
     try {
