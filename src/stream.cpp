@@ -23,19 +23,37 @@ void uint256_unserialize(uint256_t *self, datastream_t *s) {
     self->unserialize(*s);
 }
 
-datastream_t *datastream_new() { return new datastream_t(); }
-datastream_t *datastream_new_from_bytes(const uint8_t *base, size_t size) {
-    return new datastream_t(base, base + size);
+datastream_t *datastream_new() {
+    try {
+        return new datastream_t();
+    } catch (...) {
+        return nullptr;
+    }
 }
+
+datastream_t *datastream_new_from_bytes(const uint8_t *base, size_t size) {
+    try {
+        return new datastream_t(base, base + size);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 void datastream_free(const datastream_t *self) { delete self; }
 
-void datastream_assign_by_copy(datastream_t *dst, const datastream_t *src) {
-    *dst = *src;
+bool datastream_assign_by_copy(datastream_t *dst, const datastream_t *src) {
+    try {
+        *dst = *src;
+    } catch (...) { return false; }
+    return true;
 }
 
-void datastream_assign_by_move(datastream_t *dst, datastream_t *_moved_src) {
-    *dst = std::move(*_moved_src);
-    delete _moved_src;
+bool datastream_assign_by_move(datastream_t *dst, datastream_t *_moved_src) {
+    try {
+        *dst = std::move(*_moved_src);
+        delete _moved_src;
+    } catch (...) { return false; }
+    return true;
 }
 
 uint8_t *datastream_data(datastream_t *self) { return self->data(); }
@@ -44,42 +62,57 @@ void datastream_clear(datastream_t *self) { self->clear(); }
 
 size_t datastream_size(const datastream_t *self) { return self->size(); }
 
-void datastream_put_u8(datastream_t *self, uint8_t val) { *self << val; }
-void datastream_put_u16(datastream_t *self, uint16_t val) { *self << val; }
-void datastream_put_u32(datastream_t *self, uint32_t val) { *self << val; }
-void datastream_put_u64(datastream_t *self, uint64_t val) { *self << val; }
+bool datastream_put_u8(datastream_t *self, uint8_t val) { try {*self << val; } catch (...) { return false; } return true; }
+bool datastream_put_u16(datastream_t *self, uint16_t val) { try {*self << val; } catch (...) { return false; } return true; }
+bool datastream_put_u32(datastream_t *self, uint32_t val) { try {*self << val; } catch (...) { return false; } return true; }
+bool datastream_put_u64(datastream_t *self, uint64_t val) { try {*self << val; } catch (...) { return false; } return true; }
 
-void datastream_put_i8(datastream_t *self, int8_t val) { *self << val; }
-void datastream_put_i16(datastream_t *self, int16_t val) { *self << val; }
-void datastream_put_i32(datastream_t *self, int32_t val) { *self << val; }
-void datastream_put_i64(datastream_t *self, int64_t val) { *self << val; }
+bool datastream_put_i8(datastream_t *self, int8_t val) { try {*self << val; } catch (...) { return false; } return true; }
+bool datastream_put_i16(datastream_t *self, int16_t val) { try {*self << val; } catch (...) { return false; } return true; }
+bool datastream_put_i32(datastream_t *self, int32_t val) { try {*self << val; } catch (...) { return false; } return true; }
+bool datastream_put_i64(datastream_t *self, int64_t val) { try {*self << val; } catch (...) { return false; } return true; }
 
-void datastream_put_data(datastream_t *self, const uint8_t *base, size_t size) {
-    self->put_data(base, base + size);
+bool datastream_put_data(datastream_t *self, const uint8_t *base, size_t size) {
+    try {
+        self->put_data(base, base + size);
+    } catch (...) { return false; }
+    return true;
 }
 
-uint8_t datastream_get_u8(datastream_t *self) { uint8_t val; *self >> val; return val; }
-uint16_t datastream_get_u16(datastream_t *self) { uint16_t val; *self >> val; return val; }
-uint32_t datastream_get_u32(datastream_t *self) { uint32_t val; *self >> val; return val; }
-uint64_t datastream_get_u64(datastream_t *self) { uint64_t val; *self >> val; return val; }
+uint8_t datastream_get_u8(datastream_t *self, bool *succ) { uint8_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+uint16_t datastream_get_u16(datastream_t *self, bool *succ) { uint16_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+uint32_t datastream_get_u32(datastream_t *self, bool *succ) { uint32_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+uint64_t datastream_get_u64(datastream_t *self, bool *succ) { uint64_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
 
-int8_t datastream_get_i8(datastream_t *self) { int8_t val; *self >> val; return val; }
-int16_t datastream_get_i16(datastream_t *self) { int16_t val; *self >> val; return val; }
-int32_t datastream_get_i32(datastream_t *self) { int32_t val; *self >> val; return val; }
-int64_t datastream_get_i64(datastream_t *self) { int64_t val; *self >> val; return val; }
+int8_t datastream_get_i8(datastream_t *self, bool *succ) {int8_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+int16_t datastream_get_i16(datastream_t *self, bool *succ) {int16_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+int32_t datastream_get_i32(datastream_t *self, bool *succ) {int32_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
+int64_t datastream_get_i64(datastream_t *self, bool *succ) {int64_t val; try {*self >> val;} catch (...) {*succ = false;} *succ = true; return val; }
 
 const uint8_t *datastream_get_data_inplace(datastream_t *self, size_t len) {
-    return self->get_data_inplace(len);
+    try {
+        return self->get_data_inplace(len);
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 uint256_t *datastream_get_hash(const datastream_t *self) {
-    return new uint256_t(self->get_hash());
+    try {
+        return new uint256_t(self->get_hash());
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_src) {
-    auto res = new bytearray_t(std::move(*_moved_src));
-    delete _moved_src;
-    return res;
+    try {
+        auto res = new bytearray_t(std::move(*_moved_src));
+        delete _moved_src;
+        return res;
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 char *datastream_get_hex(datastream_t *self) {

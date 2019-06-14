@@ -58,6 +58,31 @@ const char *TTY_COLOR_MAGENTA = "\x1b[35m";
 const char *TTY_COLOR_CYAN = "\x1b[36m";
 const char *TTY_COLOR_RESET = "\x1b[0m";
 
+extern "C" {
+
+SalticidaeCError salticidae_cerror_normal() {
+    SalticidaeCError res;
+    res.code = SALTI_NORMAL;
+    res.oscode = 0;
+    return res;
+}
+
+SalticidaeCError salticidae_cerror_unknown() {
+    SalticidaeCError res;
+    res.code = SALTI_ERROR_UNKNOWN;
+    res.oscode = 0;
+    return res;
+}
+
+const char *salticidae_strerror(int code) {
+    if (code < 0 ||
+        code >= (int)(sizeof(SALTICIDAE_ERROR_STRINGS) / sizeof(const char *)))
+        return "invalid";
+    return SALTICIDAE_ERROR_STRINGS[code];
+}
+
+}
+
 void sec2tv(double t, struct timeval &tv) {
     tv.tv_sec = trunc(t);
     tv.tv_usec = trunc((t - tv.tv_sec) * 1e6);

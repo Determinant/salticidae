@@ -50,8 +50,17 @@ void msgnetwork_send_msg_by_move(msgnetwork_t *self,
     delete _moved_msg;
 }
 
-msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr) {
-    return new msgnetwork_conn_t(self->connect(*addr));
+msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr, SalticidaeCError *cerror) {
+    try {
+        auto res = new msgnetwork_conn_t(self->connect(*addr));
+        *cerror = salticidae_cerror_normal();
+        return res;
+    } catch (const SalticidaeError &err) {
+        *cerror = err.get_cerr();
+    } catch (const std::exception &err) {
+        *cerror = salticidae_cerror_unknown();
+    }
+    return nullptr;
 }
 
 msgnetwork_conn_t *msgnetwork_conn_copy(const msgnetwork_conn_t *self) {
@@ -61,8 +70,15 @@ msgnetwork_conn_t *msgnetwork_conn_copy(const msgnetwork_conn_t *self) {
 
 void msgnetwork_conn_free(const msgnetwork_conn_t *self) { delete self; }
 
-void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr) {
-    self->listen(*listen_addr);
+void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *cerror) {
+    try {
+        self->listen(*listen_addr);
+        *cerror = salticidae_cerror_normal();
+    } catch (const SalticidaeError &err) {
+        *cerror = err.get_cerr();
+    } catch (const std::exception &err) {
+        *cerror = salticidae_cerror_unknown();
+    }
 }
 
 void msgnetwork_reg_handler(msgnetwork_t *self,
@@ -143,8 +159,18 @@ bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr) {
 }
 
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self,
-                                        const netaddr_t *paddr) {
-    return new peernetwork_conn_t(self->get_peer_conn(*paddr));
+                                                    const netaddr_t *paddr,
+                                                    SalticidaeCError *cerror) {
+    try {
+        auto res = new peernetwork_conn_t(self->get_peer_conn(*paddr));
+        *cerror = salticidae_cerror_normal();
+        return res;
+    } catch (const SalticidaeError &err) {
+        *cerror = err.get_cerr();
+    } catch (const std::exception &err) {
+        *cerror = salticidae_cerror_unknown();
+    }
+    return nullptr;
 }
 
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self) { return self; }
@@ -172,8 +198,15 @@ void peernetwork_multicast_msg_by_move(peernetwork_t *self,
     delete _moved_msg;
 }
 
-void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr) {
-    self->listen(*listen_addr);
+void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *cerror) {
+    try {
+        self->listen(*listen_addr);
+        *cerror = salticidae_cerror_normal();
+    } catch (const SalticidaeError &err) {
+        *cerror = err.get_cerr();
+    } catch (const std::exception &err) {
+        *cerror = salticidae_cerror_unknown();
+    }
 }
 
 }

@@ -31,6 +31,14 @@
 #include "salticidae/network.h"
 #include "salticidae/stream.h"
 
+void check_err(SalticidaeCError *err) {
+    if (err->code)
+    {
+        fprintf(stderr, "error: %s\n", salticidae_strerror(err->code));
+        exit(1);
+    }
+}
+
 /** Hello Message. */
 const uint8_t MSG_OPCODE_HELLO = 0x0;
 const uint8_t MSG_OPCODE_ACK = 0x1;
@@ -56,7 +64,8 @@ MsgHello msg_hello_unserialize(const msg_t *msg) {
     datastream_t *s = msg_consume_payload(msg);
     MsgHello res;
     uint32_t len;
-    len = datastream_get_u32(s);
+    bool flag; /* ignore the flag (assume all datastream operations are good) */
+    len = datastream_get_u32(s, &flag);
     len = le32toh(len);
 
     char *name = (char *)malloc(len + 1);
@@ -84,6 +93,7 @@ typedef struct MyNet {
     const char *name;
 } MyNet;
 MyNet alice, bob;
+SalticidaeCError err;
 
 void on_receive_hello(const msg_t *_msg, const msgnetwork_conn_t *conn, void *userdata) {
     msgnetwork_t *net = msgnetwork_conn_get_net(conn);
@@ -110,7 +120,7 @@ void conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata)
     {
         if (msgnetwork_conn_get_mode(conn) == CONN_MODE_ACTIVE)
         {
-            printf("[%s] Connected, sending hello.", name);
+            printf("[%s] Connected, sending hello.\n", name);
             /* send the first message through this connection */
             msg_t *hello = msg_hello_serialize(name, "Hello there!");
             msgnetwork_send_msg_by_move(n->net, hello, conn);
@@ -123,7 +133,8 @@ void conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata)
         printf("[%s] Disconnected, retrying.\n", name);
         /* try to reconnect to the same address */
         netaddr_t *addr = msgnetwork_conn_get_addr(conn);
-        msgnetwork_connect(net, addr);
+        msgnetwork_connect(net, addr, &err);
+        check_err(&err);
         netaddr_free(addr);
     }
 }
@@ -166,12 +177,16 @@ int main() {
     msgnetwork_start(bob.net);
 
     /* accept incoming connections */
-    msgnetwork_listen(alice.net, alice_addr);
-    msgnetwork_listen(bob.net, bob_addr);
+    msgnetwork_listen(alice.net, alice_addr, &err);
+    check_err(&err);
+    msgnetwork_listen(bob.net, bob_addr, &err);
+    check_err(&err);
 
     /* try to connect once */
-    msgnetwork_conn_free(msgnetwork_connect(alice.net, bob_addr));
-    msgnetwork_conn_free(msgnetwork_connect(bob.net, alice_addr));
+    msgnetwork_conn_free(msgnetwork_connect(alice.net, bob_addr, &err));
+    check_err(&err);
+    msgnetwork_conn_free(msgnetwork_connect(bob.net, alice_addr, &err));
+    check_err(&err);
 
     netaddr_free(alice_addr);
     netaddr_free(bob_addr);

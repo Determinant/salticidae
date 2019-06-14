@@ -22,11 +22,32 @@
  * SOFTWARE.
  */
 
-#ifndef _SALTICIDAE_COMMON_H
-#define _SALTICIDAE_COMMON_H
+#ifndef _SALTICIDAE_UTIL_H
+#define _SALTICIDAE_UTIL_H
+
+#include <getopt.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include "salticidae/config.h"
+
+typedef struct SalticidaeCError {
+    int code;
+    int oscode;
+} SalticidaeCError;
 
 #ifdef __cplusplus
+extern "C" {
+#endif
 
+SalticidaeCError salticidae_cerror_normal();
+SalticidaeCError salticidae_cerror_unknown();
+const char *salticidae_strerror(int code);
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
 #include <string>
 #include <exception>
 #include <cstdarg>
@@ -34,11 +55,6 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
-#include <getopt.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-#include "salticidae/config.h"
 #include "salticidae/ref.h"
 
 namespace salticidae {
@@ -66,7 +82,8 @@ enum SalticidaeErrorCode {
     SALTI_ERROR_OPTNAME_ALREADY_EXISTS,
     SALTI_ERROR_OPT_UNKNOWN_ACTION,
     SALTI_ERROR_CONFIG_LINE_TOO_LONG,
-    SALTI_ERROR_OPT_INVALID
+    SALTI_ERROR_OPT_INVALID,
+    SALTI_ERROR_UNKNOWN
 };
 
 extern const char *SALTICIDAE_ERROR_STRINGS[];
@@ -95,6 +112,12 @@ class SalticidaeError: public std::exception {
     const char *what() const throw() override { return msg.c_str(); }
     int get_code() const { return code; }
     int get_oscode() const { return oscode; }
+    SalticidaeCError get_cerr() const {
+        SalticidaeCError res;
+        res.code = code;
+        res.oscode = oscode;
+        return res;
+    }
 };
 
 
@@ -366,7 +389,6 @@ class Config {
 };
 
 }
-
 #endif
 
 #endif
