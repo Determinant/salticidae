@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018 Cornell University.
+ * Copyright (c) 2019 Ava Labs, Inc.
  *
  * Author: Ted Yin <tederminant@gmail.com>
  *
@@ -35,7 +35,6 @@
 
 using salticidae::NetAddr;
 using salticidae::DataStream;
-using salticidae::PeerNetwork;
 using salticidae::htole;
 using salticidae::letoh;
 using salticidae::EventContext;
@@ -43,18 +42,43 @@ using salticidae::ThreadCall;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
+using PeerNetwork = salticidae::PeerNetwork<uint8_t>;
+
+struct MsgText {
+    static const uint8_t opcode = 0x0;
+    DataStream serialized;
+    uint64_t id;
+    std::string text;
+
+    MsgText(uint64_t id, const std::string &text) {
+        serialized << salticidae::htole(id) << salticidae::htole((uint32_t)text.length()) << text;
+    }
+
+    MsgText(DataStream &&s) {
+        uint32_t len;
+        s >> id;
+        id = salticidae::letoh(id);
+        s >> len;
+        len = salticidae::letoh(len);
+        text = std::string((const char *)s.get_data_inplace(len), len);
+    }
+};
+
+const uint8_t MsgText::opcode;
+
 struct Net {
     uint64_t id;
     EventContext ec;
     ThreadCall tc;
     std::thread th;
-    PeerNetwork<uint8_t> *net;
+    PeerNetwork *net;
     const std::string listen_addr;
 
     Net(uint64_t id, uint16_t port): id(id), tc(ec), listen_addr("127.0.0.1:"+ std::to_string(port)) {
-        net = new salticidae::PeerNetwork<uint8_t>(
-            ec,
-            salticidae::PeerNetwork<uint8_t>::Config().conn_timeout(5).ping_period(2));
+        net = new PeerNetwork(ec, PeerNetwork::Config().conn_timeout(5).ping_period(2));
+        net->reg_handler([this](const MsgText &msg, const PeerNetwork::conn_t &) {
+            fprintf(stdout, "net %lu: peer %lu says %s\n", this->id, msg.id, msg.text.c_str());
+        });
         net->reg_error_handler([this](const std::exception &err, bool fatal) {
             fprintf(stdout, "net %lu: captured %s error during an async call: %s\n", this->id, fatal ? "fatal" : "recoverable", err.what());
         });
@@ -204,12 +228,34 @@ int main(int argc, char **argv) {
         it->second->del_peer(it2->second->listen_addr);
     };
 
+    auto cmd_msg = [](char *buff) {
+        int id = read_int(buff);
+        if (id < 0) return;
+        auto it = nets.find(id);
+        if (it == nets.end())
+        {
+            fprintf(stdout, "net id does not exist\n");
+            return;
+        }
+        int id2 = read_int(buff);
+        if (id2 < 0) return;
+        auto it2 = nets.find(id2);
+        if (it2 == nets.end())
+        {
+            fprintf(stdout, "net id does not exist\n");
+            return;
+        }
+        scanf("%64s", buff);
+        it->second->net->send_msg(MsgText(id, buff), it2->second->listen_addr);
+    };
+
     auto cmd_help = [](char *) {
         fprintf(stdout,
             "add <node-id> <port> -- start a node (create a PeerNetwork instance)\n"
             "addpeer <node-id> <peer-id> -- add a peer to a given node\n"
             "rmpeer <node-id> <peer-id> -- add a peer to a given node\n"
             "rm <node-id> -- remove a node (destroy a PeerNetwork instance)\n"
+            "msg <node-id> <peer-id> <msg> -- send a text message to a node\n"
             "ls -- list all node ids\n"
             "exit -- quit the program\n"
             "help -- show this info\n"
@@ -220,6 +266,7 @@ int main(int argc, char **argv) {
     cmd_map.insert(std::make_pair("addpeer", cmd_addpeer));
     cmd_map.insert(std::make_pair("del", cmd_del));
     cmd_map.insert(std::make_pair("delpeer", cmd_delpeer));
+    cmd_map.insert(std::make_pair("msg", cmd_msg));
     cmd_map.insert(std::make_pair("ls", cmd_ls));
     cmd_map.insert(std::make_pair("exit", cmd_exit));
     cmd_map.insert(std::make_pair("help", cmd_help));
