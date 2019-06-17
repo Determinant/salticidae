@@ -1007,6 +1007,7 @@ const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self, c
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self);
 peernetwork_t *msgnetwork_as_peernetwork_unsafe(msgnetwork_t *self);
 msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_conn_t *conn);
+peernetwork_conn_t *peernetwork_conn_new_from_msgnetwork_conn_unsafe(const msgnetwork_conn_t *conn);
 peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self);
 void peernetwork_conn_free(const peernetwork_conn_t *self);
 void peernetwork_send_msg_by_move(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *paddr);

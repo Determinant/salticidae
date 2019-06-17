@@ -201,6 +201,10 @@ msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_c
     return new msgnetwork_conn_t(*conn);
 }
 
+peernetwork_conn_t *peernetwork_conn_new_from_msgnetwork_conn_unsafe(const msgnetwork_conn_t *conn) {
+    return new peernetwork_conn_t(salticidae::static_pointer_cast<peernetwork_t::Conn>(*conn));
+}
+
 peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self) {
     return new peernetwork_conn_t(*self);
 }
