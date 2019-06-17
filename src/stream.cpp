@@ -41,19 +41,10 @@ datastream_t *datastream_new_from_bytes(const uint8_t *base, size_t size) {
 
 void datastream_free(const datastream_t *self) { delete self; }
 
-bool datastream_assign_by_copy(datastream_t *dst, const datastream_t *src) {
+datastream_t *datastream_copy(const datastream_t *self) {
     try {
-        *dst = *src;
-    } catch (...) { return false; }
-    return true;
-}
-
-bool datastream_assign_by_move(datastream_t *dst, datastream_t *_moved_src) {
-    try {
-        *dst = std::move(*_moved_src);
-        //delete _moved_src;
-    } catch (...) { return false; }
-    return true;
+        return new datastream_t(*self);
+    } catch (...) { return nullptr; }
 }
 
 uint8_t *datastream_data(datastream_t *self) { return self->data(); }
