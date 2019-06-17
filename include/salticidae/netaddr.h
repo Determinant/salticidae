@@ -141,6 +141,7 @@ void netaddr_free(const netaddr_t *self);
 netaddr_t *netaddr_new_from_ip_port(uint32_t ip, uint16_t port);
 netaddr_t *netaddr_new_from_sip_port(const char *ip, uint16_t port);
 netaddr_t *netaddr_new_from_sipport(const char *ip_port_addr);
+netaddr_t *netaddr_copy(const netaddr_t *self);
 bool netaddr_is_eq(const netaddr_t *a, const netaddr_t *b);
 bool netaddr_is_null(const netaddr_t *self);
 uint32_t netaddr_get_ip(const netaddr_t *self);

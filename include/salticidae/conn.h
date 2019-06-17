@@ -260,7 +260,7 @@ class ConnPool {
     /* related to workers */
     size_t nworker;
     salticidae::BoxObj<Worker[]> workers;
-    bool worker_running;
+    int system_state;
 
     void accept_client(int, int);
     conn_t add_conn(const conn_t &conn);
@@ -344,7 +344,7 @@ class ConnPool {
             queue_capacity(config._queue_capacity),
             listen_fd(-1),
             nworker(config._nworker),
-            worker_running(false) {
+            system_state(0) {
         workers = new Worker[nworker];
         user_tcall = new ThreadCall(ec);
         disp_ec = workers[0].get_ec();
@@ -381,16 +381,16 @@ class ConnPool {
     ConnPool(ConnPool &&) = delete;
 
     void start() {
-        if (worker_running) return;
+        if (system_state) return;
         SALTICIDAE_LOG_INFO("starting all threads...");
         for (size_t i = 0; i < nworker; i++)
             workers[i].start();
-        worker_running = true;
+        system_state = 1;
     }
 
     void stop_workers() {
-        if (!worker_running) return;
-        worker_running = false;
+        if (system_state != 1) return;
+        system_state = 2;
         SALTICIDAE_LOG_INFO("stopping all threads...");
         /* stop the dispatcher */
         workers[0].stop();
@@ -401,10 +401,6 @@ class ConnPool {
         /* join all worker threads */
         for (size_t i = 1; i < nworker; i++)
             workers[i].get_handle().join();
-    }
-
-    void stop() {
-        stop_workers();
         for (auto it: pool)
         {
             conn_t conn = it.second;
@@ -412,6 +408,10 @@ class ConnPool {
             conn->self_ref = nullptr;
             ::close(conn->fd);
         }
+    }
+
+    void stop() {
+        stop_workers();
         if (listen_fd != -1)
         {
             close(listen_fd);

@@ -54,8 +54,10 @@ msg_t *msg_hello_serialize(const char *name, const char *text) {
     datastream_put_i32(serialized, (uint32_t)htole32(name_len));
     datastream_put_data(serialized, name, name_len);
     datastream_put_data(serialized, text, strlen(text));
-    msg_t *msg = msg_new_moved_from_bytearray(
-        MSG_OPCODE_HELLO, bytearray_new_moved_from_datastream(serialized));
+    bytearray_t *arr = bytearray_new_moved_from_datastream(serialized);
+    msg_t *msg = msg_new_moved_from_bytearray(MSG_OPCODE_HELLO, arr);
+    datastream_free(serialized);
+    bytearray_free(arr);
     return msg;
 }
 
@@ -84,7 +86,9 @@ MsgHello msg_hello_unserialize(const msg_t *msg) {
 }
 
 msg_t *msg_ack_serialize() {
-    msg_t *msg = msg_new_moved_from_bytearray(MSG_OPCODE_ACK, bytearray_new());
+    bytearray_t *arr = bytearray_new();
+    msg_t *msg = msg_new_moved_from_bytearray(MSG_OPCODE_ACK, arr);
+    bytearray_free(arr);
     return msg;
 }
 
@@ -105,6 +109,7 @@ void on_receive_hello(const msg_t *_msg, const msgnetwork_conn_t *conn, void *us
     msg_t *ack = msg_ack_serialize();
     /* send acknowledgement */
     msgnetwork_send_msg_by_move(net, ack, conn);
+    msg_free(ack);
 }
 
 void on_receive_ack(const msg_t *msg, const msgnetwork_conn_t *conn, void *userdata) {
@@ -124,6 +129,7 @@ void conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata)
             /* send the first message through this connection */
             msg_t *hello = msg_hello_serialize(name, "Hello there!");
             msgnetwork_send_msg_by_move(n->net, hello, conn);
+            msg_free(hello);
         }
         else
             printf("[%s] Accepted, waiting for greetings.\n", name);
@@ -132,10 +138,9 @@ void conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata)
     {
         printf("[%s] Disconnected, retrying.\n", name);
         /* try to reconnect to the same address */
-        netaddr_t *addr = msgnetwork_conn_get_addr(conn);
+        const netaddr_t *addr = msgnetwork_conn_get_addr(conn);
         msgnetwork_connect(net, addr, &err);
         check_err(&err);
-        netaddr_free(addr);
     }
 }
 

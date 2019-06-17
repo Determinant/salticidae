@@ -118,6 +118,8 @@ void msgnetwork_reg_error_handler(msgnetwork_t *self,
 
 void msgnetwork_start(msgnetwork_t *self) { self->start(); }
 
+void msgnetwork_stop(msgnetwork_t *self) { self->stop(); }
+
 void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn) {
     self->terminate(*conn);
 }
@@ -130,8 +132,8 @@ msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn) {
     return (msgnetwork_conn_mode_t)(*conn)->get_mode();
 }
 
-netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn) {
-    return new netaddr_t((*conn)->get_addr());
+const netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn) {
+    return &(*conn)->get_addr();
 }
 
 // PeerNetwork
@@ -159,6 +161,10 @@ void peernetwork_config_id_mode(peernetwork_config_t *self, peernetwork_id_mode_
 }
 
 msgnetwork_config_t *peernetwork_config_as_msgnetwork_config(peernetwork_config_t *self) { return self; }
+
+peernetwork_t *msgnetwork_as_peernetwork_unsafe(msgnetwork_t *self) {
+    return static_cast<peernetwork_t *>(self);
+}
 
 peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config) {
     return new peernetwork_t(*ec, *config);
@@ -224,6 +230,8 @@ void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, Salti
         *cerror = salticidae_cerror_unknown();
     }
 }
+
+void peernetwork_stop(peernetwork_t *self) { self->stop(); }
 
 }
 

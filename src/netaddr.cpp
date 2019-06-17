@@ -20,6 +20,10 @@ netaddr_t *netaddr_new_from_sipport(const char *ip_port_addr) {
     return new netaddr_t(ip_port_addr);
 }
 
+netaddr_t *netaddr_copy(const netaddr_t *self) {
+    return new netaddr_t(*self);
+}
+
 bool netaddr_is_eq(const netaddr_t *a, const netaddr_t *b) {
     return *a == *b;
 }

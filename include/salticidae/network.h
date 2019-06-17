@@ -144,7 +144,7 @@ class MsgNetwork: public ConnPool {
         }
     };
 
-    virtual ~MsgNetwork() { stop_workers(); }
+    virtual ~MsgNetwork() { stop(); }
 
     MsgNetwork(const EventContext &ec, const Config &config):
             ConnPool(ec, config) {
@@ -203,6 +203,7 @@ class MsgNetwork: public ConnPool {
     inline void _send_msg(Msg &&msg, const conn_t &conn);
     inline void _send_msg_dispatcher(const Msg &msg, const conn_t &conn);
 
+    void stop() { stop_workers(); }
     using ConnPool::listen;
     conn_t connect(const NetAddr &addr) {
         return static_pointer_cast<Conn>(ConnPool::connect(addr));
@@ -437,7 +438,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         this->reg_handler(generic_bind(&PeerNetwork::msg_pong, this, _1, _2));
     }
 
-    ~PeerNetwork() { this->stop_workers(); }
+    virtual ~PeerNetwork() { this->stop(); }
 
     void add_peer(const NetAddr &paddr);
     void del_peer(const NetAddr &paddr);
@@ -969,6 +970,7 @@ msgnetwork_conn_t *msgnetwork_conn_copy(const msgnetwork_conn_t *self);
 void msgnetwork_conn_free(const msgnetwork_conn_t *self);
 void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *err);
 void msgnetwork_start(msgnetwork_t *self);
+void msgnetwork_stop(msgnetwork_t *self);
 void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn);
 
 typedef void (*msgnetwork_msg_callback_t)(const msg_t *, const msgnetwork_conn_t *, void *userdata);
@@ -983,7 +985,7 @@ void msgnetwork_reg_error_handler(msgnetwork_t *self, msgnetwork_error_callback_
 
 msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn);
 msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn);
-netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn);
+const netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn);
 
 // PeerNetwork
 
@@ -1002,12 +1004,14 @@ void peernetwork_del_peer(peernetwork_t *self, const netaddr_t *paddr);
 bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr);
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self, const netaddr_t *paddr, SalticidaeCError *cerror);
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self);
+peernetwork_t *msgnetwork_as_peernetwork_unsafe(msgnetwork_t *self);
 msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_conn_t *conn);
 peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self);
 void peernetwork_conn_free(const peernetwork_conn_t *self);
 void peernetwork_send_msg_by_move(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *paddr);
 void peernetwork_multicast_msg_by_move(peernetwork_t *self, msg_t *_moved_msg, const netaddr_array_t *paddrs);
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *err);
+void peernetwork_stop(peernetwork_t *self);
 
 #ifdef __cplusplus
 }
