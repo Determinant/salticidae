@@ -952,7 +952,8 @@ extern "C" {
 
 void salticidae_injected_msg_callback(const msg_t *msg, msgnetwork_conn_t *conn);
 
-// MsgNetwork
+/* MsgNetwork */
+
 msgnetwork_config_t *msgnetwork_config_new();
 void msgnetwork_config_free(const msgnetwork_config_t *self);
 void msgnetwork_config_burst_size(msgnetwork_config_t *self, size_t burst_size);
@@ -987,7 +988,7 @@ msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn);
 msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn);
 const netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn);
 
-// PeerNetwork
+/* PeerNetwork */
 
 peernetwork_config_t *peernetwork_config_new();
 void peernetwork_config_free(const peernetwork_config_t *self);
@@ -1012,6 +1013,9 @@ void peernetwork_send_msg_by_move(peernetwork_t *self, msg_t * _moved_msg, const
 void peernetwork_multicast_msg_by_move(peernetwork_t *self, msg_t *_moved_msg, const netaddr_array_t *paddrs);
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *err);
 void peernetwork_stop(peernetwork_t *self);
+
+typedef void (*msgnetwork_unknown_peer_callback_t)(const netaddr_t *, void *userdata);
+void peernetwork_reg_unknown_peer_handler(peernetwork_t *self, msgnetwork_unknown_peer_callback_t cb, void *userdata);
 
 #ifdef __cplusplus
 }
