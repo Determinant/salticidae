@@ -235,6 +235,8 @@ class TimerEvent {
     }
 
     operator bool() const { return ev_timer != nullptr; }
+
+    const EventContext &get_ec() const { return ec; }
 };
 
 class TimedFdEvent: public FdEvent, public TimerEvent {
@@ -412,6 +414,8 @@ class SigEvent {
     }
 
     operator bool() const { return ev_sig != nullptr; }
+
+    const EventContext &get_ec() const { return ec; }
 };
 
 template<typename T>
@@ -681,12 +685,15 @@ typedef void (*threadcall_callback_t)(threadcall_handle_t *handle, void *userdat
 threadcall_t *threadcall_new(const eventcontext_t *ec);
 void threadcall_free(threadcall_t *self);
 void threadcall_async_call(threadcall_t *self, threadcall_callback_t callback, void *userdata);
-eventcontext_t *threadcall_get_ec(threadcall_t *self);
+const eventcontext_t *threadcall_get_ec(const threadcall_t *self);
 
 typedef void (*sigev_callback_t)(int signum, void *);
 sigev_t *sigev_new(const eventcontext_t *ec, sigev_callback_t cb, void *userdata);
 void sigev_free(sigev_t *self);
 void sigev_add(sigev_t *self, int signum);
+void sigev_del(sigev_t *self);
+void sigev_clear(sigev_t *self);
+const eventcontext_t *sigev_get_ec(const sigev_t *self);
 
 typedef void (*timerev_callback_t)(timerev_t *, void *);
 timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback, void *);
@@ -695,6 +702,7 @@ void timerev_free(timerev_t *self);
 void timerev_add(timerev_t *self, double t_sec);
 void timerev_del(timerev_t *self);
 void timerev_clear(timerev_t *self);
+const eventcontext_t *timerev_get_ec(const timerev_t *self);
 
 #ifdef __cplusplus
 }

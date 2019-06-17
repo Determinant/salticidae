@@ -47,7 +47,7 @@ void msgnetwork_config_queue_capacity(msgnetwork_config_t *self, size_t cap) {
 void msgnetwork_send_msg_by_move(msgnetwork_t *self,
                         msg_t *_moved_msg, const msgnetwork_conn_t *conn) {
     self->_send_msg(std::move(*_moved_msg), *conn);
-    delete _moved_msg;
+    //delete _moved_msg;
 }
 
 msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr, SalticidaeCError *cerror) {
@@ -204,14 +204,14 @@ void peernetwork_conn_free(const peernetwork_conn_t *self) { delete self; }
 void peernetwork_send_msg_by_move(peernetwork_t *self,
                                 msg_t * _moved_msg, const netaddr_t *paddr) {
     self->_send_msg(std::move(*_moved_msg), *paddr);
-    delete _moved_msg;
+    //delete _moved_msg;
 }
 
 void peernetwork_multicast_msg_by_move(peernetwork_t *self,
                                 msg_t *_moved_msg,
                                 const netaddr_array_t *paddrs) {
     self->_multicast_msg(std::move(*_moved_msg), *paddrs);
-    delete _moved_msg;
+    //delete _moved_msg;
 }
 
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *cerror) {

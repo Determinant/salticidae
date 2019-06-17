@@ -51,7 +51,7 @@ bool datastream_assign_by_copy(datastream_t *dst, const datastream_t *src) {
 bool datastream_assign_by_move(datastream_t *dst, datastream_t *_moved_src) {
     try {
         *dst = std::move(*_moved_src);
-        delete _moved_src;
+        //delete _moved_src;
     } catch (...) { return false; }
     return true;
 }
@@ -108,7 +108,7 @@ uint256_t *datastream_get_hash(const datastream_t *self) {
 bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_src) {
     try {
         auto res = new bytearray_t(std::move(*_moved_src));
-        delete _moved_src;
+        //delete _moved_src;
         return res;
     } catch (...) {
         return nullptr;

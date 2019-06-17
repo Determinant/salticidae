@@ -28,13 +28,21 @@ void threadcall_async_call(threadcall_t *self, threadcall_callback_t callback, v
     });
 }
 
-eventcontext_t *threadcall_get_ec(threadcall_t *self) {
-    return new eventcontext_t(self->get_ec());
+const eventcontext_t *threadcall_get_ec(const threadcall_t *self) {
+    return &self->get_ec();
 }
 
 void sigev_free(sigev_t *self) { delete self; }
 
 void sigev_add(sigev_t *self, int signum) { self->add(signum); }
+
+void sigev_del(sigev_t *self) { self->del(); }
+
+void sigev_clear(sigev_t *self) { self->clear(); }
+
+const eventcontext_t *sigev_get_ec(const sigev_t *self) {
+    return &self->get_ec();
+}
 
 timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback, void *userdata) {
     return new timerev_t(*ec, [=](salticidae::TimerEvent &ev) {
@@ -46,6 +54,11 @@ void timerev_set_callback(timerev_t *self, timerev_callback_t callback, void *us
     self->set_callback([=](salticidae::TimerEvent &ev) {
         callback(&ev, userdata);
     });
+}
+
+
+const eventcontext_t *timerev_get_ec(const timerev_t *self) {
+    return &self->get_ec();
 }
 
 void timerev_free(timerev_t *self) { delete self; }

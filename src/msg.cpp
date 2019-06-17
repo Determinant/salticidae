@@ -5,9 +5,7 @@
 extern "C" {
 
 msg_t *msg_new_moved_from_bytearray(_opcode_t opcode, bytearray_t *_moved_payload) {
-    auto res = new msg_t(opcode, std::move(*_moved_payload));
-    bytearray_free(_moved_payload);
-    return res;
+    return new msg_t(opcode, std::move(*_moved_payload));
 }
 
 void msg_free(msg_t *msg) { delete msg; }

@@ -147,6 +147,7 @@ uint32_t netaddr_get_ip(const netaddr_t *self);
 uint16_t netaddr_get_port(const netaddr_t *self);
 netaddr_array_t *netaddr_array_new();
 netaddr_array_t *netaddr_array_new_from_addrs(const netaddr_t * const *paddrs, size_t naddrs);
+void netaddr_array_free(netaddr_array_t *self);
 
 #ifdef __cplusplus
 }
