@@ -46,7 +46,7 @@ void msgnetwork_config_queue_capacity(msgnetwork_config_t *self, size_t cap) {
 
 void msgnetwork_send_msg_by_move(msgnetwork_t *self,
                         msg_t *_moved_msg, const msgnetwork_conn_t *conn) {
-    self->_send_msg(std::move(*_moved_msg), *conn);
+    self->_send_msg_deferred(std::move(*_moved_msg), *conn);
     //delete _moved_msg;
 }
 
@@ -213,7 +213,7 @@ void peernetwork_conn_free(const peernetwork_conn_t *self) { delete self; }
 
 void peernetwork_send_msg_by_move(peernetwork_t *self,
                                 msg_t * _moved_msg, const netaddr_t *paddr) {
-    self->_send_msg(std::move(*_moved_msg), *paddr);
+    self->_send_msg_deferred(std::move(*_moved_msg), *paddr);
     //delete _moved_msg;
 }
 

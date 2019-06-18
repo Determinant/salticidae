@@ -418,6 +418,85 @@ class SigEvent {
     const EventContext &get_ec() const { return ec; }
 };
 
+class CheckEvent {
+    public:
+    using callback_t = std::function<void()>;
+    private:
+    EventContext ec;
+    uv_check_t *ev_check;
+    callback_t callback;
+    static inline void check_then(uv_check_t *h) {
+        auto event = static_cast<CheckEvent *>(h->data);
+        event->callback();
+    }
+
+    public:
+    CheckEvent(): ec(nullptr), ev_check(nullptr) {}
+    CheckEvent(const EventContext &ec, callback_t callback):
+            ec(ec), ev_check(new uv_check_t()),
+            callback(std::move(callback)) {
+        uv_check_init(ec.get(), ev_check);
+        ev_check->data = this;
+    }
+
+    CheckEvent(const CheckEvent &) = delete;
+    CheckEvent(CheckEvent &&other):
+            ec(std::move(other.ec)), ev_check(other.ev_check),
+            callback(std::move(other.callback)) {
+        other.ev_check = nullptr;
+        if (ev_check != nullptr)
+            ev_check->data = this;
+    }
+
+    void swap(CheckEvent &other) {
+        std::swap(ec, other.ec);
+        std::swap(ev_check, other.ev_check);
+        std::swap(callback, other.callback);
+        if (ev_check != nullptr)
+            ev_check->data = this;
+        if (other.ev_check != nullptr)
+            other.ev_check->data = &other;
+    }
+
+    CheckEvent &operator=(CheckEvent &&other) {
+        if (this != &other)
+        {
+            CheckEvent tmp(std::move(other));
+            tmp.swap(*this);
+        }
+        return *this;
+    }
+
+    ~CheckEvent() { clear(); }
+
+    void clear() {
+        if (ev_check != nullptr)
+        {
+            uv_check_stop(ev_check);
+            uv_close((uv_handle_t *)ev_check, _on_uv_handle_close);
+            ev_check = nullptr;
+        }
+        callback = nullptr;
+    }
+
+    void set_callback(callback_t _callback) {
+        callback = _callback;
+    }
+
+    void add() {
+        assert(ev_check != nullptr);
+        uv_check_start(ev_check, CheckEvent::check_then);
+    }
+
+    void del() {
+        if (ev_check != nullptr) uv_check_stop(ev_check);
+    }
+
+    operator bool() const { return ev_check != nullptr; }
+
+    const EventContext &get_ec() const { return ec; }
+};
+
 template<typename T>
 class ThreadNotifier {
     std::condition_variable cv;

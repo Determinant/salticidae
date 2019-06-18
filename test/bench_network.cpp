@@ -43,6 +43,7 @@ using salticidae::htole;
 using salticidae::letoh;
 using salticidae::bytearray_t;
 using salticidae::TimerEvent;
+using salticidae::ThreadCall;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using opcode_t = uint8_t;
@@ -71,9 +72,10 @@ using MsgNetworkByteOp = MsgNetwork<opcode_t>;
 struct MyNet: public MsgNetworkByteOp {
     const std::string name;
     const NetAddr peer;
-    TimerEvent ev_period_send;
     TimerEvent ev_period_stat;
+    ThreadCall tcall;
     size_t nrecv;
+    std::function<void(ThreadCall::Handle &)> trigger;
 
     MyNet(const salticidae::EventContext &ec,
             const std::string name,
@@ -88,50 +90,36 @@ struct MyNet: public MsgNetworkByteOp {
                 nrecv = 0;
                 ev_period_stat.add(stat_timeout);
             }),
+            tcall(ec),
             nrecv(0) {
         /* message handler could be a bound method */
-        reg_handler(salticidae::generic_bind(
-            &MyNet::on_receive_bytes, this, _1, _2));
+        reg_handler(salticidae::generic_bind(&MyNet::on_receive_bytes, this, _1, _2));
         if (stat_timeout > 0)
             ev_period_stat.add(0);
-    }
-
-    struct Conn: public MsgNetworkByteOp::Conn {
-        MyNet *get_net() { return static_cast<MyNet *>(get_pool()); }
-        salticidae::ArcObj<Conn> self() {
-            return salticidae::static_pointer_cast<Conn>(
-                MsgNetworkByteOp::Conn::self());
-        }
-
-        void on_setup() override {
-            auto net = get_net();
-            if (get_mode() == ACTIVE)
+        reg_conn_handler([this, ec](const ConnPool::conn_t &conn, bool connected) {
+            if (connected)
             {
-                printf("[%s] Connected, sending hello.\n",
-                        net->name.c_str());
-                /* send the first message through this connection */
-                net->ev_period_send = TimerEvent(net->ec,
-                                            [net, conn = self()](TimerEvent &) {
-                    net->send_msg(MsgBytes(256), conn);
-                    net->ev_period_send.add(0);
-                });
-                net->ev_period_send.add(0);
+                if (conn->get_mode() == MyNet::Conn::ACTIVE)
+                {
+                    printf("[%s] Connected, sending hello.\n", this->name.c_str());
+                    /* send the first message through this connection */
+                    trigger = [this, conn](ThreadCall::Handle &) {
+                        send_msg(MsgBytes(256), salticidae::static_pointer_cast<Conn>(conn));
+                        if (conn->get_mode() != MyNet::Conn::DEAD)
+                            tcall.async_call(trigger);
+                    };
+                    tcall.async_call(trigger);
+                }
+                else
+                    printf("[%s] Passively connected, waiting for greetings.\n", this->name.c_str());
             }
             else
-                printf("[%s] Passively connected, waiting for greetings.\n",
-                        net->name.c_str());
-        }
-        void on_teardown() override {
-            auto net = get_net();
-            net->ev_period_send.clear();
-            printf("[%s] Disconnected, retrying.\n", net->name.c_str());
-            /* try to reconnect to the same address */
-            net->connect(get_addr());
-        }
-    };
-
-    salticidae::ConnPool::Conn *create_conn() override {
-        return new Conn();
+            {
+                printf("[%s] Disconnected, retrying.\n", this->name.c_str());
+                /* try to reconnect to the same address */
+                connect(conn->get_addr(), false);
+            }
+        });
     }
 
     void on_receive_bytes(MsgBytes &&msg, const conn_t &conn) {
@@ -148,7 +136,7 @@ int main() {
     alice->start();
     alice->listen(alice_addr);
     salticidae::EventContext tec;
-    salticidae::BoxObj<salticidae::ThreadCall> tcall = new salticidae::ThreadCall(tec);
+    salticidae::BoxObj<ThreadCall> tcall = new ThreadCall(tec);
     std::thread bob_thread([&tec]() {
         MyNet bob(tec, "Bob", alice_addr);
         bob.start();
@@ -163,8 +151,8 @@ int main() {
             tec.stop();
         });
         alice = nullptr;
-        //ec.stop();
-        //bob_thread.join();
+        ec.stop();
+        bob_thread.join();
     };
     salticidae::SigEvent ev_sigint(ec, shutdown);
     salticidae::SigEvent ev_sigterm(ec, shutdown);
