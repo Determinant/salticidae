@@ -47,7 +47,10 @@ const char *SALTICIDAE_ERROR_STRINGS[] = {
     "option name already exists",
     "unknown action",
     "configuration file line too long",
-    "invalid option format"
+    "invalid option format",
+    "unable to load cert",
+    "uable to load key",
+    "tls generic error"
 };
 
 const char *TTY_COLOR_RED = "\x1b[31m";
