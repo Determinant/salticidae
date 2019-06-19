@@ -211,19 +211,21 @@ void ConnPool::Conn::_recv_data_tls(const ConnPool::conn_t &conn, int fd, int ev
     conn->on_read();
 }
 
-void ConnPool::Conn::_send_data_tls_handshake(const ConnPool::conn_t &conn, int fd, int events) {
+void ConnPool::Conn::_send_data_tls_handshake(const ConnPool::conn_t &conn, int, int) {
     int ret;
     if (conn->tls->do_handshake(ret))
     {
+        /* finishing TLS handshake */
         conn->send_data_func = _send_data_tls;
         conn->recv_data_func = _recv_data_tls;
+        conn->peer_cert = new X509(conn->tls->get_peer_cert());
         conn->cpool->update_conn(conn, true);
     }
     else
     {
         conn->ev_socket.del();
         conn->ev_socket.add(ret == 0 ? FdEvent::READ : FdEvent::WRITE);
-        SALTICIDAE_LOG_INFO("tls handshake %d", ret);
+        SALTICIDAE_LOG_DEBUG("tls handshake %s", ret == 0 ? "read" : "write");
     }
 }
 

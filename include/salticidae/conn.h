@@ -93,6 +93,7 @@ class ConnPool {
         socket_io_func *send_data_func;
         socket_io_func *recv_data_func;
         BoxObj<TLS> tls;
+        BoxObj<X509> peer_cert;
     
         static socket_io_func _recv_data;
         static socket_io_func _send_data;
@@ -131,6 +132,7 @@ class ConnPool {
 
         operator std::string() const;
         const NetAddr &get_addr() const { return addr; }
+        const X509 &get_peer_cert() const { return *peer_cert; }
         ConnMode get_mode() const { return mode; }
         ConnPool *get_pool() const { return cpool; }
         MPSCWriteBuffer &get_send_buffer() { return send_buffer; }
@@ -332,6 +334,8 @@ class ConnPool {
         bool _enable_tls;
         std::string _tls_cert_file;
         std::string _tls_key_file;
+        RcObj<X509> _tls_cert;
+        RcObj<PKey> _tls_key;
 
         public:
         Config():
@@ -341,8 +345,10 @@ class ConnPool {
             _nworker(1),
             _queue_capacity(0),
             _enable_tls(true),
-            _tls_cert_file("./server.pem"),
-            _tls_key_file("./server.pem") {}
+            _tls_cert_file("./all.pem"),
+            _tls_key_file("./all.pem"),
+            _tls_cert(nullptr),
+            _tls_key(nullptr) {}
 
         Config &max_listen_backlog(int x) {
             _max_listen_backlog = x;
@@ -389,10 +395,16 @@ class ConnPool {
         if (enable_tls)
         {
             tls_ctx = new TLSContext();
-            tls_ctx->use_cert_file(config._tls_cert_file);
-            tls_ctx->use_priv_key_file(config._tls_key_file);
-            if (!tls_ctx->check_priv_key())
-                throw SalticidaeError(SALTI_ERROR_TLS_GENERIC_ERROR);
+            if (config._tls_cert)
+                tls_ctx->use_cert(*config._tls_cert);
+            else
+                tls_ctx->use_cert_file(config._tls_cert_file);
+            if (config._tls_key)
+                tls_ctx->use_privkey(*config._tls_key);
+            else
+                tls_ctx->use_privkey_file(config._tls_key_file);
+            if (!tls_ctx->check_privkey())
+                throw SalticidaeError(SALTI_ERROR_TLS_GENERIC);
         }
         workers = new Worker[nworker];
         user_tcall = new ThreadCall(ec);

@@ -49,8 +49,11 @@ const char *SALTICIDAE_ERROR_STRINGS[] = {
     "configuration file line too long",
     "invalid option format",
     "unable to load cert",
-    "uable to load key",
-    "tls generic error"
+    "unable to load key",
+    "tls generic error",
+    "x509 cert error",
+    "EVP_PKEY error",
+    "unknown error"
 };
 
 const char *TTY_COLOR_RED = "\x1b[31m";
