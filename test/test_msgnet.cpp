@@ -108,8 +108,9 @@ struct MyNet: public MsgNetworkByteOp {
             {
                 printf("[%s] Disconnected, retrying.\n", this->name.c_str());
                 /* try to reconnect to the same address */
-                connect(conn->get_addr());
+                connect(conn->get_addr(), false);
             }
+            return true;
         });
     }
 

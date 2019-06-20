@@ -113,6 +113,7 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
                 send_rand(tc.state, static_pointer_cast<MyNet::Conn>(conn));
             }
         }
+        return true;
     });
     net.reg_error_handler([ec](const std::exception_ptr _err, bool fatal) {
         try {

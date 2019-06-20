@@ -41,5 +41,8 @@ target_link_libraries(test_queue salticidae_static pthread)
 add_executable(bench_network bench_network.cpp)
 target_link_libraries(bench_network salticidae_static pthread)
 
+add_executable(bench_network_tls bench_network_tls.cpp)
+target_link_libraries(bench_network_tls salticidae_static pthread)
+
 add_executable(test_msgnet_c test_msgnet_c.c)
 target_link_libraries(test_msgnet_c salticidae_static pthread)

@@ -996,7 +996,7 @@ void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn);
 typedef void (*msgnetwork_msg_callback_t)(const msg_t *, const msgnetwork_conn_t *, void *userdata);
 void msgnetwork_reg_handler(msgnetwork_t *self, _opcode_t opcode, msgnetwork_msg_callback_t cb, void *userdata);
 
-typedef void (*msgnetwork_conn_callback_t)(const msgnetwork_conn_t *, bool connected, void *userdata);
+typedef bool (*msgnetwork_conn_callback_t)(const msgnetwork_conn_t *, bool connected, void *userdata);
 void msgnetwork_reg_conn_handler(msgnetwork_t *self, msgnetwork_conn_callback_t cb, void *userdata);
 
 

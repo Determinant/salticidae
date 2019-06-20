@@ -53,6 +53,8 @@ const char *SALTICIDAE_ERROR_STRINGS[] = {
     "tls generic error",
     "x509 cert error",
     "EVP_PKEY error",
+    "tls key does not match the cert",
+    "tls fail to get peer cert",
     "unknown error"
 };
 

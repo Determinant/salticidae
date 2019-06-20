@@ -128,6 +128,10 @@ static inline int _tls_pem_with_passwd(char *buf, int size, int, void *) {
     return _size - 1;
 }
 
+static int _skip_CA_check(int, X509_STORE_CTX *) {
+    return 1;
+}
+
 class PKey {
     EVP_PKEY *key;
     friend class TLSContext;
@@ -271,6 +275,11 @@ class TLSContext {
             throw SalticidaeError(SALTI_ERROR_TLS_LOAD_KEY);
     }
 
+    void set_verify(bool skip_ca_check = true, SSL_verify_cb verify_callback = nullptr) {
+        SSL_CTX_set_verify(ctx,
+                SSL_VERIFY_PEER, skip_ca_check ? _skip_CA_check : verify_callback);
+    }
+
     bool check_privkey() {
         return SSL_CTX_check_private_key(ctx) > 0;
     }
@@ -329,13 +338,9 @@ class TLS {
         return SSL_get_error(ssl, ret);
     }
 
-    ~TLS() {
-        if (ssl)
-        {
-            SSL_shutdown(ssl);
-            SSL_free(ssl);
-        }
-    }
+    void shutdown() { SSL_shutdown(ssl); }
+
+    ~TLS() { if (ssl) SSL_free(ssl); }
 };
 
 }

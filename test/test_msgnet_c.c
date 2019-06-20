@@ -117,7 +117,7 @@ void on_receive_ack(const msg_t *msg, const msgnetwork_conn_t *conn, void *userd
     printf("[%s] the peer knows\n", name);
 }
 
-void conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata) {
+bool conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata) {
     msgnetwork_t *net = msgnetwork_conn_get_net(conn);
     MyNet *n = (MyNet *)userdata;
     const char *name = n->name;
@@ -142,6 +142,7 @@ void conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata)
         msgnetwork_connect(net, addr, &err);
         check_err(&err);
     }
+    return true;
 }
 
 void error_handler(const SalticidaeCError *err, bool fatal, void *userdata) {

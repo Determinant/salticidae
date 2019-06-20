@@ -211,13 +211,18 @@ void ConnPool::Conn::_recv_data_tls(const ConnPool::conn_t &conn, int fd, int ev
     conn->on_read();
 }
 
-void ConnPool::Conn::_send_data_tls_handshake(const ConnPool::conn_t &conn, int, int) {
+void ConnPool::Conn::_send_data_tls_handshake(const ConnPool::conn_t &conn, int fd, int events) {
+    conn->ready_send = true;
+    _recv_data_tls_handshake(conn, fd, events);
+}
+
+void ConnPool::Conn::_recv_data_tls_handshake(const ConnPool::conn_t &conn, int, int) {
     int ret;
     if (conn->tls->do_handshake(ret))
     {
         /* finishing TLS handshake */
         conn->send_data_func = _send_data_tls;
-        conn->recv_data_func = _recv_data_tls;
+        conn->recv_data_func = _recv_data_dummy;
         conn->peer_cert = new X509(conn->tls->get_peer_cert());
         conn->cpool->update_conn(conn, true);
     }
@@ -229,9 +234,8 @@ void ConnPool::Conn::_send_data_tls_handshake(const ConnPool::conn_t &conn, int,
     }
 }
 
-void ConnPool::Conn::_recv_data_tls_handshake(const ConnPool::conn_t &conn, int fd, int events) {
-    conn->ready_send = true;
-    _send_data_tls_handshake(conn, fd, events);
+
+void ConnPool::Conn::_recv_data_dummy(const ConnPool::conn_t &, int, int) {
 }
 /****/
 
@@ -239,6 +243,7 @@ void ConnPool::Conn::stop() {
     if (mode != ConnMode::DEAD)
     {
         if (worker) worker->unfeed();
+        if (tls) tls->shutdown();
         ev_connect.clear();
         ev_socket.clear();
         send_buffer.get_queue().unreg_handler();
@@ -290,7 +295,6 @@ void ConnPool::accept_client(int fd, int) {
             conn->send_buffer.set_capacity(queue_capacity);
             conn->seg_buff_size = seg_buff_size;
             conn->fd = client_fd;
-            conn->worker = nullptr;
             conn->cpool = this;
             conn->mode = Conn::PASSIVE;
             conn->addr = addr;

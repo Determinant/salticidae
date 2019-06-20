@@ -96,7 +96,7 @@ void msgnetwork_reg_conn_handler(msgnetwork_t *self,
                                 void *userdata) {
     self->reg_conn_handler([=](const ConnPool::conn_t &_conn, bool connected) {
         auto conn = salticidae::static_pointer_cast<msgnetwork_t::Conn>(_conn);
-        cb(&conn, connected, userdata);
+        return cb(&conn, connected, userdata);
     });
 }
 
