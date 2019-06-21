@@ -26,6 +26,7 @@
 #define _SALTICIDAE_NETWORK_H
 
 #include "salticidae/event.h"
+#include "salticidae/crypto.h"
 #include "salticidae/netaddr.h"
 #include "salticidae/msg.h"
 #include "salticidae/conn.h"
@@ -981,8 +982,13 @@ void msgnetwork_config_conn_server_timeout(msgnetwork_config_t *self, double tim
 void msgnetwork_config_seg_buff_size(msgnetwork_config_t *self, size_t size);
 void msgnetwork_config_nworker(msgnetwork_config_t *self, size_t nworker);
 void msgnetwork_config_queue_capacity(msgnetwork_config_t *self, size_t cap);
+void msgnetwork_config_enable_tls(msgnetwork_config_t *self, bool enabled);
+void msgnetwork_config_tls_key_file(msgnetwork_config_t *self, const char *pem_fname);
+void msgnetwork_config_tls_cert_file(msgnetwork_config_t *self, const char *pem_fname);
+void msgnetwork_config_tls_key_by_move(msgnetwork_config_t *self, pkey_t *key);
+void msgnetwork_config_tls_cert_by_move(msgnetwork_config_t *self, x509_t *cert);
 
-msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config);
+msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config, SalticidaeCError *err);
 void msgnetwork_free(const msgnetwork_t *self);
 void msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_conn_t *conn);
 void msgnetwork_send_msg_deferred_by_move(msgnetwork_t *self, msg_t *_moved_msg, const msgnetwork_conn_t *conn);
@@ -1018,7 +1024,7 @@ void peernetwork_config_conn_timeout(peernetwork_config_t *self, double t);
 void peernetwork_config_id_mode(peernetwork_config_t *self, peernetwork_id_mode_t mode);
 msgnetwork_config_t *peernetwork_config_as_msgnetwork_config(peernetwork_config_t *self);
 
-peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config);
+peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config, SalticidaeCError *err);
 void peernetwork_free(const peernetwork_t *self);
 void peernetwork_add_peer(peernetwork_t *self, const netaddr_t *paddr);
 void peernetwork_del_peer(peernetwork_t *self, const netaddr_t *paddr);

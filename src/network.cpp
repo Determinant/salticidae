@@ -14,8 +14,11 @@ msgnetwork_config_t *msgnetwork_config_new() {
 
 void msgnetwork_config_free(const msgnetwork_config_t *self) { delete self; }
 
-msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config) {
+msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config, SalticidaeCError *cerror) {
+    SALTICIDAE_CERROR_TRY(cerror)
     return new msgnetwork_t(*ec, *config);
+    SALTICIDAE_CERROR_CATCH(cerror)
+    return nullptr;
 }
 
 void msgnetwork_free(const msgnetwork_t *self) { delete self; }
@@ -44,6 +47,26 @@ void msgnetwork_config_queue_capacity(msgnetwork_config_t *self, size_t cap) {
     self->queue_capacity(cap);
 }
 
+void msgnetwork_config_enable_tls(msgnetwork_config_t *self, bool enabled) {
+    self->enable_tls(enabled);
+}
+
+void msgnetwork_config_tls_key_file(msgnetwork_config_t *self, const char *pem_fname) {
+    self->tls_key_file(pem_fname);
+}
+
+void msgnetwork_config_tls_cert_file(msgnetwork_config_t *self, const char *pem_fname) {
+    self->tls_cert_file(pem_fname);
+}
+
+void msgnetwork_config_tls_key_by_move(msgnetwork_config_t *self, pkey_t *key) {
+    self->tls_key(new pkey_t(std::move(*key)));
+}
+
+void msgnetwork_config_tls_cert_by_move(msgnetwork_config_t *self, x509_t *cert) {
+    self->tls_cert(new x509_t(std::move(*cert)));
+}
+
 void msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_conn_t *conn) {
     self->_send_msg(*msg, *conn);
 }
@@ -54,15 +77,9 @@ void msgnetwork_send_msg_deferred_by_move(msgnetwork_t *self,
 }
 
 msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr, SalticidaeCError *cerror) {
-    try {
-        auto res = new msgnetwork_conn_t(self->connect(*addr));
-        *cerror = salticidae_cerror_normal();
-        return res;
-    } catch (const SalticidaeError &err) {
-        *cerror = err.get_cerr();
-    } catch (const std::exception &err) {
-        *cerror = salticidae_cerror_unknown();
-    }
+    SALTICIDAE_CERROR_TRY(cerror)
+    return new msgnetwork_conn_t(self->connect(*addr));
+    SALTICIDAE_CERROR_CATCH(cerror)
     return nullptr;
 }
 
@@ -74,14 +91,9 @@ msgnetwork_conn_t *msgnetwork_conn_copy(const msgnetwork_conn_t *self) {
 void msgnetwork_conn_free(const msgnetwork_conn_t *self) { delete self; }
 
 void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *cerror) {
-    try {
-        self->listen(*listen_addr);
-        *cerror = salticidae_cerror_normal();
-    } catch (const SalticidaeError &err) {
-        *cerror = err.get_cerr();
-    } catch (const std::exception &err) {
-        *cerror = salticidae_cerror_unknown();
-    }
+    SALTICIDAE_CERROR_TRY(cerror)
+    self->listen(*listen_addr);
+    SALTICIDAE_CERROR_CATCH(cerror)
 }
 
 void msgnetwork_reg_handler(msgnetwork_t *self,
@@ -169,8 +181,11 @@ peernetwork_t *msgnetwork_as_peernetwork_unsafe(msgnetwork_t *self) {
     return static_cast<peernetwork_t *>(self);
 }
 
-peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config) {
+peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config, SalticidaeCError *cerror) {
+    SALTICIDAE_CERROR_TRY(cerror)
     return new peernetwork_t(*ec, *config);
+    SALTICIDAE_CERROR_CATCH(cerror)
+    return nullptr;
 }
 
 void peernetwork_free(const peernetwork_t *self) { delete self; }
@@ -186,15 +201,9 @@ bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr) {
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self,
                                                     const netaddr_t *paddr,
                                                     SalticidaeCError *cerror) {
-    try {
-        auto res = new peernetwork_conn_t(self->get_peer_conn(*paddr));
-        *cerror = salticidae_cerror_normal();
-        return res;
-    } catch (const SalticidaeError &err) {
-        *cerror = err.get_cerr();
-    } catch (const std::exception &err) {
-        *cerror = salticidae_cerror_unknown();
-    }
+    SALTICIDAE_CERROR_TRY(cerror)
+    return new peernetwork_conn_t(self->get_peer_conn(*paddr));
+    SALTICIDAE_CERROR_CATCH(cerror)
     return nullptr;
 }
 
@@ -231,14 +240,9 @@ void peernetwork_multicast_msg_by_move(peernetwork_t *self,
 }
 
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *cerror) {
-    try {
-        self->listen(*listen_addr);
-        *cerror = salticidae_cerror_normal();
-    } catch (const SalticidaeError &err) {
-        *cerror = err.get_cerr();
-    } catch (const std::exception &err) {
-        *cerror = salticidae_cerror_unknown();
-    }
+    SALTICIDAE_CERROR_TRY(cerror)
+    self->listen(*listen_addr);
+    SALTICIDAE_CERROR_CATCH(cerror)
 }
 
 void peernetwork_stop(peernetwork_t *self) { self->stop(); }

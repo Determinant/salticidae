@@ -35,6 +35,7 @@ add_library(salticidae
     src/type.cpp
     src/util.cpp
     src/event.cpp
+    src/crypto.cpp
     src/stream.cpp
     src/msg.cpp
     src/netaddr.cpp

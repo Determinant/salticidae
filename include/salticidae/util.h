@@ -43,6 +43,14 @@ SalticidaeCError salticidae_cerror_normal();
 SalticidaeCError salticidae_cerror_unknown();
 const char *salticidae_strerror(int code);
 
+#define SALTICIDAE_CERROR_TRY(cerror) try {  (*(cerror)) = salticidae_cerror_normal();
+#define SALTICIDAE_CERROR_CATCH(cerror) \
+    } catch (const SalticidaeError &err) { \
+        *cerror = err.get_cerr(); \
+    } catch (const std::exception &err) { \
+        *cerror = salticidae_cerror_unknown(); \
+    }
+
 #ifdef __cplusplus
 }
 #endif

@@ -112,7 +112,7 @@ class ConnPool {
         void disp_terminate();
 
         public:
-        Conn(): ready_send(false),
+        Conn(): worker(nullptr), ready_send(false),
             send_data_func(nullptr), recv_data_func(nullptr),
             tls(nullptr), peer_cert(nullptr) {}
         Conn(const Conn &) = delete;

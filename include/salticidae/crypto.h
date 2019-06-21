@@ -27,6 +27,8 @@
 
 #include "salticidae/type.h"
 #include "salticidae/util.h"
+
+#ifdef __cplusplus
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
 
@@ -116,15 +118,15 @@ class SHA1 {
     }
 };
 
-static thread_local const char *_password;
+static thread_local const char *_passwd;
 static inline int _tls_pem_no_passswd(char *, int, int, void *) {
     return -1;
 }
 static inline int _tls_pem_with_passwd(char *buf, int size, int, void *) {
-    size_t _size = strlen(_password) + 1;
+    size_t _size = strlen(_passwd) + 1;
     if (_size > (size_t)size)
         throw SalticidaeError(SALTI_ERROR_TLS_X509);
-    memmove(buf, _password, _size);
+    memmove(buf, _passwd, _size);
     return _size - 1;
 }
 
@@ -140,14 +142,14 @@ class PKey {
     PKey(const PKey &) = delete;
     PKey(PKey &&other): key(other.key) { other.key = nullptr; }
     
-    PKey create_privkey_from_pem_file(std::string pem_fname, std::string *password = nullptr) {
+    static PKey create_privkey_from_pem_file(std::string pem_fname, std::string *passwd = nullptr) {
         FILE *fp = fopen(pem_fname.c_str(), "r");
         EVP_PKEY *key;
         if (fp == nullptr)
             throw SalticidaeError(SALTI_ERROR_TLS_KEY);
-        if (password)
+        if (passwd)
         {
-            _password = password->c_str();
+            _passwd = passwd->c_str();
             key = PEM_read_PrivateKey(fp, NULL, _tls_pem_with_passwd, NULL);
         }
         else
@@ -160,9 +162,10 @@ class PKey {
         return PKey(key);
     }
 
-    PKey create_privkey_from_der(const uint8_t *der, size_t size) {
+    static PKey create_privkey_from_der(const bytearray_t &der) {
+        const auto *_der = &der[0];
         EVP_PKEY *key;
-        key = d2i_AutoPrivateKey(NULL, (const unsigned char **)&der, size);
+        key = d2i_AutoPrivateKey(NULL, (const unsigned char **)&_der, der.size());
         if (key == nullptr)
             throw SalticidaeError(SALTI_ERROR_TLS_KEY);
         return PKey(key);
@@ -201,14 +204,14 @@ class X509 {
     X509(const X509 &) = delete;
     X509(X509 &&other): x509(other.x509) { other.x509 = nullptr; }
     
-    X509 create_from_pem_file(std::string pem_fname, std::string *password = nullptr) {
+    static X509 create_from_pem_file(std::string pem_fname, std::string *passwd = nullptr) {
         FILE *fp = fopen(pem_fname.c_str(), "r");
         ::X509 *x509;
         if (fp == nullptr)
             throw SalticidaeError(SALTI_ERROR_TLS_X509);
-        if (password)
+        if (passwd)
         {
-            _password = password->c_str();
+            _passwd = passwd->c_str();
             x509 = PEM_read_X509(fp, NULL, _tls_pem_with_passwd, NULL);
         }
         else
@@ -221,9 +224,10 @@ class X509 {
         return X509(x509);
     }
 
-    X509 create_from_der(const uint8_t *der, size_t size) {
+    static X509 create_from_der(const bytearray_t &der) {
+        const auto *_der = &der[0];
         ::X509 *x509;
-        x509 = d2i_X509(NULL, (const unsigned char **)&der, size);
+        x509 = d2i_X509(NULL, (const unsigned char **)&_der, der.size());
         if (x509 == nullptr)
             throw SalticidaeError(SALTI_ERROR_TLS_X509);
         return X509(x509);
@@ -355,5 +359,41 @@ class TLS {
 };
 
 }
+
+#ifdef SALTICIDAE_CBINDINGS
+using x509_t = salticidae::X509;
+using pkey_t = salticidae::PKey;
+#endif
+
+#else
+
+#ifdef SALTICIDAE_CBINDINGS
+typedef struct x509_t x509_t;
+typedef struct pkey_t pkey_t;
+#endif
+
+#endif
+
+#ifdef SALTICIDAE_CBINDINGS
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+x509_t *x509_new_from_pem_file(const char *pem_fname, const char *passwd, SalticidaeCError *err);
+x509_t *x509_new_from_der(const bytearray_t *der, SalticidaeCError *err);
+void x509_free(const x509_t *self);
+pkey_t *x509_get_pubkey(const x509_t *self);
+bytearray_t *x509_get_der(const x509_t *self);
+
+pkey_t *pkey_new_privkey_from_pem_file(const char *pem_fname, const char *passwd, SalticidaeCError *err);
+pkey_t *pkey_new_privkey_from_der(const bytearray_t *der, SalticidaeCError *err);
+void pkey_free(const pkey_t *self);
+bytearray_t *pkey_get_pubkey_der(const pkey_t *self);
+bytearray_t *pkey_get_privkey_der(const pkey_t *self);
+
+#ifdef __cplusplus
+}
+#endif
+#endif
 
 #endif

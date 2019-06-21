@@ -139,8 +139,7 @@ bool conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata)
         printf("[%s] Disconnected, retrying.\n", name);
         /* try to reconnect to the same address */
         const netaddr_t *addr = msgnetwork_conn_get_addr(conn);
-        msgnetwork_connect(net, addr, &err);
-        check_err(&err);
+        msgnetwork_connect(net, addr, &err); check_err(&err);
     }
     return true;
 }
@@ -155,8 +154,9 @@ void error_handler(const SalticidaeCError *err, bool fatal, void *userdata) {
 MyNet gen_mynet(const eventcontext_t *ec,
                 const char *name) {
     MyNet res;
+    SalticidaeCError err;
     const msgnetwork_config_t *netconfig = msgnetwork_config_new();
-    res.net = msgnetwork_new(ec, netconfig);
+    res.net = msgnetwork_new(ec, netconfig, &err); check_err(&err);
     msgnetwork_config_free(netconfig);
     res.name = name;
     return res;
@@ -190,16 +190,12 @@ int main() {
     msgnetwork_start(bob.net);
 
     /* accept incoming connections */
-    msgnetwork_listen(alice.net, alice_addr, &err);
-    check_err(&err);
-    msgnetwork_listen(bob.net, bob_addr, &err);
-    check_err(&err);
+    msgnetwork_listen(alice.net, alice_addr, &err); check_err(&err);
+    msgnetwork_listen(bob.net, bob_addr, &err); check_err(&err);
 
     /* try to connect once */
-    msgnetwork_conn_free(msgnetwork_connect(alice.net, bob_addr, &err));
-    check_err(&err);
-    msgnetwork_conn_free(msgnetwork_connect(bob.net, alice_addr, &err));
-    check_err(&err);
+    msgnetwork_conn_free(msgnetwork_connect(alice.net, bob_addr, &err)); check_err(&err);
+    msgnetwork_conn_free(msgnetwork_connect(bob.net, alice_addr, &err)); check_err(&err);
 
     netaddr_free(alice_addr);
     netaddr_free(bob_addr);
