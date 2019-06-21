@@ -108,7 +108,7 @@ void on_receive_hello(const msg_t *_msg, const msgnetwork_conn_t *conn, void *us
     free(msg.text);
     msg_t *ack = msg_ack_serialize();
     /* send acknowledgement */
-    msgnetwork_send_msg_by_move(net, ack, conn);
+    msgnetwork_send_msg(net, ack, conn);
     msg_free(ack);
 }
 
@@ -128,7 +128,7 @@ bool conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata)
             printf("[%s] Connected, sending hello.\n", name);
             /* send the first message through this connection */
             msg_t *hello = msg_hello_serialize(name, "Hello there!");
-            msgnetwork_send_msg_by_move(n->net, hello, conn);
+            msgnetwork_send_msg(n->net, hello, conn);
             msg_free(hello);
         }
         else
