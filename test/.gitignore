@@ -7,3 +7,5 @@ test_queue
 bench_network
 Makefile
 test_msgnet_c
+test_msgnet_tls
+bench_network_tls

@@ -112,7 +112,9 @@ class ConnPool {
         void disp_terminate();
 
         public:
-        Conn(): ready_send(false), send_data_func(nullptr), recv_data_func(nullptr) {}
+        Conn(): ready_send(false),
+            send_data_func(nullptr), recv_data_func(nullptr),
+            tls(nullptr), peer_cert(nullptr) {}
         Conn(const Conn &) = delete;
         Conn(Conn &&other) = delete;
     
@@ -133,7 +135,7 @@ class ConnPool {
 
         operator std::string() const;
         const NetAddr &get_addr() const { return addr; }
-        const X509 &get_peer_cert() const { return *peer_cert; }
+        const X509 *get_peer_cert() const { return peer_cert.get(); }
         ConnMode get_mode() const { return mode; }
         ConnPool *get_pool() const { return cpool; }
         MPSCWriteBuffer &get_send_buffer() { return send_buffer; }
@@ -190,12 +192,16 @@ class ConnPool {
 
     void update_conn(const conn_t &conn, bool connected) {
         user_tcall->async_call([this, conn, connected](ThreadCall::Handle &) {
-            if ((!conn_cb ||
-                conn_cb(conn, connected)) &&
-                enable_tls && connected)
-                conn->worker->get_tcall()->async_call([conn](ThreadCall::Handle &) {
-                    conn->recv_data_func = Conn::_recv_data_tls;
+            bool ret = !conn_cb || conn_cb(conn, connected);
+            if (enable_tls && connected)
+            {
+                conn->worker->get_tcall()->async_call([conn, ret](ThreadCall::Handle &) {
+                    if (ret)
+                        conn->recv_data_func = Conn::_recv_data_tls;
+                    else
+                        conn->worker_terminate();
                 });
+            }
         });
     }
 

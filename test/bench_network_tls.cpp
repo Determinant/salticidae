@@ -82,7 +82,11 @@ struct MyNet: public MsgNetworkByteOp {
             const NetAddr &peer,
             double stat_timeout = -1):
             MsgNetworkByteOp(ec, MsgNetworkByteOp::Config(
-                ConnPool::Config().queue_capacity(65536).enable_tls(true).tls_cert_file("all.pem").tls_key_file("all.pem")).burst_size(1000)),
+                ConnPool::Config()
+                    .queue_capacity(65536)
+                    .enable_tls(true)
+                    .tls_cert_file("alice.pem")
+                    .tls_key_file("alice.pem")).burst_size(1000)),
             name(name),
             peer(peer),
             ev_period_stat(ec, [this, stat_timeout](TimerEvent &) {

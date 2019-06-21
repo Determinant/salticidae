@@ -168,8 +168,8 @@ class PKey {
         return PKey(key);
     }
 
-    bytearray_t get_pubkey_der() {
-        uint8_t *der;
+    bytearray_t get_pubkey_der() const {
+        uint8_t *der = nullptr;
         auto ret = i2d_PublicKey(key, &der);
         if (ret <= 0)
             throw SalticidaeError(SALTI_ERROR_TLS_KEY);
@@ -179,8 +179,8 @@ class PKey {
         return std::move(res);
     }
 
-    bytearray_t get_privkey_der() {
-        uint8_t *der;
+    bytearray_t get_privkey_der() const {
+        uint8_t *der = nullptr;
         auto ret = i2d_PrivateKey(key, &der);
         if (ret <= 0)
             throw SalticidaeError(SALTI_ERROR_TLS_KEY);
@@ -229,11 +229,22 @@ class X509 {
         return X509(x509);
     }
 
-    PKey get_pubkey() {
+    PKey get_pubkey() const {
         auto key = X509_get_pubkey(x509);
         if (key == nullptr)
             throw SalticidaeError(SALTI_ERROR_TLS_X509);
         return PKey(key);
+    }
+
+    bytearray_t get_der() const {
+        uint8_t *der = nullptr;
+        auto ret = i2d_X509(x509, &der);
+        if (ret <= 0)
+            throw SalticidaeError(SALTI_ERROR_TLS_X509);
+        bytearray_t res(der, der + ret);
+        OPENSSL_cleanse(der, ret);
+        OPENSSL_free(der);
+        return std::move(res);
     }
 
     ~X509() { if (x509) X509_free(x509); }
