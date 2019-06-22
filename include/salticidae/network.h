@@ -775,7 +775,7 @@ void PeerNetwork<O, _, __>::add_peer(const NetAddr &addr) {
             if (it != id2peer.end())
                 throw PeerNetworkError(SALTI_ERROR_PEER_ALREADY_EXISTS);
             auto it2 = id2upeer.find(addr);
-            if (it2 != id2peer.end())
+            if (it2 != id2upeer.end())
             { /* move to the known peer set */
                 auto p = std::move(it2->second);
                 id2upeer.erase(it2);
