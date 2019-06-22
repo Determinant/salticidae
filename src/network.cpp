@@ -76,9 +76,9 @@ void msgnetwork_send_msg_deferred_by_move(msgnetwork_t *self,
     self->_send_msg_deferred(std::move(*_moved_msg), *conn);
 }
 
-msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr, SalticidaeCError *cerror) {
+msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr, bool blocking, SalticidaeCError *cerror) {
     SALTICIDAE_CERROR_TRY(cerror)
-    return new msgnetwork_conn_t(self->connect(*addr));
+    return new msgnetwork_conn_t(self->connect(*addr, blocking));
     SALTICIDAE_CERROR_CATCH(cerror)
     return nullptr;
 }
@@ -149,6 +149,10 @@ msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn) {
 
 const netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn) {
     return &(*conn)->get_addr();
+}
+
+const x509_t *msgnetwork_conn_get_peer_cert(const msgnetwork_conn_t *conn) {
+    return (*conn)->get_peer_cert();
 }
 
 // PeerNetwork

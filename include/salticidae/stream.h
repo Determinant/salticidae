@@ -494,6 +494,7 @@ extern "C" {
 
 uint256_t *uint256_new();
 uint256_t *uint256_new_from_bytes(const uint8_t *arr);
+uint256_t *uint256_new_from_bytearray(const bytearray_t *bytes);
 void uint256_free(const uint256_t *self);
 
 bool uint256_is_null(const uint256_t *self);
@@ -503,6 +504,8 @@ void uint256_unserialize(uint256_t *self, datastream_t *s);
 
 datastream_t *datastream_new();
 datastream_t *datastream_new_from_bytes(const uint8_t *base, size_t size);
+datastream_t *datastream_new_from_bytearray(const bytearray_t *bytes);
+datastream_t *datastream_new_moved_from_bytearray(bytearray_t *bytes);
 void datastream_free(const datastream_t *self);
 
 datastream_t *datastream_copy(const datastream_t *self);
@@ -534,6 +537,7 @@ int64_t datastream_get_i64(datastream_t *self, bool *succ);
 const uint8_t *datastream_get_data_inplace(datastream_t *self, size_t len);
 uint256_t *datastream_get_hash(const datastream_t *self);
 bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_self);
+bytearray_t *bytearray_new_from_hex(const char *hex_str);
 
 char *datastream_get_hex(datastream_t *self);
 

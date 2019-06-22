@@ -528,13 +528,11 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
 
     public:
     MPSCQueueEventDriven():
-        wait_sig(true),
-        fd(eventfd(0, EFD_NONBLOCK)) {}
-
-    ~MPSCQueueEventDriven() {
-        ev.clear();
-        close(fd);
+            wait_sig(true),
+            fd(eventfd(0, EFD_NONBLOCK)) {
+        if (fd == -1) throw SalticidaeError(SALTI_ERROR_FD);
     }
+    ~MPSCQueueEventDriven() { close(fd); }
 
     template<typename Func>
     void reg_handler(const EventContext &ec, Func &&func) {
@@ -585,13 +583,11 @@ class MPMCQueueEventDriven: public MPMCQueue<T> {
 
     public:
     MPMCQueueEventDriven():
-        wait_sig(true),
-        fd(eventfd(0, EFD_NONBLOCK)) {}
-
-    ~MPMCQueueEventDriven() {
-        evs.clear();
-        close(fd);
+            wait_sig(true),
+            fd(eventfd(0, EFD_NONBLOCK)) {
+        if (fd == -1) throw SalticidaeError(SALTI_ERROR_FD);
     }
+    ~MPMCQueueEventDriven() { close(fd); }
 
     // this function is *NOT* thread-safe
     template<typename Func>

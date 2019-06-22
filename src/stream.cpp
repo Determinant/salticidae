@@ -6,8 +6,21 @@ extern "C" {
 
 uint256_t *uint256_new() { return new uint256_t(); }
 uint256_t *uint256_new_from_bytes(const uint8_t *arr) {
-    return new uint256_t(arr);
+    try {
+        return new uint256_t(arr);
+    } catch (...) {
+        return nullptr;
+    }
 }
+
+uint256_t *uint256_new_from_bytearray(const bytearray_t *bytes) {
+    try {
+        return new uint256_t(*bytes);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 void uint256_free(const uint256_t *self) { delete self; }
 
 bool uint256_is_null(const uint256_t *self) { return self->is_null(); }
@@ -34,6 +47,22 @@ datastream_t *datastream_new() {
 datastream_t *datastream_new_from_bytes(const uint8_t *base, size_t size) {
     try {
         return new datastream_t(base, base + size);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+datastream_t *datastream_new_from_bytearray(const bytearray_t *bytes) {
+    try {
+        return new datastream_t(*bytes);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+datastream_t *datastream_new_moved_from_bytearray(bytearray_t *bytes) {
+    try {
+        return new datastream_t(std::move(*bytes));
     } catch (...) {
         return nullptr;
     }
@@ -98,9 +127,15 @@ uint256_t *datastream_get_hash(const datastream_t *self) {
 
 bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_src) {
     try {
-        auto res = new bytearray_t(std::move(*_moved_src));
-        //delete _moved_src;
-        return res;
+        return new bytearray_t(std::move(*_moved_src));
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+bytearray_t *bytearray_new_from_hex(const char *hex_str) {
+    try {
+        return new bytearray_t(salticidae::from_hex(hex_str));
     } catch (...) {
         return nullptr;
     }

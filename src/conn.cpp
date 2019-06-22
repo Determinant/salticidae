@@ -305,10 +305,7 @@ void ConnPool::accept_client(int fd, int) {
             conn->on_setup();
             worker.feed(conn, client_fd);
         }
-    } catch (ConnPoolError &e) {
-        SALTICIDAE_LOG_ERROR("%s", e.what());
-        throw e;
-    }
+    } catch (...) { recoverable_error(std::current_exception()); }
 }
 
 void ConnPool::Conn::conn_server(int fd, int events) {
@@ -338,31 +335,26 @@ void ConnPool::_listen(NetAddr listen_addr) {
         ev_listen.clear();
         close(listen_fd);
     }
-    try {
-        if ((listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
-        if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
-            setsockopt(listen_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
-            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
-        if (fcntl(listen_fd, F_SETFL, O_NONBLOCK) == -1)
-            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
+    if ((listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+        throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
+        setsockopt(listen_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
+        throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
+    if (fcntl(listen_fd, F_SETFL, O_NONBLOCK) == -1)
+        throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
 
-        struct sockaddr_in sockin;
-        memset(&sockin, 0, sizeof(struct sockaddr_in));
-        sockin.sin_family = AF_INET;
-        sockin.sin_addr.s_addr = INADDR_ANY;
-        sockin.sin_port = listen_addr.port;
+    struct sockaddr_in sockin;
+    memset(&sockin, 0, sizeof(struct sockaddr_in));
+    sockin.sin_family = AF_INET;
+    sockin.sin_addr.s_addr = INADDR_ANY;
+    sockin.sin_port = listen_addr.port;
 
-        if (bind(listen_fd, (struct sockaddr *)&sockin, sizeof(sockin)) < 0)
-            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
-        if (::listen(listen_fd, max_listen_backlog) < 0)
-            throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
-    } catch (ConnPoolError &e) {
-        SALTICIDAE_LOG_ERROR("%s", e.what());
-        throw e;
-    }
+    if (bind(listen_fd, (struct sockaddr *)&sockin, sizeof(sockin)) < 0)
+        throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
+    if (::listen(listen_fd, max_listen_backlog) < 0)
+        throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
     ev_listen = FdEvent(disp_ec, listen_fd,
-                    std::bind(&ConnPool::accept_client, this, _1, _2));
+                std::bind(&ConnPool::accept_client, this, _1, _2));
     ev_listen.add(FdEvent::READ);
     SALTICIDAE_LOG_INFO("listening to %u", ntohs(listen_addr.port));
 }
@@ -370,18 +362,13 @@ void ConnPool::_listen(NetAddr listen_addr) {
 ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
     int fd;
     int one = 1;
-    try {
-        if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-            throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
-        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
-            setsockopt(fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
-            throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
-        if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
-            throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
-    } catch (ConnPoolError &e) {
-        SALTICIDAE_LOG_ERROR("%s", e.what());
-        throw e;
-    }
+    if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+        throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
+        setsockopt(fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
+        throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
+    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
+        throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
     conn_t conn = create_conn();
     conn->self_ref = conn;
     conn->send_buffer.set_capacity(queue_capacity);

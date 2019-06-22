@@ -55,6 +55,7 @@ const char *SALTICIDAE_ERROR_STRINGS[] = {
     "EVP_PKEY error",
     "tls key does not match the cert",
     "tls fail to get peer cert",
+    "fd error",
     "unknown error"
 };
 

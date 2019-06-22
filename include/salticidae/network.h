@@ -992,7 +992,7 @@ msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t
 void msgnetwork_free(const msgnetwork_t *self);
 void msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_conn_t *conn);
 void msgnetwork_send_msg_deferred_by_move(msgnetwork_t *self, msg_t *_moved_msg, const msgnetwork_conn_t *conn);
-msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr, SalticidaeCError *err);
+msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr, bool blocking, SalticidaeCError *err);
 msgnetwork_conn_t *msgnetwork_conn_copy(const msgnetwork_conn_t *self);
 void msgnetwork_conn_free(const msgnetwork_conn_t *self);
 void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *err);
@@ -1013,6 +1013,7 @@ void msgnetwork_reg_error_handler(msgnetwork_t *self, msgnetwork_error_callback_
 msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn);
 msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn);
 const netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn);
+const x509_t *msgnetwork_conn_get_peer_cert(const msgnetwork_conn_t *conn);
 
 /* PeerNetwork */
 

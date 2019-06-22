@@ -139,7 +139,7 @@ bool conn_handler(const msgnetwork_conn_t *conn, bool connected, void *userdata)
         printf("[%s] Disconnected, retrying.\n", name);
         /* try to reconnect to the same address */
         const netaddr_t *addr = msgnetwork_conn_get_addr(conn);
-        msgnetwork_connect(net, addr, &err); check_err(&err);
+        msgnetwork_connect(net, addr, false, &err); check_err(&err);
     }
     return true;
 }
@@ -194,8 +194,8 @@ int main() {
     msgnetwork_listen(bob.net, bob_addr, &err); check_err(&err);
 
     /* try to connect once */
-    msgnetwork_conn_free(msgnetwork_connect(alice.net, bob_addr, &err)); check_err(&err);
-    msgnetwork_conn_free(msgnetwork_connect(bob.net, alice_addr, &err)); check_err(&err);
+    msgnetwork_conn_free(msgnetwork_connect(alice.net, bob_addr, false, &err)); check_err(&err);
+    msgnetwork_conn_free(msgnetwork_connect(bob.net, alice_addr, false, &err)); check_err(&err);
 
     netaddr_free(alice_addr);
     netaddr_free(bob_addr);
