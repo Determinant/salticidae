@@ -308,6 +308,7 @@ class TimedFdEvent: public FdEvent, public TimerEvent {
     void clear() {
         TimerEvent::clear();
         FdEvent::clear();
+        callback = nullptr;
     }
 
     using FdEvent::set_callback;
@@ -532,7 +533,7 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
             fd(eventfd(0, EFD_NONBLOCK)) {
         if (fd == -1) throw SalticidaeError(SALTI_ERROR_FD);
     }
-    ~MPSCQueueEventDriven() { close(fd); }
+    ~MPSCQueueEventDriven() { close(fd); unreg_handler(); }
 
     template<typename Func>
     void reg_handler(const EventContext &ec, Func &&func) {
@@ -587,7 +588,7 @@ class MPMCQueueEventDriven: public MPMCQueue<T> {
             fd(eventfd(0, EFD_NONBLOCK)) {
         if (fd == -1) throw SalticidaeError(SALTI_ERROR_FD);
     }
-    ~MPMCQueueEventDriven() { close(fd); }
+    ~MPMCQueueEventDriven() { close(fd); unreg_handlers(); }
 
     // this function is *NOT* thread-safe
     template<typename Func>

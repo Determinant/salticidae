@@ -151,8 +151,8 @@ int main() {
     bob.listen(bob_addr);
 
     /* try to connect once */
-    alice.connect(bob_addr);
-    bob.connect(alice_addr);
+    alice.connect(bob_addr, false);
+    bob.connect(alice_addr, false);
 
     /* the main loop can be shutdown by ctrl-c or kill */
     auto shutdown = [&](int) {ec.stop();};

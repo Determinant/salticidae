@@ -150,7 +150,6 @@ int main() {
         try {
             tec.dispatch();
         } catch (std::exception &) {}
-        SALTICIDAE_LOG_INFO("thread exiting");
     });
     auto shutdown = [&](int) {
         tcall->async_call([&](salticidae::ThreadCall::Handle &) {
