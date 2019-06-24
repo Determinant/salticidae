@@ -47,7 +47,7 @@ ConnPool::Conn::operator std::string() const {
         case Conn::PASSIVE: s << "passive"; break;
         case Conn::DEAD: s << "dead"; break;
     }
-    s << " term=" << (is_terminated() ? "yes" : "no") << ">";
+    s << ">";
     return std::move(s);
 }
 
@@ -406,7 +406,6 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
 
 void ConnPool::del_conn(const conn_t &conn) {
     auto it = pool.find(conn->fd);
-    SALTICIDAE_LOG_INFO("%s %d\n", std::string(*conn).c_str());
     assert(it != pool.end());
     pool.erase(it);
     update_conn(conn, false);

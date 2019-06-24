@@ -638,9 +638,8 @@ bool PeerNetwork<O, _, __>::check_new_conn(const conn_t &conn, uint16_t port) {
     if (conn->peer_id.is_null())
     {   /* passive connections can eventually have ids after getting the port
            number in IP_BASED_PORT mode */
-        assert(id_mode == IP_PORT_BASED);
         conn->peer_id.ip = conn->get_addr().ip;
-        conn->peer_id.port = port;
+        conn->peer_id.port = id_mode == IP_BASED ? 0: port;
     }
     const auto &id = conn->peer_id;
     auto it = id2peer.find(id);
