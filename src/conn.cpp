@@ -47,13 +47,13 @@ ConnPool::Conn::operator std::string() const {
         case Conn::PASSIVE: s << "passive"; break;
         case Conn::DEAD: s << "dead"; break;
     }
-    s << ">";
+    s << " term=" << (is_terminated() ? "yes" : "no") << ">";
     return std::move(s);
 }
 
 /* the following functions are executed by exactly one worker per Conn object */
 
-void ConnPool::Conn::_send_data(const ConnPool::conn_t &conn, int fd, int events) {
+void ConnPool::Conn::_send_data(const conn_t &conn, int fd, int events) {
     if (events & FdEvent::ERROR)
     {
         conn->cpool->worker_terminate(conn);
@@ -97,7 +97,7 @@ void ConnPool::Conn::_send_data(const ConnPool::conn_t &conn, int fd, int events
     conn->ready_send = true;
 }
 
-void ConnPool::Conn::_recv_data(const ConnPool::conn_t &conn, int fd, int events) {
+void ConnPool::Conn::_recv_data(const conn_t &conn, int fd, int events) {
     if (events & FdEvent::ERROR)
     {
         conn->cpool->worker_terminate(conn);
@@ -133,7 +133,7 @@ void ConnPool::Conn::_recv_data(const ConnPool::conn_t &conn, int fd, int events
 }
 
 
-void ConnPool::Conn::_send_data_tls(const ConnPool::conn_t &conn, int fd, int events) {
+void ConnPool::Conn::_send_data_tls(const conn_t &conn, int fd, int events) {
     if (events & FdEvent::ERROR)
     {
         conn->cpool->worker_terminate(conn);
@@ -177,7 +177,7 @@ void ConnPool::Conn::_send_data_tls(const ConnPool::conn_t &conn, int fd, int ev
     conn->ready_send = true;
 }
 
-void ConnPool::Conn::_recv_data_tls(const ConnPool::conn_t &conn, int fd, int events) {
+void ConnPool::Conn::_recv_data_tls(const conn_t &conn, int fd, int events) {
     if (events & FdEvent::ERROR)
     {
         conn->cpool->worker_terminate(conn);
@@ -211,12 +211,12 @@ void ConnPool::Conn::_recv_data_tls(const ConnPool::conn_t &conn, int fd, int ev
     conn->cpool->on_read(conn);
 }
 
-void ConnPool::Conn::_send_data_tls_handshake(const ConnPool::conn_t &conn, int fd, int events) {
+void ConnPool::Conn::_send_data_tls_handshake(const conn_t &conn, int fd, int events) {
     conn->ready_send = true;
     _recv_data_tls_handshake(conn, fd, events);
 }
 
-void ConnPool::Conn::_recv_data_tls_handshake(const ConnPool::conn_t &conn, int, int) {
+void ConnPool::Conn::_recv_data_tls_handshake(const conn_t &conn, int, int) {
     int ret;
     if (conn->tls->do_handshake(ret))
     {
@@ -224,6 +224,7 @@ void ConnPool::Conn::_recv_data_tls_handshake(const ConnPool::conn_t &conn, int,
         conn->send_data_func = _send_data_tls;
         conn->recv_data_func = _recv_data_dummy;
         conn->peer_cert = new X509(conn->tls->get_peer_cert());
+        conn->worker->enable_send_buffer(conn, conn->fd);
         conn->cpool->update_conn(conn, true);
     }
     else
@@ -234,8 +235,7 @@ void ConnPool::Conn::_recv_data_tls_handshake(const ConnPool::conn_t &conn, int,
     }
 }
 
-void ConnPool::Conn::_recv_data_dummy(const ConnPool::conn_t &, int, int) {
-}
+void ConnPool::Conn::_recv_data_dummy(const conn_t &, int, int) {}
 
 void ConnPool::Conn::stop() {
     if (mode != ConnMode::DEAD)
@@ -308,21 +308,25 @@ void ConnPool::accept_client(int fd, int) {
 }
 
 void ConnPool::conn_server(const conn_t &conn, int fd, int events) {
-    if (send(fd, "", 0, MSG_NOSIGNAL) == 0)
-    {
-        conn->ev_connect.del();
-        SALTICIDAE_LOG_INFO("connected to remote %s", std::string(*conn).c_str());
-        auto &worker = select_worker();
-        conn->worker = &worker;
-        on_setup(conn);
-        worker.feed(conn, fd);
-    }
-    else
-    {
-        if (events & TimedFdEvent::TIMEOUT)
-            SALTICIDAE_LOG_INFO("%s connect timeout", std::string(*conn).c_str());
+    try {
+        if (send(fd, "", 0, MSG_NOSIGNAL) == 0)
+        {
+            conn->ev_connect.del();
+            SALTICIDAE_LOG_INFO("connected to remote %s", std::string(*conn).c_str());
+            auto &worker = select_worker();
+            conn->worker = &worker;
+            on_setup(conn);
+            worker.feed(conn, fd);
+        }
+        else
+        {
+            if (events & TimedFdEvent::TIMEOUT)
+                SALTICIDAE_LOG_INFO("%s connect timeout", std::string(*conn).c_str());
+            throw SalticidaeError(SALTI_ERROR_CONNECT);
+        }
+    } catch (...) {
         disp_terminate(conn);
-        return;
+        recoverable_error(std::current_exception());
     }
 }
 
@@ -402,6 +406,7 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
 
 void ConnPool::del_conn(const conn_t &conn) {
     auto it = pool.find(conn->fd);
+    SALTICIDAE_LOG_INFO("%s %d\n", std::string(*conn).c_str());
     assert(it != pool.end());
     pool.erase(it);
     update_conn(conn, false);
@@ -417,7 +422,7 @@ void ConnPool::release_conn(const conn_t &conn) {
 }
 
 ConnPool::conn_t ConnPool::add_conn(const conn_t &conn) {
-    //assert(pool.find(conn->fd) == pool.end());
+    assert(pool.find(conn->fd) == pool.end());
     return pool.insert(std::make_pair(conn->fd, conn)).first->second;
 }
 

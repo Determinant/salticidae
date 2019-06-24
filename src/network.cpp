@@ -72,7 +72,7 @@ void msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_
 }
 
 void msgnetwork_send_msg_deferred_by_move(msgnetwork_t *self,
-                        msg_t *_moved_msg, const msgnetwork_conn_t *conn) {
+                                        msg_t *_moved_msg, const msgnetwork_conn_t *conn) {
     self->_send_msg_deferred(std::move(*_moved_msg), *conn);
 }
 
@@ -94,6 +94,14 @@ void msgnetwork_listen(msgnetwork_t *self, const netaddr_t *listen_addr, Saltici
     SALTICIDAE_CERROR_TRY(cerror)
     self->listen(*listen_addr);
     SALTICIDAE_CERROR_CATCH(cerror)
+}
+
+void msgnetwork_start(msgnetwork_t *self) { self->start(); }
+
+void msgnetwork_stop(msgnetwork_t *self) { self->stop(); }
+
+void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn) {
+    self->terminate(*conn);
 }
 
 void msgnetwork_reg_handler(msgnetwork_t *self,
@@ -129,14 +137,6 @@ void msgnetwork_reg_error_handler(msgnetwork_t *self,
         }
         cb(&cerror, fatal, userdata);
     });
-}
-
-void msgnetwork_start(msgnetwork_t *self) { self->start(); }
-
-void msgnetwork_stop(msgnetwork_t *self) { self->stop(); }
-
-void msgnetwork_terminate(msgnetwork_t *self, const msgnetwork_conn_t *conn) {
-    self->terminate(*conn);
 }
 
 msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn) {
@@ -181,10 +181,6 @@ void peernetwork_config_id_mode(peernetwork_config_t *self, peernetwork_id_mode_
 
 msgnetwork_config_t *peernetwork_config_as_msgnetwork_config(peernetwork_config_t *self) { return self; }
 
-peernetwork_t *msgnetwork_as_peernetwork_unsafe(msgnetwork_t *self) {
-    return static_cast<peernetwork_t *>(self);
-}
-
 peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_config_t *config, SalticidaeCError *cerror) {
     SALTICIDAE_CERROR_TRY(cerror)
     return new peernetwork_t(*ec, *config);
@@ -213,6 +209,10 @@ const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self,
 
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self) { return self; }
 
+peernetwork_t *msgnetwork_as_peernetwork_unsafe(msgnetwork_t *self) {
+    return static_cast<peernetwork_t *>(self);
+}
+
 msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_conn_t *conn) {
     return new msgnetwork_conn_t(*conn);
 }
@@ -227,19 +227,17 @@ peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self) {
 
 void peernetwork_conn_free(const peernetwork_conn_t *self) { delete self; }
 
-void peernetwork_send_msg(peernetwork_t *self,
-                        const msg_t * msg, const netaddr_t *paddr) {
+void peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *paddr) {
     self->_send_msg(*msg, *paddr);
 }
 
 void peernetwork_send_msg_deferred_by_move(peernetwork_t *self,
-                                        msg_t * _moved_msg, const netaddr_t *paddr) {
+                                        msg_t *_moved_msg, const netaddr_t *paddr) {
     self->_send_msg_deferred(std::move(*_moved_msg), *paddr);
 }
 
 void peernetwork_multicast_msg_by_move(peernetwork_t *self,
-                                    msg_t *_moved_msg,
-                                    const netaddr_array_t *paddrs) {
+                                    msg_t *_moved_msg, const netaddr_array_t *paddrs) {
     self->_multicast_msg(std::move(*_moved_msg), *paddrs);
 }
 
@@ -249,14 +247,49 @@ void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, Salti
     SALTICIDAE_CERROR_CATCH(cerror)
 }
 
-void peernetwork_stop(peernetwork_t *self) { self->stop(); }
-
 void peernetwork_reg_unknown_peer_handler(peernetwork_t *self,
                                         msgnetwork_unknown_peer_callback_t cb,
                                         void *userdata) {
     self->reg_unknown_peer_handler([=](const NetAddr &addr) {
         cb(&addr, userdata);
     });
+}
+
+clientnetwork_t *clientnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config, SalticidaeCError *cerror) {
+    SALTICIDAE_CERROR_TRY(cerror)
+    return new clientnetwork_t(*ec, *config);
+    SALTICIDAE_CERROR_CATCH(cerror)
+    return nullptr;
+}
+
+void clientnetwork_free(const clientnetwork_t *self) { delete self; }
+
+msgnetwork_t *clientnetwork_as_msgnetwork(clientnetwork_t *self) { return self; }
+
+clientnetwork_t *msgnetwork_as_clientnetwork_unsafe(msgnetwork_t *self) {
+    return static_cast<clientnetwork_t *>(self);
+}
+
+msgnetwork_conn_t *msgnetwork_conn_new_from_clientnetwork_conn(const clientnetwork_conn_t *conn) {
+    return new msgnetwork_conn_t(*conn);
+}
+
+clientnetwork_conn_t *clientnetwork_conn_new_from_msgnetwork_conn_unsafe(const msgnetwork_conn_t *conn) {
+    return new clientnetwork_conn_t(salticidae::static_pointer_cast<clientnetwork_t::Conn>(*conn));
+}
+
+clientnetwork_conn_t *clientnetwork_conn_copy(const clientnetwork_conn_t *self) {
+    return new clientnetwork_conn_t(*self);
+}
+
+void clientnetwork_conn_free(const clientnetwork_conn_t *self) { delete self; }
+
+void clientnetwork_send_msg(clientnetwork_t *self, const msg_t * msg, const netaddr_t *addr) {
+    self->_send_msg(*msg, *addr);
+}
+
+void clientnetwork_send_msg_deferred_by_move(clientnetwork_t *self, msg_t *_moved_msg, const netaddr_t *addr) {
+    self->_send_msg_deferred(std::move(*_moved_msg), *addr);
 }
 
 }

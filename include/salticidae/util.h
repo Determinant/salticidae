@@ -145,6 +145,10 @@ class PeerNetworkError: public ConnPoolError {
     using ConnPoolError::ConnPoolError;
 };
 
+class ClientNetworkError: public ConnPoolError {
+    using ConnPoolError::ConnPoolError;
+};
+
 extern const char *TTY_COLOR_RED;
 extern const char *TTY_COLOR_GREEN;
 extern const char *TTY_COLOR_YELLOW;

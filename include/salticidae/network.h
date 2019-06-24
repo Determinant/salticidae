@@ -226,23 +226,19 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
     public:
     class Conn: public MsgNet::Conn {
         friend ClientNetwork;
-
         public:
         Conn() = default;
-
         ClientNetwork *get_net() {
             return static_cast<ClientNetwork *>(ConnPool::Conn::get_pool());
         }
-
-        protected:
-        void on_setup() override;
-        void on_teardown() override;
     };
 
     using conn_t = ArcObj<Conn>;
 
     protected:
     ConnPool::Conn *create_conn() override { return new Conn(); }
+    void on_setup(const ConnPool::conn_t &) override;
+    void on_teardown(const ConnPool::conn_t &) override;
 
     public:
     using Config = typename MsgNet::Config;
@@ -251,7 +247,11 @@ class ClientNetwork: public MsgNetwork<OpcodeType> {
 
     using MsgNet::send_msg;
     template<typename MsgType>
-    void send_msg(MsgType &&msg, const NetAddr &addr);
+    inline void send_msg(const MsgType &msg, const NetAddr &addr);
+    inline void _send_msg(const Msg &msg, const NetAddr &addr);
+    template<typename MsgType>
+    inline void send_msg_deferred(MsgType &&msg, const NetAddr &addr);
+    inline void _send_msg_deferred(Msg &&msg, const NetAddr &addr);
 };
 
 /** Peer-to-peer network where any two nodes could hold a bi-diretional message
@@ -503,7 +503,7 @@ void MsgNetwork<OpcodeType>::on_read(const ConnPool::conn_t &_conn) {
 template<typename OpcodeType>
 template<typename MsgType>
 inline void MsgNetwork<OpcodeType>::send_msg_deferred(MsgType &&msg, const conn_t &conn) {
-    return _send_msg_deferred(MsgType(std::move(msg)), conn);
+    return _send_msg_deferred(std::move(msg), conn);
 }
 
 template<typename OpcodeType>
@@ -511,7 +511,7 @@ inline void MsgNetwork<OpcodeType>::_send_msg_deferred(Msg &&msg, const conn_t &
     this->disp_tcall->async_call(
             [this, msg=std::move(msg), conn](ThreadCall::Handle &) {
         try {
-            this->send_msg(msg, conn);
+            this->_send_msg(msg, conn);
         } catch (...) { this->recoverable_error(std::current_exception()); }
     });
 }
@@ -841,7 +841,7 @@ bool PeerNetwork<O, _, __>::has_peer(const NetAddr &paddr) const {
 template<typename O, O _, O __>
 template<typename MsgType>
 inline void PeerNetwork<O, _, __>::send_msg_deferred(MsgType &&msg, const NetAddr &paddr) {
-    return _send_msg_deferred(MsgType(std::move(msg)), paddr);
+    return _send_msg_deferred(std::move(msg), paddr);
 }
 
 template<typename O, O _, O __>
@@ -849,7 +849,7 @@ inline void PeerNetwork<O, _, __>::_send_msg_deferred(Msg &&msg, const NetAddr &
     this->disp_tcall->async_call(
             [this, msg=std::move(msg), paddr](ThreadCall::Handle &) {
         try {
-            send_msg(msg, paddr);
+            _send_msg(msg, paddr);
         } catch (...) { this->recoverable_error(std::current_exception()); }
     });
 }
@@ -864,7 +864,7 @@ template<typename O, O _, O __>
 inline void PeerNetwork<O, _, __>::_send_msg(const Msg &msg, const NetAddr &paddr) {
     auto p = get_peer(paddr);
     if (!p) throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
-    this->send_msg(msg, p->conn);
+    MsgNet::_send_msg(msg, p->conn);
 }
 
 template<typename O, O _, O __>
@@ -883,7 +883,7 @@ inline void PeerNetwork<O, _, __>::_multicast_msg(Msg &&msg, const std::vector<N
                 auto p = get_peer(addr);
                 if (!p)
                     throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
-                this->send_msg(msg, p->conn);
+                MsgNet::_send_msg(msg, p->conn);
             }
         } catch (const PeerNetworkError &) {
             this->recoverable_error(std::current_exception());
@@ -894,33 +894,52 @@ inline void PeerNetwork<O, _, __>::_multicast_msg(Msg &&msg, const std::vector<N
 /* end: functions invoked by the user loop */
 
 template<typename OpcodeType>
-void ClientNetwork<OpcodeType>::Conn::on_setup() {
-    MsgNet::Conn::on_setup();
-    assert(this->get_mode() == Conn::PASSIVE);
-    const auto &addr = this->get_addr();
-    auto cn = get_net();
+void ClientNetwork<OpcodeType>::on_setup(const ConnPool::conn_t &_conn) {
+    MsgNet::on_setup(_conn);
+    auto conn = static_pointer_cast<Conn>(_conn);
+    assert(conn->get_mode() == Conn::PASSIVE);
+    const auto &addr = conn->get_addr();
+    auto cn = conn->get_net();
     cn->addr2conn.erase(addr);
-    cn->addr2conn.insert(
-        std::make_pair(addr, static_pointer_cast<Conn>(this->self())));
+    cn->addr2conn.insert(std::make_pair(addr, conn));
 }
 
 template<typename OpcodeType>
-void ClientNetwork<OpcodeType>::Conn::on_teardown() {
-    MsgNet::Conn::on_teardown();
-    get_net()->addr2conn.erase(this->get_addr());
+void ClientNetwork<OpcodeType>::on_teardown(const ConnPool::conn_t &_conn) {
+    MsgNet::on_teardown(_conn);
+    auto conn = static_pointer_cast<Conn>(_conn);
+    conn->get_net()->addr2conn.erase(conn->get_addr());
 }
 
 template<typename OpcodeType>
 template<typename MsgType>
-void ClientNetwork<OpcodeType>::send_msg(MsgType &&msg, const NetAddr &addr) {
+inline void ClientNetwork<OpcodeType>::send_msg_deferred(MsgType &&msg, const NetAddr &addr) {
+    return _send_msg_deferred(std::move(msg), addr);
+}
+
+template<typename OpcodeType>
+inline void ClientNetwork<OpcodeType>::_send_msg_deferred(Msg &&msg, const NetAddr &addr) {
     this->disp_tcall->async_call(
-            [this, addr, msg=std::forward<MsgType>(msg)](ThreadCall::Handle &) {
+            [this, msg=std::move(msg), addr](ThreadCall::Handle &) {
         try {
-            auto it = addr2conn.find(addr);
-            if (it != addr2conn.end())
-                send_msg(std::move(msg), it->second);
-        } catch (...) { this->disp_error_cb(std::current_exception()); }
+            _send_msg(msg, addr);
+        } catch (...) { this->recoverable_error(std::current_exception()); }
     });
+}
+
+template<typename OpcodeType>
+template<typename MsgType>
+inline void ClientNetwork<OpcodeType>::send_msg(const MsgType &msg, const NetAddr &addr) {
+    return _send_msg(msg, addr);
+}
+
+template<typename OpcodeType>
+inline void ClientNetwork<OpcodeType>::_send_msg(const Msg &msg, const NetAddr &addr) {
+    auto it = addr2conn.find(addr);
+    if (it != addr2conn.end())
+        MsgNet::_send_msg(msg, it->second);
+    else
+        throw ClientNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
 }
 
 template<typename O, O OPCODE_PING, O _>
@@ -939,6 +958,9 @@ using msgnetwork_conn_t = msgnetwork_t::conn_t;
 using peernetwork_t = salticidae::PeerNetwork<_opcode_t>;
 using peernetwork_config_t = peernetwork_t::Config;
 using peernetwork_conn_t = peernetwork_t::conn_t;
+
+using clientnetwork_t = salticidae::ClientNetwork<_opcode_t>;
+using clientnetwork_conn_t = clientnetwork_t::conn_t;
 #endif
 
 #else
@@ -951,6 +973,9 @@ typedef struct msgnetwork_conn_t msgnetwork_conn_t;
 typedef struct peernetwork_t peernetwork_t;
 typedef struct peernetwork_config_t peernetwork_config_t;
 typedef struct peernetwork_conn_t peernetwork_conn_t;
+
+typedef struct clientnetwork_t clientnetwork_t;
+typedef struct clientnetwork_conn_t clientnetwork_conn_t;
 #endif
 
 #endif
@@ -1042,10 +1067,22 @@ void peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_
 void peernetwork_send_msg_deferred_by_move(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *paddr);
 void peernetwork_multicast_msg_by_move(peernetwork_t *self, msg_t *_moved_msg, const netaddr_array_t *paddrs);
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *err);
-void peernetwork_stop(peernetwork_t *self);
 
 typedef void (*msgnetwork_unknown_peer_callback_t)(const netaddr_t *, void *userdata);
 void peernetwork_reg_unknown_peer_handler(peernetwork_t *self, msgnetwork_unknown_peer_callback_t cb, void *userdata);
+
+/* ClientNetwork */
+
+clientnetwork_t *clientnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t *config, SalticidaeCError *err);
+void clientnetwork_free(const clientnetwork_t *self);
+msgnetwork_t *clientnetwork_as_msgnetwork(clientnetwork_t *self);
+clientnetwork_t *msgnetwork_as_clientnetwork_unsafe(msgnetwork_t *self);
+msgnetwork_conn_t *msgnetwork_conn_new_from_clientnetwork_conn(const clientnetwork_conn_t *conn);
+clientnetwork_conn_t *clientnetwork_conn_new_from_msgnetwork_conn_unsafe(const msgnetwork_conn_t *conn);
+clientnetwork_conn_t *clientnetwork_conn_copy(const clientnetwork_conn_t *self);
+void clientnetwork_conn_free(const clientnetwork_conn_t *self);
+void clientnetwork_send_msg(clientnetwork_t *self, const msg_t * msg, const netaddr_t *addr);
+void clientnetwork_send_msg_deferred_by_move(clientnetwork_t *self, msg_t * _moved_msg, const netaddr_t *addr);
 
 #ifdef __cplusplus
 }
