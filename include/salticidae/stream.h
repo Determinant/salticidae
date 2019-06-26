@@ -243,6 +243,13 @@ class Blob {
         return !(*this == other);
     }
 
+    bool operator<(const Blob<N> &other) const {
+        for (size_t i = _len - 1; i > 0; i--)
+            if (data[i] != other.data[i])
+                return data[i] < other.data[i];
+        return data[0] < other.data[0];
+    }
+
     size_t cheap_hash() const { return *data; }
 
     void serialize(DataStream &s) const {

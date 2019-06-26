@@ -144,8 +144,9 @@ class ConnPool {
     EventContext ec;
     EventContext disp_ec;
     ThreadCall* disp_tcall;
-    /* owned by user loop */
     BoxObj<ThreadCall> user_tcall;
+    const bool enable_tls;
+    RcObj<const X509> tls_cert;
 
     using worker_error_callback_t = std::function<void(const std::exception_ptr err)>;
     worker_error_callback_t disp_error_cb;
@@ -178,7 +179,6 @@ class ConnPool {
     const double conn_server_timeout;
     const size_t seg_buff_size;
     const size_t queue_capacity;
-    const bool enable_tls;
     tls_context_t tls_ctx;
 
     conn_callback_t conn_cb;
@@ -422,11 +422,11 @@ class ConnPool {
 
     ConnPool(const EventContext &ec, const Config &config):
             ec(ec),
+            enable_tls(config._enable_tls),
             max_listen_backlog(config._max_listen_backlog),
             conn_server_timeout(config._conn_server_timeout),
             seg_buff_size(config._seg_buff_size),
             queue_capacity(config._queue_capacity),
-            enable_tls(config._enable_tls),
             tls_ctx(nullptr),
             listen_fd(-1),
             nworker(config._nworker),
@@ -435,9 +435,10 @@ class ConnPool {
         {
             tls_ctx = new TLSContext();
             if (config._tls_cert)
-                tls_ctx->use_cert(*config._tls_cert);
+                tls_cert = config._tls_cert;
             else
-                tls_ctx->use_cert_file(config._tls_cert_file);
+                tls_cert = new X509(X509::create_from_pem_file(config._tls_cert_file));
+            tls_ctx->use_cert(*tls_cert);
             if (config._tls_key)
                 tls_ctx->use_privkey(*config._tls_key);
             else

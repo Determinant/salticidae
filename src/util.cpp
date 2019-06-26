@@ -56,6 +56,7 @@ const char *SALTICIDAE_ERROR_STRINGS[] = {
     "tls key does not match the cert",
     "tls fail to get peer cert",
     "fd error",
+    "rand source is not available, try again",
     "unknown error"
 };
 
