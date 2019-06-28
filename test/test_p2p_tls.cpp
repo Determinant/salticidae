@@ -27,6 +27,8 @@
 #include <string>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
+#include <unistd.h>
 
 #include "salticidae/msg.h"
 #include "salticidae/event.h"
@@ -67,6 +69,8 @@ struct MsgText {
 
 const uint8_t MsgText::opcode;
 
+std::unordered_set<uint256_t> valid_certs;
+
 struct Net {
     uint64_t id;
     EventContext ec;
@@ -74,12 +78,15 @@ struct Net {
     std::thread th;
     PeerNetwork *net;
     const std::string listen_addr;
+    uint256_t cert;
 
     Net(uint64_t id, uint16_t port): id(id), tc(ec), listen_addr("127.0.0.1:"+ std::to_string(port)) {
         auto tls_key = new PKey(PKey::create_privkey_rsa(2048));
         auto tls_cert = new salticidae::X509(salticidae::X509::create_self_signed_from_pubkey(*tls_key));
         tls_key->save_privkey_to_file(std::to_string(port) + "_pkey.pem");
         tls_cert->save_to_file(std::to_string(port) + ".pem");
+        cert = salticidae::get_hash(tls_cert->get_der());
+        valid_certs.insert(cert);
         net = new PeerNetwork(ec, PeerNetwork::Config(salticidae::ConnPool::Config()
                     .enable_tls(true)
                     .tls_key(tls_key)
@@ -93,8 +100,8 @@ struct Net {
         net->reg_conn_handler([this](const salticidae::ConnPool::conn_t &conn, bool connected) {
             if (connected)
             {
-                fprintf(stdout, "net %lu: peer's cert is %s\n", this->id,
-                        salticidae::get_hash(conn->get_peer_cert()->get_der()).to_hex().c_str());
+                auto cert_hash = salticidae::get_hash(conn->get_peer_cert()->get_der());
+                return valid_certs.count(cert_hash) > 0;
             }
             return true;
         });
@@ -107,9 +114,10 @@ struct Net {
             }
         });
         net->reg_peer_handler([this](const PeerNetwork::conn_t &conn, bool connected) {
-            fprintf(stdout, "net %lu: %s peer %s\n", this->id,
+            fprintf(stdout, "net %lu: %s peer %s (cert: %s)\n", this->id,
                     connected ? "connected to" : "disconnected from",
-                    std::string(conn->get_peer_addr()).c_str());
+                    std::string(conn->get_peer_addr()).c_str(),
+                    salticidae::get_hash(conn->get_peer_cert()->get_der()).to_hex().c_str());
         });
         net->reg_unknown_peer_handler([this](const NetAddr &claimed_addr) {
             fprintf(stdout, "net %lu: unknown peer %s attempts to connnect\n",
@@ -149,7 +157,10 @@ struct Net {
         th.join();
     }
 
-    ~Net() { delete net; }
+    ~Net() {
+        valid_certs.erase(cert);
+        delete net;
+    }
 };
 
 std::unordered_map<uint64_t, Net *> nets;
@@ -279,6 +290,12 @@ int main(int argc, char **argv) {
         it->second->net->send_msg(MsgText(id, buff), it2->second->listen_addr);
     };
 
+    auto cmd_sleep = [](char *buff) {
+        int sec = read_int(buff);
+        if (sec < 0) return;
+        sleep(sec);
+    };
+
     auto cmd_help = [](char *) {
         fprintf(stdout,
             "add <node-id> <port> -- start a node (create a PeerNetwork instance)\n"
@@ -287,6 +304,7 @@ int main(int argc, char **argv) {
             "del <node-id> -- remove a node (destroy a PeerNetwork instance)\n"
             "msg <node-id> <peer-id> <msg> -- send a text message to a node\n"
             "ls -- list all node ids\n"
+            "sleep <sec> -- wait for some seconds\n"
             "exit -- quit the program\n"
             "help -- show this info\n"
         );
@@ -298,12 +316,14 @@ int main(int argc, char **argv) {
     cmd_map.insert(std::make_pair("delpeer", cmd_delpeer));
     cmd_map.insert(std::make_pair("msg", cmd_msg));
     cmd_map.insert(std::make_pair("ls", cmd_ls));
+    cmd_map.insert(std::make_pair("sleep", cmd_sleep));
     cmd_map.insert(std::make_pair("exit", cmd_exit));
     cmd_map.insert(std::make_pair("help", cmd_help));
 
+    bool is_tty = isatty(0);
     for (;;)
     {
-        fprintf(stdout, "> ");
+        if (is_tty) fprintf(stdout, "> ");
         char buff[128];
         if (scanf("%64s", buff) == EOF) break;
         auto it = cmd_map.find(buff);

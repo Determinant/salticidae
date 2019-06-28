@@ -77,12 +77,12 @@ using MsgNetworkByteOp = MsgNetwork<uint8_t>;
 
 struct MyNet: public MsgNetworkByteOp {
     const std::string name;
-    const salticidae::uint256_t peer_footprint;
+    const salticidae::uint256_t peer_fingerprint;
     const NetAddr peer;
 
     MyNet(const salticidae::EventContext &ec,
             const std::string &name,
-            const std::string &peer_footprint_hex,
+            const std::string &peer_fingerprint_hex,
             const NetAddr &peer):
             MsgNetwork<uint8_t>(ec, MsgNetwork::Config(
                 ConnPool::Config()
@@ -91,7 +91,7 @@ struct MyNet: public MsgNetworkByteOp {
                     .tls_key_file(name + ".pem")
             )),
             name(name),
-            peer_footprint(salticidae::from_hex(peer_footprint_hex)),
+            peer_fingerprint(salticidae::from_hex(peer_fingerprint_hex)),
             peer(peer) {
         /* message handler could be a bound method */
         reg_handler(
@@ -101,8 +101,8 @@ struct MyNet: public MsgNetworkByteOp {
             bool res = true;
             if (connected)
             {
-                auto cert_der = salticidae::get_hash(conn->get_peer_cert()->get_der());
-                res = peer_footprint == cert_der;
+                auto cert_hash = salticidae::get_hash(conn->get_peer_cert()->get_der());
+                res = peer_fingerprint == cert_hash;
                 if (conn->get_mode() == ConnPool::Conn::ACTIVE)
                 {
                     printf("[%s] Connected, sending hello.\n",
@@ -112,12 +112,10 @@ struct MyNet: public MsgNetworkByteOp {
                             salticidae::static_pointer_cast<Conn>(conn));
                 }
                 else
-                {
-                    printf("[%s] Accepted, waiting for greetings.\n"
-                           "The peer certificate footprint is %s (%s).\n",
-                            this->name.c_str(), salticidae::get_hex(cert_der).c_str(),
+                    printf("[%s] accepted, waiting for greetings.\n"
+                           "The peer certificate fingerprint is %s (%s).\n",
+                            this->name.c_str(), salticidae::get_hex(cert_hash).c_str(),
                             res ? "ok" : "fail");
-                }
             }
             else
             {
@@ -130,14 +128,11 @@ struct MyNet: public MsgNetworkByteOp {
     }
 
     void on_receive_hello(MsgHello &&msg, const MyNet::conn_t &conn) {
-        printf("[%s] %s says %s\n",
-                name.c_str(),
-                msg.name.c_str(), msg.text.c_str());
+        printf("[%s] %s says %s\n", name.c_str(), msg.name.c_str(), msg.text.c_str());
         /* send acknowledgement */
         send_msg(MsgAck(), conn);
     }
 };
-
 
 void on_receive_ack(MsgAck &&msg, const MyNet::conn_t &conn) {
     auto net = static_cast<MyNet *>(conn->get_net());
@@ -166,8 +161,8 @@ int main() {
     bob.listen(bob_addr);
 
     /* try to connect once */
-    alice.connect(bob_addr);
-    bob.connect(alice_addr);
+    alice.connect(bob_addr, false);
+    bob.connect(alice_addr, false);
 
     /* the main loop can be shutdown by ctrl-c or kill */
     auto shutdown = [&](int) {ec.stop();};

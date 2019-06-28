@@ -27,6 +27,7 @@
 #include <string>
 #include <functional>
 #include <unordered_map>
+#include <unistd.h>
 
 #include "salticidae/msg.h"
 #include "salticidae/event.h"
@@ -260,6 +261,12 @@ int main(int argc, char **argv) {
         it->second->net->send_msg(MsgText(id, buff), it2->second->listen_addr);
     };
 
+    auto cmd_sleep = [](char *buff) {
+        int sec = read_int(buff);
+        if (sec < 0) return;
+        sleep(sec);
+    };
+
     auto cmd_help = [](char *) {
         fprintf(stdout,
             "add <node-id> <port> -- start a node (create a PeerNetwork instance)\n"
@@ -268,6 +275,7 @@ int main(int argc, char **argv) {
             "del <node-id> -- remove a node (destroy a PeerNetwork instance)\n"
             "msg <node-id> <peer-id> <msg> -- send a text message to a node\n"
             "ls -- list all node ids\n"
+            "sleep <sec> -- wait for some seconds\n"
             "exit -- quit the program\n"
             "help -- show this info\n"
         );
@@ -279,12 +287,14 @@ int main(int argc, char **argv) {
     cmd_map.insert(std::make_pair("delpeer", cmd_delpeer));
     cmd_map.insert(std::make_pair("msg", cmd_msg));
     cmd_map.insert(std::make_pair("ls", cmd_ls));
+    cmd_map.insert(std::make_pair("sleep", cmd_sleep));
     cmd_map.insert(std::make_pair("exit", cmd_exit));
     cmd_map.insert(std::make_pair("help", cmd_help));
 
+    bool is_tty = isatty(0);
     for (;;)
     {
-        fprintf(stdout, "> ");
+        if (is_tty) fprintf(stdout, "> ");
         char buff[128];
         if (scanf("%64s", buff) == EOF) break;
         auto it = cmd_map.find(buff);

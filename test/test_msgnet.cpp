@@ -101,7 +101,7 @@ struct MyNet: public MsgNetworkByteOp {
                             salticidae::static_pointer_cast<Conn>(conn));
                 }
                 else
-                    printf("[%s] Accepted, waiting for greetings.\n",
+                    printf("[%s] accepted, waiting for greetings.\n",
                             this->name.c_str());
             }
             else
@@ -115,14 +115,11 @@ struct MyNet: public MsgNetworkByteOp {
     }
 
     void on_receive_hello(MsgHello &&msg, const MyNet::conn_t &conn) {
-        printf("[%s] %s says %s\n",
-                name.c_str(),
-                msg.name.c_str(), msg.text.c_str());
+        printf("[%s] %s says %s\n", name.c_str(), msg.name.c_str(), msg.text.c_str());
         /* send acknowledgement */
         send_msg(MsgAck(), conn);
     }
 };
-
 
 void on_receive_ack(MsgAck &&msg, const MyNet::conn_t &conn) {
     auto net = static_cast<MyNet *>(conn->get_net());
@@ -135,8 +132,8 @@ int main() {
     NetAddr bob_addr("127.0.0.1:12346");
 
     /* test two nodes in the same main loop */
-    MyNet alice(ec, "Alice", bob_addr);
-    MyNet bob(ec, "Bob", alice_addr);
+    MyNet alice(ec, "alice", bob_addr);
+    MyNet bob(ec, "bob", alice_addr);
 
     /* message handler could be a normal function */
     alice.reg_handler(on_receive_ack);
