@@ -52,22 +52,35 @@ using std::placeholders::_2;
 struct MsgRand {
     static const uint8_t opcode = 0x0;
     DataStream serialized;
+    uint32_t view;
     bytearray_t bytes;
-    MsgRand(size_t size) {
+    uint256_t hash;
+    MsgRand(uint32_t _view, size_t size) {
         bytearray_t bytes;
         bytes.resize(size);
         RAND_bytes(&bytes[0], size);
-        serialized << std::move(bytes);
+        hash = salticidae::get_hash(bytes);
+        serialized << htole(_view) << std::move(bytes);
     }
-    MsgRand(DataStream &&s) { bytes = s; }
+    MsgRand(DataStream &&s) {
+        s >> view;
+        view = letoh(view);
+        bytes = s;
+    }
 };
 
 struct MsgAck {
     static const uint8_t opcode = 0x1;
-    uint256_t hash;
     DataStream serialized;
-    MsgAck(const uint256_t &hash) { serialized << hash; }
-    MsgAck(DataStream &&s) { s >> hash; }
+    uint32_t view;
+    uint256_t hash;
+    MsgAck(uint32_t _view, const uint256_t &hash) {
+        serialized << htole(_view) << hash;
+    }
+    MsgAck(DataStream &&s) {
+        s >> view >> hash;
+        view = letoh(view);
+    }
 };
 
 const uint8_t MsgRand::opcode;
@@ -80,9 +93,10 @@ std::vector<NetAddr> addrs;
 struct TestContext {
     TimerEvent timer;
     int state;
+    uint32_t view;
     uint256_t hash;
     size_t ncompleted;
-    TestContext(): ncompleted(0) {}
+    TestContext(): view(0), ncompleted(0) {}
 };
 
 struct AppContext {
@@ -100,8 +114,8 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
         auto addr = conn->get_peer_addr();
         assert(!addr.is_null());
         auto &tc = app.tc[addr];
-        MsgRand msg(size);
-        tc.hash = msg.serialized.get_hash();
+        MsgRand msg(tc.view, size);
+        tc.hash = msg.hash;
         net.send_msg(std::move(msg), conn);
     };
     net.reg_peer_handler([&, send_rand](const MyNet::conn_t &conn, bool connected) {
@@ -111,7 +125,7 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
             assert(!addr.is_null());
             auto &tc = app.tc[addr];
             tc.state = 1;
-            SALTICIDAE_LOG_INFO("increasing phase");
+            tc.view++;
             send_rand(tc.state, conn);
         }
     });
@@ -125,12 +139,17 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
     });
     net.reg_handler([&](MsgRand &&msg, const MyNet::conn_t &conn) {
         uint256_t hash = salticidae::get_hash(msg.bytes);
-        net.send_msg(MsgAck(hash), conn);
+        net.send_msg(MsgAck(msg.view, hash), conn);
     });
     net.reg_handler([&, send_rand](MsgAck &&msg, const MyNet::conn_t &conn) {
         auto addr = conn->get_peer_addr();
         assert(!addr.is_null());
         auto &tc = app.tc[addr];
+        if (msg.view != tc.view)
+        {
+            SALTICIDAE_LOG_WARN("dropping MsgAck from a stale view");
+            return;
+        }
         if (msg.hash != tc.hash)
         {
             SALTICIDAE_LOG_ERROR("corrupted I/O!");
@@ -150,7 +169,7 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
                 SALTICIDAE_LOG_INFO("%d completed:%s", ntohs(app.addr.port), s.c_str());
                 SALTICIDAE_LOG_INFO("%d npending: %lu", ntohs(app.addr.port), net.get_npending());
             });
-            double t = salticidae::gen_rand_timeout(10);
+            double t = salticidae::gen_rand_timeout(5);
             tc.timer.add(t);
             SALTICIDAE_LOG_INFO("rand-bomboard phase, ending in %.2f secs", t);
         }
