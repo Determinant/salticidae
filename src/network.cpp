@@ -190,19 +190,23 @@ peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_confi
 
 void peernetwork_free(const peernetwork_t *self) { delete self; }
 
-void peernetwork_add_peer(peernetwork_t *self, const netaddr_t *paddr) {
-    self->add_peer(*paddr);
+void peernetwork_add_peer(peernetwork_t *self, const netaddr_t *addr) {
+    self->add_peer(*addr);
 }
 
-bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *paddr) {
-    return self->has_peer(*paddr);
+void peernetwork_del_peer(peernetwork_t *self, const netaddr_t *addr) {
+    self->del_peer(*addr);
+}
+
+bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *addr) {
+    return self->has_peer(*addr);
 }
 
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self,
-                                                    const netaddr_t *paddr,
+                                                    const netaddr_t *addr,
                                                     SalticidaeCError *cerror) {
     SALTICIDAE_CERROR_TRY(cerror)
-    return new peernetwork_conn_t(self->get_peer_conn(*paddr));
+    return new peernetwork_conn_t(self->get_peer_conn(*addr));
     SALTICIDAE_CERROR_CATCH(cerror)
     return nullptr;
 }
@@ -227,18 +231,18 @@ peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self) {
 
 void peernetwork_conn_free(const peernetwork_conn_t *self) { delete self; }
 
-void peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *paddr) {
-    self->_send_msg(*msg, *paddr);
+void peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *addr) {
+    self->_send_msg(*msg, *addr);
 }
 
 void peernetwork_send_msg_deferred_by_move(peernetwork_t *self,
-                                        msg_t *_moved_msg, const netaddr_t *paddr) {
-    self->_send_msg_deferred(std::move(*_moved_msg), *paddr);
+                                        msg_t *_moved_msg, const netaddr_t *addr) {
+    self->_send_msg_deferred(std::move(*_moved_msg), *addr);
 }
 
 void peernetwork_multicast_msg_by_move(peernetwork_t *self,
-                                    msg_t *_moved_msg, const netaddr_array_t *paddrs) {
-    self->_multicast_msg(std::move(*_moved_msg), *paddrs);
+                                    msg_t *_moved_msg, const netaddr_array_t *addrs) {
+    self->_multicast_msg(std::move(*_moved_msg), *addrs);
 }
 
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *cerror) {

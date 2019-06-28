@@ -546,7 +546,9 @@ int64_t datastream_get_i64(datastream_t *self, bool *succ);
 const uint8_t *datastream_get_data_inplace(datastream_t *self, size_t len);
 uint256_t *datastream_get_hash(const datastream_t *self);
 bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_self);
+bytearray_t *bytearray_new_copied_from_datastream(datastream_t *src);
 bytearray_t *bytearray_new_from_hex(const char *hex_str);
+bytearray_t *bytearray_new_from_bytes(const uint8_t *arr, size_t len);
 
 char *datastream_get_hex(datastream_t *self);
 

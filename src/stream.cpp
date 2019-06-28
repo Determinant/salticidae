@@ -133,9 +133,25 @@ bytearray_t *bytearray_new_moved_from_datastream(datastream_t *_moved_src) {
     }
 }
 
+bytearray_t *bytearray_new_copied_from_datastream(datastream_t *src) {
+    try {
+        return new bytearray_t(*src);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 bytearray_t *bytearray_new_from_hex(const char *hex_str) {
     try {
         return new bytearray_t(salticidae::from_hex(hex_str));
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+bytearray_t *bytearray_new_from_bytes(const uint8_t *arr, size_t len) {
+    try {
+        return new bytearray_t(arr, arr + len);
     } catch (...) {
         return nullptr;
     }

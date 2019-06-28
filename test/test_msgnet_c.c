@@ -170,8 +170,8 @@ void on_term_signal(int sig, void *userdata) {
 
 int main() {
     ec = eventcontext_new();
-    netaddr_t *alice_addr = netaddr_new_from_sipport("127.0.0.1:12345");
-    netaddr_t *bob_addr = netaddr_new_from_sipport("127.0.0.1:12346");
+    netaddr_t *alice_addr = netaddr_new_from_sipport("127.0.0.1:12345", &err);
+    netaddr_t *bob_addr = netaddr_new_from_sipport("127.0.0.1:12346", &err);
 
     /* test two nodes in the same main loop */
     alice = gen_mynet(ec, "Alice");

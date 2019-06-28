@@ -105,7 +105,7 @@ struct MyNet: public MsgNetworkByteOp {
                 res = peer_fingerprint == cert_hash;
                 if (conn->get_mode() == ConnPool::Conn::ACTIVE)
                 {
-                    printf("[%s] Connected, sending hello.\n",
+                    printf("[%s] connected, sending hello.\n",
                             this->name.c_str());
                     /* send the first message through this connection */
                     send_msg(MsgHello(this->name, "Hello there!"),
@@ -119,7 +119,7 @@ struct MyNet: public MsgNetworkByteOp {
             }
             else
             {
-                printf("[%s] Disconnected, retrying.\n", this->name.c_str());
+                printf("[%s] disconnected, retrying.\n", this->name.c_str());
                 /* try to reconnect to the same address */
                 connect(conn->get_addr(), false);
             }

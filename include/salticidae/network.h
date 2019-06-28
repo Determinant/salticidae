@@ -1186,7 +1186,8 @@ typedef enum msgnetwork_conn_mode_t {
 } msgnetwork_conn_mode_t;
 
 typedef enum peernetwork_id_mode_t {
-    ID_MODE_ADDR_BASED
+    ID_MODE_ADDR_BASED,
+    ID_MODE_CERT_BASED
 } peernetwork_id_mode_t;
 
 #ifdef __cplusplus
