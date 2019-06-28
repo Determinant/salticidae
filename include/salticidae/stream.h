@@ -198,8 +198,40 @@ class DataStream {
     inline uint256_t get_hash() const;
 };
 
+class Serializable {
+    public:
+    virtual ~Serializable() = default;
+    virtual void serialize(DataStream &s) const = 0;
+    virtual void unserialize(DataStream &s) = 0;
+
+    virtual void from_bytes(const bytearray_t &raw_bytes) {
+        DataStream s(raw_bytes);
+        s >> *this;
+    }
+
+    virtual void from_bytes(bytearray_t &&raw_bytes) {
+        DataStream s(std::move(raw_bytes));
+        s >> *this;
+    }
+
+
+    virtual void from_hex(const std::string &hex_str) {
+        DataStream s;
+        s.load_hex(hex_str);
+        s >> *this;
+    }
+
+    bytearray_t to_bytes() const {
+        DataStream s;
+        s << *this;
+        return std::move(s);
+    }
+
+    inline std::string to_hex() const;
+};
+
 template<size_t N, typename T = uint64_t>
-class Blob {
+class Blob: public Serializable {
     using _impl_type = T;
     static const size_t bit_per_datum = sizeof(_impl_type) * 8;
     static_assert(!(N % bit_per_datum), "N must be divisible by bit_per_datum");
@@ -252,7 +284,7 @@ class Blob {
 
     size_t cheap_hash() const { return *data; }
 
-    void serialize(DataStream &s) const {
+    void serialize(DataStream &s) const override {
         if (loaded)
         {
             for (const _impl_type *ptr = data; ptr < data + _len; ptr++)
@@ -265,7 +297,7 @@ class Blob {
         }
     }
 
-    void unserialize(DataStream &s) {
+    void unserialize(DataStream &s) override {
         for (_impl_type *ptr = data; ptr < data + _len; ptr++)
         {
             _impl_type x;
@@ -424,37 +456,7 @@ inline bytearray_t from_hex(const std::string &hex_str) {
     return std::move(s);
 }
 
-class Serializable {
-    public:
-    virtual ~Serializable() = default;
-    virtual void serialize(DataStream &s) const = 0;
-    virtual void unserialize(DataStream &s) = 0;
-
-    virtual void from_bytes(const bytearray_t &raw_bytes) {
-        DataStream s(raw_bytes);
-        s >> *this;
-    }
-
-    virtual void from_bytes(bytearray_t &&raw_bytes) {
-        DataStream s(std::move(raw_bytes));
-        s >> *this;
-    }
-
-
-    virtual void from_hex(const std::string &hex_str) {
-        DataStream s;
-        s.load_hex(hex_str);
-        s >> *this;
-    }
-
-    bytearray_t to_bytes() const {
-        DataStream s;
-        s << *this;
-        return std::move(s);
-    }
-
-    std::string to_hex() const { return get_hex(*this); }
-};
+inline std::string Serializable::to_hex() const { return get_hex(*this); }
 
 }
 

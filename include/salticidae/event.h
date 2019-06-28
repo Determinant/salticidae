@@ -565,7 +565,7 @@ class MPSCQueueEventDriven: public MPSCQueue<T> {
         // memory barrier here, so any load/store in enqueue must be finialized
         if (wait_sig.exchange(false, std::memory_order_acq_rel))
         {
-            SALTICIDAE_LOG_DEBUG("mpsc notify");
+            //SALTICIDAE_LOG_DEBUG("mpsc notify");
             write(fd, &dummy, 8);
         }
         return true;
@@ -616,7 +616,7 @@ class MPMCQueueEventDriven: public MPMCQueue<T> {
         // memory barrier here, so any load/store in enqueue must be finialized
         if (wait_sig.exchange(false, std::memory_order_acq_rel))
         {
-            SALTICIDAE_LOG_DEBUG("mpsc notify");
+            //SALTICIDAE_LOG_DEBUG("mpmc notify");
             write(fd, &dummy, 8);
         }
         return true;

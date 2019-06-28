@@ -31,6 +31,7 @@
 #ifdef __cplusplus
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
+#include <openssl/bn.h>
 
 namespace salticidae {
 
@@ -137,10 +138,30 @@ static int _skip_CA_check(int, X509_STORE_CTX *) {
 class PKey {
     EVP_PKEY *key;
     friend class TLSContext;
+    friend class X509;
     public:
     PKey(EVP_PKEY *key): key(key) {}
     PKey(const PKey &) = delete;
     PKey(PKey &&other): key(other.key) { other.key = nullptr; }
+
+    static PKey create_privkey_rsa(size_t nbits = 2048) {
+        auto key = EVP_PKEY_new();
+        if (key == nullptr)
+            throw SalticidaeError(SALTI_ERROR_TLS_KEY);
+        auto e = BN_new();
+        BN_set_word(e, 17);
+        auto rsa = RSA_new();
+        auto ret = RSA_generate_key_ex(rsa, nbits, e, nullptr);
+        BN_free(e);
+        if (!ret)
+        {
+            RSA_free(rsa);
+            throw SalticidaeError(SALTI_ERROR_TLS_KEY);
+        }
+        EVP_PKEY_set1_RSA(key, rsa);
+        RSA_free(rsa);
+        return PKey(key);
+    }
     
     static PKey create_privkey_from_pem_file(std::string pem_fname, std::string *passwd = nullptr) {
         FILE *fp = fopen(pem_fname.c_str(), "r");
@@ -193,6 +214,14 @@ class PKey {
         return std::move(res);
     }
 
+    void save_privkey_to_file(const std::string &fname) {
+        FILE *fp = fopen(fname.c_str(), "wb");
+        auto ret = PEM_write_PrivateKey(fp, key, nullptr, nullptr, 0, nullptr, nullptr);
+        fclose(fp);
+        if (!ret)
+            throw SalticidaeError(SALTI_ERROR_TLS_X509);
+    }
+
     ~PKey() { if (key) EVP_PKEY_free(key); }
 };
 
@@ -203,6 +232,24 @@ class X509 {
     X509(::X509 *x509): x509(x509) {}
     X509(const X509 &) = delete;
     X509(X509 &&other): x509(other.x509) { other.x509 = nullptr; }
+
+    static X509 create_self_signed_from_pubkey(const PKey &pkey, const char *country = "US", const char *common_name = "localhost") {
+        auto x509 = X509_new();
+        ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
+        X509_set_pubkey(x509, pkey.key);
+        X509_gmtime_adj(X509_get_notBefore(x509), 0);
+        X509_gmtime_adj(X509_get_notAfter(x509), 0);
+        auto name = X509_get_subject_name(x509);
+        X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC,
+                                    (unsigned char *)country, -1, -1, 0);
+        X509_NAME_add_entry_by_txt(name, "O", MBSTRING_ASC,
+                                    (unsigned char *)"libsalticidae", -1, -1, 0);
+        X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
+                                    (unsigned char *)common_name, -1, -1, 0);
+        X509_set_issuer_name(x509, name);
+        X509_sign(x509, pkey.key, EVP_sha1());
+        return X509(x509);
+    }
     
     static X509 create_from_pem_file(std::string pem_fname, std::string *passwd = nullptr) {
         FILE *fp = fopen(pem_fname.c_str(), "r");
@@ -249,6 +296,14 @@ class X509 {
         OPENSSL_cleanse(der, ret);
         OPENSSL_free(der);
         return std::move(res);
+    }
+
+    void save_to_file(const std::string &fname) {
+        FILE *fp = fopen(fname.c_str(), "wb");
+        auto ret = PEM_write_X509(fp, x509);
+        fclose(fp);
+        if (!ret)
+            throw SalticidaeError(SALTI_ERROR_TLS_X509);
     }
 
     ~X509() { if (x509) X509_free(x509); }

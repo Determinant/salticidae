@@ -223,9 +223,13 @@ void ConnPool::Conn::_recv_data_tls_handshake(const conn_t &conn, int, int) {
         /* finishing TLS handshake */
         conn->send_data_func = _send_data_tls;
         conn->recv_data_func = _recv_data_dummy;
+        conn->ev_socket.del();
+        conn->ev_socket.add(FdEvent::WRITE);
         conn->peer_cert = new X509(conn->tls->get_peer_cert());
         conn->worker->enable_send_buffer(conn, conn->fd);
-        conn->cpool->update_conn(conn, true);
+        auto cpool = conn->cpool;
+        cpool->on_setup(conn);
+        cpool->update_conn(conn, true);
     }
     else
     {
@@ -301,7 +305,6 @@ void ConnPool::accept_client(int fd, int) {
             SALTICIDAE_LOG_INFO("accepted %s", std::string(*conn).c_str());
             auto &worker = select_worker();
             conn->worker = &worker;
-            on_setup(conn);
             worker.feed(conn, client_fd);
         }
     } catch (...) { recoverable_error(std::current_exception()); }
@@ -315,14 +318,13 @@ void ConnPool::conn_server(const conn_t &conn, int fd, int events) {
             SALTICIDAE_LOG_INFO("connected to remote %s", std::string(*conn).c_str());
             auto &worker = select_worker();
             conn->worker = &worker;
-            on_setup(conn);
             worker.feed(conn, fd);
         }
         else
         {
             if (events & TimedFdEvent::TIMEOUT)
                 SALTICIDAE_LOG_INFO("%s connect timeout", std::string(*conn).c_str());
-            throw SalticidaeError(SALTI_ERROR_CONNECT);
+            throw SalticidaeError(SALTI_ERROR_CONNECT, errno);
         }
     } catch (...) {
         disp_terminate(conn);

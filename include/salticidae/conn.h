@@ -195,7 +195,12 @@ class ConnPool {
             if (enable_tls && connected)
             {
                 conn->worker->get_tcall()->async_call([this, conn, ret](ThreadCall::Handle &) {
-                    if (ret) conn->recv_data_func = Conn::_recv_data_tls;
+                    if (ret)
+                    {
+                        conn->recv_data_func = Conn::_recv_data_tls;
+                        conn->ev_socket.del();
+                        conn->ev_socket.add(FdEvent::READ | FdEvent::WRITE);
+                    }
                     else worker_terminate(conn);
                 });
             }
@@ -262,6 +267,7 @@ class ConnPool {
                         conn->send_data_func = Conn::_send_data;
                         conn->recv_data_func = Conn::_recv_data;
                         enable_send_buffer(conn, client_fd);
+                        cpool->on_setup(conn);
                         cpool->update_conn(conn, true);
                     }
                     assert(conn->fd != -1);

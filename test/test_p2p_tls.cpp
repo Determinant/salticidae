@@ -39,6 +39,7 @@ using salticidae::htole;
 using salticidae::letoh;
 using salticidae::EventContext;
 using salticidae::ThreadCall;
+using salticidae::PKey;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
@@ -75,9 +76,27 @@ struct Net {
     const std::string listen_addr;
 
     Net(uint64_t id, uint16_t port): id(id), tc(ec), listen_addr("127.0.0.1:"+ std::to_string(port)) {
-        net = new PeerNetwork(ec, PeerNetwork::Config().conn_timeout(5).ping_period(2));
+        auto tls_key = new PKey(PKey::create_privkey_rsa(2048));
+        auto tls_cert = new salticidae::X509(salticidae::X509::create_self_signed_from_pubkey(*tls_key));
+        tls_key->save_privkey_to_file(std::to_string(port) + "_pkey.pem");
+        tls_cert->save_to_file(std::to_string(port) + ".pem");
+        net = new PeerNetwork(ec, PeerNetwork::Config(salticidae::ConnPool::Config()
+                    .enable_tls(true)
+                    .tls_key(tls_key)
+                    .tls_cert(tls_cert)
+                ).conn_timeout(5)
+                .ping_period(2)
+                .id_mode(PeerNetwork::IdentityMode::ADDR_BASED));
         net->reg_handler([this](const MsgText &msg, const PeerNetwork::conn_t &) {
             fprintf(stdout, "net %lu: peer %lu says %s\n", this->id, msg.id, msg.text.c_str());
+        });
+        net->reg_conn_handler([this](const salticidae::ConnPool::conn_t &conn, bool connected) {
+            if (connected)
+            {
+                fprintf(stdout, "net %lu: peer's cert is %s\n", this->id,
+                        salticidae::get_hash(conn->get_peer_cert()->get_der()).to_hex().c_str());
+            }
+            return true;
         });
         net->reg_error_handler([this](const std::exception_ptr _err, bool fatal) {
             try {

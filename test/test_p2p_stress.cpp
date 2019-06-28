@@ -97,29 +97,29 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
     auto &ec = app.ec;
     auto &net = *app.net;
     auto send_rand = [&](int size, const MyNet::conn_t &conn) {
-        auto &tc = app.tc[conn->get_addr()];
+        auto addr = conn->get_peer_addr();
+        assert(!addr.is_null());
+        auto &tc = app.tc[addr];
         MsgRand msg(size);
         tc.hash = msg.serialized.get_hash();
         net.send_msg(std::move(msg), conn);
     };
-    net.reg_conn_handler([&, send_rand](const ConnPool::conn_t &conn, bool connected) {
+    net.reg_peer_handler([&, send_rand](const MyNet::conn_t &conn, bool connected) {
         if (connected)
         {
-            if (conn->get_mode() == ConnPool::Conn::ACTIVE)
-            {
-                auto &tc = app.tc[conn->get_addr()];
-                tc.state = 1;
-                SALTICIDAE_LOG_INFO("increasing phase");
-                send_rand(tc.state, static_pointer_cast<MyNet::Conn>(conn));
-            }
+            auto addr = conn->get_peer_addr();
+            assert(!addr.is_null());
+            auto &tc = app.tc[addr];
+            tc.state = 1;
+            SALTICIDAE_LOG_INFO("increasing phase");
+            send_rand(tc.state, conn);
         }
-        return true;
     });
     net.reg_error_handler([ec](const std::exception_ptr _err, bool fatal) {
         try {
             std::rethrow_exception(_err);
         } catch (const std::exception & err) {
-            SALTICIDAE_LOG_WARN("main thread captured %s error: %s",
+            SALTICIDAE_LOG_WARN("captured %s error: %s",
                 fatal ? "fatal" : "recoverable", err.what());
         }
     });
@@ -128,7 +128,9 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
         net.send_msg(MsgAck(hash), conn);
     });
     net.reg_handler([&, send_rand](MsgAck &&msg, const MyNet::conn_t &conn) {
-        auto &tc = app.tc[conn->get_addr()];
+        auto addr = conn->get_peer_addr();
+        assert(!addr.is_null());
+        auto &tc = app.tc[addr];
         if (msg.hash != tc.hash)
         {
             SALTICIDAE_LOG_ERROR("corrupted I/O!");

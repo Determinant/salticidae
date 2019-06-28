@@ -250,8 +250,8 @@ void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, Salti
 void peernetwork_reg_unknown_peer_handler(peernetwork_t *self,
                                         msgnetwork_unknown_peer_callback_t cb,
                                         void *userdata) {
-    self->reg_unknown_peer_handler([=](const NetAddr &addr) {
-        cb(&addr, userdata);
+    self->reg_unknown_peer_handler([=](const NetAddr &claimed_addr) {
+        cb(&claimed_addr, userdata);
     });
 }
 
