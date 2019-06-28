@@ -63,11 +63,41 @@ Dependencies
 - CMake >= 3.9
 - C++14
 - libuv
-- libcrypto
+- openssl >= 1.1.0
 
-Example (MsgNetwork layer)
---------------------------
+Minimal working P2P network
+---------------------------
+.. code-block:: cpp
 
+   #include <memory>
+   #include "salticidae/event.h"
+   #include "salticidae/network.h"
+   
+   using Net = salticidae::PeerNetwork<uint8_t>;
+   
+   int main() { /* exampmle of 4 peer nodes pinging each other */
+       std::vector<std::pair<salticidae::NetAddr, std::unique_ptr<Net>>> nodes;
+       Net::Config config;
+       salticidae::EventContext ec;
+       config.ping_period(2);
+       nodes.resize(4);
+       for (size_t i = 0; i < nodes.size(); i++)
+       {
+           salticidae::NetAddr addr("127.0.0.1:" + std::to_string(10000 + i));
+           auto &net = (nodes[i] = std::make_pair(addr, std::make_unique<Net>(ec, config))).second;
+           net->start();
+           net->listen(addr);
+       }
+       for (size_t i = 0; i < nodes.size(); i++)
+           for (size_t j = 0; j < nodes.size(); j++)
+               if (i != j)
+                   nodes[i].second->add_peer(nodes[j].first);
+       ec.dispatch();
+       return 0;
+   }
+
+Using MsgNetwork class
+----------------------
 .. code-block:: cpp
 
    #include <cstdio>
@@ -142,34 +172,32 @@ Example (MsgNetwork layer)
                {
                    if (conn->get_mode() == ConnPool::Conn::ACTIVE)
                    {
-                       printf("[%s] Connected, sending hello.\n",
+                       printf("[%s] connected, sending hello.\n",
                                this->name.c_str());
                        /* send the first message through this connection */
                        send_msg(MsgHello(this->name, "Hello there!"),
                                salticidae::static_pointer_cast<Conn>(conn));
                    }
                    else
-                       printf("[%s] Accepted, waiting for greetings.\n",
+                       printf("[%s] accepted, waiting for greetings.\n",
                                this->name.c_str());
                }
                else
                {
-                   printf("[%s] Disconnected, retrying.\n", this->name.c_str());
+                   printf("[%s] disconnected, retrying.\n", this->name.c_str());
                    /* try to reconnect to the same address */
-                   connect(conn->get_addr());
+                   connect(conn->get_addr(), false);
                }
+               return true;
            });
        }
    
        void on_receive_hello(MsgHello &&msg, const MyNet::conn_t &conn) {
-           printf("[%s] %s says %s\n",
-                   name.c_str(),
-                   msg.name.c_str(), msg.text.c_str());
+           printf("[%s] %s says %s\n", name.c_str(), msg.name.c_str(), msg.text.c_str());
            /* send acknowledgement */
            send_msg(MsgAck(), conn);
        }
    };
-   
    
    void on_receive_ack(MsgAck &&msg, const MyNet::conn_t &conn) {
        auto net = static_cast<MyNet *>(conn->get_net());
@@ -182,8 +210,8 @@ Example (MsgNetwork layer)
        NetAddr bob_addr("127.0.0.1:12346");
    
        /* test two nodes in the same main loop */
-       MyNet alice(ec, "Alice", bob_addr);
-       MyNet bob(ec, "Bob", alice_addr);
+       MyNet alice(ec, "alice", bob_addr);
+       MyNet bob(ec, "bob", alice_addr);
    
        /* message handler could be a normal function */
        alice.reg_handler(on_receive_ack);
@@ -198,8 +226,8 @@ Example (MsgNetwork layer)
        bob.listen(bob_addr);
    
        /* try to connect once */
-       alice.connect(bob_addr);
-       bob.connect(alice_addr);
+       alice.connect(bob_addr, false);
+       bob.connect(alice_addr, false);
    
        /* the main loop can be shutdown by ctrl-c or kill */
        auto shutdown = [&](int) {ec.stop();};
