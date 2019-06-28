@@ -228,8 +228,10 @@ void ConnPool::Conn::_recv_data_tls_handshake(const conn_t &conn, int, int) {
         conn->peer_cert = new X509(conn->tls->get_peer_cert());
         conn->worker->enable_send_buffer(conn, conn->fd);
         auto cpool = conn->cpool;
-        cpool->on_setup(conn);
-        cpool->update_conn(conn, true);
+        cpool->disp_tcall->async_call([cpool, conn](ThreadCall::Handle &) {
+            cpool->on_setup(conn);
+            cpool->update_conn(conn, true);
+        });
     }
     else
     {

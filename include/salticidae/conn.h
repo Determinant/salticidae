@@ -267,8 +267,10 @@ class ConnPool {
                         conn->send_data_func = Conn::_send_data;
                         conn->recv_data_func = Conn::_recv_data;
                         enable_send_buffer(conn, client_fd);
-                        cpool->on_setup(conn);
-                        cpool->update_conn(conn, true);
+                        cpool->disp_tcall->async_call([cpool, conn](ThreadCall::Handle &) {
+                            cpool->on_setup(conn);
+                            cpool->update_conn(conn, true);
+                        });
                     }
                     assert(conn->fd != -1);
                     assert(conn->worker == this);
