@@ -733,16 +733,21 @@ using threadcall_t = salticidae::ThreadCall;
 using threadcall_handle_t = salticidae::ThreadCall::Handle;
 using sigev_t = salticidae::SigEvent;
 using timerev_t = salticidae::TimerEvent;
+using mpscqueue_t = salticidae::MPSCQueueEventDriven<void *>;
 #endif
 
 #else
+
+#include <stdbool.h>
 #include "config.h"
+
 #ifdef SALTICIDAE_CBINDINGS
 typedef struct eventcontext_t eventcontext_t;
 typedef struct threadcall_t threadcall_t;
 typedef struct threadcall_handle_t threadcall_handle_t;
 typedef struct sigev_t sigev_t;
 typedef struct timerev_t timerev_t;
+typedef struct mpscqueue_t mpscqueue_t;
 #endif
 
 #endif
@@ -771,7 +776,7 @@ void sigev_del(sigev_t *self);
 void sigev_clear(sigev_t *self);
 const eventcontext_t *sigev_get_ec(const sigev_t *self);
 
-typedef void (*timerev_callback_t)(timerev_t *, void *);
+typedef void (*timerev_callback_t)(timerev_t *self, void *userdata);
 timerev_t *timerev_new(const eventcontext_t *ec, timerev_callback_t callback, void *);
 void timerev_set_callback(timerev_t *self, timerev_callback_t callback, void *);
 void timerev_free(timerev_t *self);
@@ -779,6 +784,15 @@ void timerev_add(timerev_t *self, double t_sec);
 void timerev_del(timerev_t *self);
 void timerev_clear(timerev_t *self);
 const eventcontext_t *timerev_get_ec(const timerev_t *self);
+
+typedef bool (*mpscqueue_callback_t)(mpscqueue_t *self, void *userdata);
+mpscqueue_t *mpscqueue_new();
+void mpscqueue_free(mpscqueue_t *self);
+void mpscqueue_reg_handler(mpscqueue_t *self, const eventcontext_t *ec, mpscqueue_callback_t callback, void *);
+void mpscqueue_unreg_handler(mpscqueue_t *self);
+bool mpscqueue_enqueue(mpscqueue_t *self, void *elem, bool unbounded);
+bool mpscqueue_try_dequeue(mpscqueue_t *self, void **elem);
+void mpscqueue_set_capacity(mpscqueue_t *self, size_t cap);
 
 #ifdef __cplusplus
 }

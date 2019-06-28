@@ -69,6 +69,30 @@ void timerev_del(timerev_t *self) { self->del(); }
 
 void timerev_clear(timerev_t *self) { self->clear(); }
 
+mpscqueue_t *mpscqueue_new() { return new mpscqueue_t(); }
+
+void mpscqueue_free(mpscqueue_t *self) { delete self; }
+
+void mpscqueue_reg_handler(mpscqueue_t *self, const eventcontext_t *ec, mpscqueue_callback_t callback, void *userdata) {
+    self->reg_handler(*ec, [=](mpscqueue_t &q) {
+        return callback(&q, userdata);
+    });
+}
+
+void mpscqueue_unreg_handler(mpscqueue_t *self) { self->unreg_handler(); }
+
+bool mpscqueue_enqueue(mpscqueue_t *self, void *elem, bool unbounded) {
+    return self->enqueue(elem, unbounded);
+}
+
+bool mpscqueue_try_dequeue(mpscqueue_t *self, void **elem) {
+    return self->try_dequeue(*elem);
+}
+
+void mpscqueue_set_capacity(mpscqueue_t *self, size_t cap) {
+    self->set_capacity(cap);
+}
+
 }
 
 #endif

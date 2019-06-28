@@ -154,7 +154,13 @@ class MsgBase {
 
     size_t get_length() const { return length; }
 
+    uint32_t get_magic() const { return magic; }
+
     const opcode_t &get_opcode() const { return opcode; }
+
+    void set_magic(uint32_t _magic) {
+        magic = _magic;
+    }
 
     void set_opcode(const opcode_t &_opcode) {
         opcode = _opcode;
@@ -289,6 +295,8 @@ msg_t *msg_new_moved_from_bytearray(_opcode_t opcode, bytearray_t *_moved_payloa
 void msg_free(msg_t *msg);
 datastream_t *msg_consume_payload(const msg_t *msg);
 _opcode_t msg_get_opcode(const msg_t *msg);
+uint32_t msg_get_magic(const msg_t *msg);
+void msg_set_magic(msg_t *msg, uint32_t magic);
 
 #ifdef __cplusplus
 }
