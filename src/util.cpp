@@ -42,6 +42,7 @@ const char *SALTICIDAE_ERROR_STRINGS[] = {
     "unable to connect",
     "peer already exists",
     "peer does not exist",
+    "peer is not ready",
     "invalid NetAddr format",
     "invalid OptVal format",
     "option name already exists",
