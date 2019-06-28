@@ -1266,8 +1266,11 @@ void peernetwork_send_msg_deferred_by_move(peernetwork_t *self, msg_t * _moved_m
 void peernetwork_multicast_msg_by_move(peernetwork_t *self, msg_t *_moved_msg, const netaddr_array_t *addrs);
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *err);
 
-typedef void (*msgnetwork_unknown_peer_callback_t)(const netaddr_t *, void *userdata);
-void peernetwork_reg_unknown_peer_handler(peernetwork_t *self, msgnetwork_unknown_peer_callback_t cb, void *userdata);
+typedef void (*peernetwork_peer_callback_t)(const peernetwork_conn_t *, bool connected, void *userdata);
+void peernetwork_reg_peer_handler(peernetwork_t *self, peernetwork_peer_callback_t cb, void *userdata);
+
+typedef void (*peernetwork_unknown_peer_callback_t)(const netaddr_t *, void *userdata);
+void peernetwork_reg_unknown_peer_handler(peernetwork_t *self, peernetwork_unknown_peer_callback_t cb, void *userdata);
 
 /* ClientNetwork */
 

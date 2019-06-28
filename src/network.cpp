@@ -251,8 +251,16 @@ void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, Salti
     SALTICIDAE_CERROR_CATCH(cerror)
 }
 
+void peernetwork_reg_peer_handler(peernetwork_t *self,
+                                peernetwork_peer_callback_t cb,
+                                void *userdata) {
+    self->reg_peer_handler([=](const peernetwork_conn_t &conn, bool connected) {
+        cb(&conn, connected, userdata);
+    });
+}
+
 void peernetwork_reg_unknown_peer_handler(peernetwork_t *self,
-                                        msgnetwork_unknown_peer_callback_t cb,
+                                        peernetwork_unknown_peer_callback_t cb,
                                         void *userdata) {
     self->reg_unknown_peer_handler([=](const NetAddr &claimed_addr) {
         cb(&claimed_addr, userdata);
