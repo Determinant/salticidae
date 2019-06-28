@@ -298,7 +298,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
 
     using conn_t = ArcObj<Conn>;
     using peer_callback_t = std::function<void(const conn_t &peer_conn, bool connected)>;
-    using unknown_peer_callback_t = std::function<void(const NetAddr &claimed_addr)>;
+    using unknown_peer_callback_t = std::function<void(const NetAddr &claimed_addr, const X509 *cert)>;
 
     private:
     class Peer {
@@ -779,8 +779,8 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                     pinfo_ulock_t __g(pid2peer_lock);
                     if (!known_peers.count(msg.claimed_addr))
                     {
-                        this->user_tcall->async_call([this, addr=msg.claimed_addr](ThreadCall::Handle &) {
-                            if (unknown_peer_cb) unknown_peer_cb(addr);
+                        this->user_tcall->async_call([this, addr=msg.claimed_addr, conn](ThreadCall::Handle &) {
+                            if (unknown_peer_cb) unknown_peer_cb(addr, conn->get_peer_cert());
                         });
                         this->disp_terminate(conn);
                         return;
@@ -1269,7 +1269,7 @@ void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, Salti
 typedef void (*peernetwork_peer_callback_t)(const peernetwork_conn_t *, bool connected, void *userdata);
 void peernetwork_reg_peer_handler(peernetwork_t *self, peernetwork_peer_callback_t cb, void *userdata);
 
-typedef void (*peernetwork_unknown_peer_callback_t)(const netaddr_t *, void *userdata);
+typedef void (*peernetwork_unknown_peer_callback_t)(const netaddr_t *, const x509_t *, void *userdata);
 void peernetwork_reg_unknown_peer_handler(peernetwork_t *self, peernetwork_unknown_peer_callback_t cb, void *userdata);
 
 /* ClientNetwork */

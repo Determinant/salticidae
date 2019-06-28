@@ -119,7 +119,7 @@ struct Net {
                     std::string(conn->get_peer_addr()).c_str(),
                     salticidae::get_hash(conn->get_peer_cert()->get_der()).to_hex().c_str());
         });
-        net->reg_unknown_peer_handler([this](const NetAddr &claimed_addr) {
+        net->reg_unknown_peer_handler([this](const NetAddr &claimed_addr, const salticidae::X509 *) {
             fprintf(stdout, "net %lu: unknown peer %s attempts to connnect\n",
                     this->id, std::string(claimed_addr).c_str());
         });

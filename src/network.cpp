@@ -262,8 +262,8 @@ void peernetwork_reg_peer_handler(peernetwork_t *self,
 void peernetwork_reg_unknown_peer_handler(peernetwork_t *self,
                                         peernetwork_unknown_peer_callback_t cb,
                                         void *userdata) {
-    self->reg_unknown_peer_handler([=](const NetAddr &claimed_addr) {
-        cb(&claimed_addr, userdata);
+    self->reg_unknown_peer_handler([=](const NetAddr &claimed_addr, const salticidae::X509 *cert) {
+        cb(&claimed_addr, cert, userdata);
     });
 }
 

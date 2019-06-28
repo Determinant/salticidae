@@ -93,7 +93,7 @@ struct Net {
                     connected ? "connected to" : "disconnected from",
                     std::string(conn->get_peer_addr()).c_str());
         });
-        net->reg_unknown_peer_handler([this](const NetAddr &claimed_addr) {
+        net->reg_unknown_peer_handler([this](const NetAddr &claimed_addr, const salticidae::X509 *) {
             fprintf(stdout, "net %lu: unknown peer %s attempts to connnect\n",
                     this->id, std::string(claimed_addr).c_str());
         });
