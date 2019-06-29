@@ -603,6 +603,7 @@ void PeerNetwork<O, _, __>::on_setup(const ConnPool::conn_t &_conn) {
     MsgNet::on_setup(_conn);
     auto conn = static_pointer_cast<Conn>(_conn);
     auto worker = conn->worker;
+    SALTICIDAE_LOG_INFO("connection: %s", std::string(*conn).c_str());
     worker->get_tcall()->async_call([this, conn, worker](ThreadCall::Handle &) {
         auto &ev_timeout = conn->ev_timeout;
         assert(!ev_timeout);
@@ -1261,6 +1262,7 @@ peernetwork_t *msgnetwork_as_peernetwork_unsafe(msgnetwork_t *self);
 msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_conn_t *conn);
 peernetwork_conn_t *peernetwork_conn_new_from_msgnetwork_conn_unsafe(const msgnetwork_conn_t *conn);
 peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self);
+netaddr_t *peernetwork_conn_get_peer_addr(const peernetwork_conn_t *self);
 void peernetwork_conn_free(const peernetwork_conn_t *self);
 void peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *addr);
 void peernetwork_send_msg_deferred_by_move(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *addr);

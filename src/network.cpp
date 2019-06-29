@@ -229,6 +229,10 @@ peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self) {
     return new peernetwork_conn_t(*self);
 }
 
+netaddr_t *peernetwork_conn_get_peer_addr(const peernetwork_conn_t *self) {
+    return new netaddr_t((*self)->get_peer_addr());
+}
+
 void peernetwork_conn_free(const peernetwork_conn_t *self) { delete self; }
 
 void peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *addr) {
