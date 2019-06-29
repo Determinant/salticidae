@@ -235,8 +235,13 @@ netaddr_t *peernetwork_conn_get_peer_addr(const peernetwork_conn_t *self) {
 
 void peernetwork_conn_free(const peernetwork_conn_t *self) { delete self; }
 
-void peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *addr) {
-    self->_send_msg(*msg, *addr);
+bool peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *addr) {
+    try {
+        self->_send_msg(*msg, *addr);
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 void peernetwork_send_msg_deferred_by_move(peernetwork_t *self,
@@ -300,8 +305,13 @@ clientnetwork_conn_t *clientnetwork_conn_copy(const clientnetwork_conn_t *self) 
 
 void clientnetwork_conn_free(const clientnetwork_conn_t *self) { delete self; }
 
-void clientnetwork_send_msg(clientnetwork_t *self, const msg_t * msg, const netaddr_t *addr) {
-    self->_send_msg(*msg, *addr);
+bool clientnetwork_send_msg(clientnetwork_t *self, const msg_t * msg, const netaddr_t *addr) {
+    try {
+        self->_send_msg(*msg, *addr);
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 void clientnetwork_send_msg_deferred_by_move(clientnetwork_t *self, msg_t *_moved_msg, const netaddr_t *addr) {

@@ -408,7 +408,6 @@ void ConnPool::del_conn(const conn_t &conn) {
     pool.erase(it);
     update_conn(conn, false);
     release_conn(conn);
-    //std::atomic_thread_fence(std::memory_order_release);
 }
 
 void ConnPool::release_conn(const conn_t &conn) {

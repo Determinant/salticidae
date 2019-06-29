@@ -114,7 +114,6 @@ class ConnPool {
         Conn(Conn &&other) = delete;
     
         virtual ~Conn() {
-            //std::atomic_thread_fence(std::memory_order_acquire);
             SALTICIDAE_LOG_INFO("destroyed %s", std::string(*this).c_str());
         }
 

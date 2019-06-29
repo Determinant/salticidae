@@ -1264,7 +1264,7 @@ peernetwork_conn_t *peernetwork_conn_new_from_msgnetwork_conn_unsafe(const msgne
 peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self);
 netaddr_t *peernetwork_conn_get_peer_addr(const peernetwork_conn_t *self);
 void peernetwork_conn_free(const peernetwork_conn_t *self);
-void peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *addr);
+bool peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *addr);
 void peernetwork_send_msg_deferred_by_move(peernetwork_t *self, msg_t * _moved_msg, const netaddr_t *addr);
 void peernetwork_multicast_msg_by_move(peernetwork_t *self, msg_t *_moved_msg, const netaddr_array_t *addrs);
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *err);
@@ -1285,7 +1285,7 @@ msgnetwork_conn_t *msgnetwork_conn_new_from_clientnetwork_conn(const clientnetwo
 clientnetwork_conn_t *clientnetwork_conn_new_from_msgnetwork_conn_unsafe(const msgnetwork_conn_t *conn);
 clientnetwork_conn_t *clientnetwork_conn_copy(const clientnetwork_conn_t *self);
 void clientnetwork_conn_free(const clientnetwork_conn_t *self);
-void clientnetwork_send_msg(clientnetwork_t *self, const msg_t * msg, const netaddr_t *addr);
+bool clientnetwork_send_msg(clientnetwork_t *self, const msg_t * msg, const netaddr_t *addr);
 void clientnetwork_send_msg_deferred_by_move(clientnetwork_t *self, msg_t * _moved_msg, const netaddr_t *addr);
 
 #ifdef __cplusplus
