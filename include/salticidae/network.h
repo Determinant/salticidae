@@ -291,7 +291,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
 
         protected:
         void stop() override {
-            ev_timeout.del();
+            ev_timeout.clear();
             MsgNet::Conn::stop();
         }
     };
@@ -596,16 +596,17 @@ void PeerNetwork<O, _, __>::on_setup(const ConnPool::conn_t &_conn) {
     MsgNet::on_setup(_conn);
     auto conn = static_pointer_cast<Conn>(_conn);
     auto worker = conn->worker;
-    auto &ev_timeout = conn->ev_timeout;
-    assert(!ev_timeout);
-    ev_timeout = TimerEvent(worker->get_ec(),
-            [listen_addr=this->listen_addr, worker, conn](TimerEvent &) {
-        try {
-            SALTICIDAE_LOG_INFO("peer ping-pong timeout %s <-> %s",
-                std::string(listen_addr).c_str(),
-                std::string(conn->get_peer_addr()).c_str());
-            conn->get_net()->worker_terminate(conn);
-        } catch (...) { worker->error_callback(std::current_exception()); }
+    worker->get_tcall()->async_call([this, conn, worker](ThreadCall::Handle &) {
+        auto &ev_timeout = conn->ev_timeout;
+        assert(!ev_timeout);
+        ev_timeout = TimerEvent(worker->get_ec(), [=](TimerEvent &) {
+            try {
+                SALTICIDAE_LOG_INFO("peer ping-pong timeout %s <-> %s",
+                    std::string(listen_addr).c_str(),
+                    std::string(conn->get_peer_addr()).c_str());
+                this->worker_terminate(conn);
+            } catch (...) { worker->error_callback(std::current_exception()); }
+        });
     });
     /* the initial ping-pong to set up the connection */
     tcall_reset_timeout(worker, conn, conn_timeout);
@@ -619,7 +620,6 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
     MsgNet::on_teardown(_conn);
     auto conn = static_pointer_cast<Conn>(_conn);
     auto addr = conn->get_addr();
-    conn->ev_timeout.clear();
     pending_peers.erase(addr);
     SALTICIDAE_LOG_INFO("connection lost: %s", std::string(*conn).c_str());
     auto p = conn->peer;

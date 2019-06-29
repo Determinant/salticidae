@@ -115,6 +115,7 @@ class ConnPool {
         Conn(Conn &&other) = delete;
     
         virtual ~Conn() {
+            std::atomic_thread_fence(std::memory_order_acquire);
             SALTICIDAE_LOG_INFO("destroyed %s", std::string(*this).c_str());
         }
 
@@ -251,7 +252,6 @@ class ConnPool {
             /* the caller should finalize all the preparation */
             tcall.async_call([this, conn, client_fd](ThreadCall::Handle &) {
                 try {
-                    conn->ev_connect.clear();
                     assert(conn->mode != Conn::ConnMode::DEAD);
                     auto cpool = conn->cpool;
                     if (cpool->enable_tls)

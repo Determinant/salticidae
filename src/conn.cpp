@@ -248,8 +248,8 @@ void ConnPool::Conn::stop() {
     {
         if (worker) worker->unfeed();
         if (tls) tls->shutdown();
-        ev_connect.del();
-        ev_socket.del();
+        ev_socket.clear();
+        ev_connect.clear();
         send_buffer.get_queue().unreg_handler();
         mode = ConnMode::DEAD;
     }
@@ -419,9 +419,8 @@ void ConnPool::del_conn(const conn_t &conn) {
 void ConnPool::release_conn(const conn_t &conn) {
     /* inform the upper layer the connection will be destroyed */
     on_teardown(conn);
-    conn->ev_connect.clear();
-    conn->ev_socket.clear();
     ::close(conn->fd);
+    std::atomic_thread_fence(std::memory_order_release);
 }
 
 ConnPool::conn_t ConnPool::add_conn(const conn_t &conn) {
