@@ -305,6 +305,8 @@ class TimedFdEvent: public FdEvent, public TimerEvent {
         return *this;
     }
 
+    ~TimedFdEvent() { clear(); }
+
     void clear() {
         TimerEvent::clear();
         FdEvent::clear();

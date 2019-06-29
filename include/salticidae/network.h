@@ -282,7 +282,11 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         public:
         Conn(): MsgNet::Conn(), peer(nullptr) {}
         NetAddr get_peer_addr() {
-            return peer ? peer->peer_addr : NetAddr();
+            auto ret = *(static_cast<NetAddr *>(
+                get_net()->disp_tcall->call([this](ThreadCall::Handle &h) {
+                    h.set_result(peer ? peer->peer_addr : NetAddr());
+                }).get()));
+            return ret;
         }
 
         PeerNetwork *get_net() {
@@ -344,7 +348,10 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
                 ev_ping_timer.del();
         }
         public:
-        ~Peer() {}
+        ~Peer() {
+            if (inbound_conn) inbound_conn->peer = nullptr;
+            if (outbound_conn) outbound_conn->peer = nullptr;
+        }
     };
 
     std::unordered_map<NetAddr, conn_t> pending_peers;
@@ -601,9 +608,7 @@ void PeerNetwork<O, _, __>::on_setup(const ConnPool::conn_t &_conn) {
         assert(!ev_timeout);
         ev_timeout = TimerEvent(worker->get_ec(), [=](TimerEvent &) {
             try {
-                SALTICIDAE_LOG_INFO("peer ping-pong timeout %s <-> %s",
-                    std::string(listen_addr).c_str(),
-                    std::string(conn->get_peer_addr()).c_str());
+                SALTICIDAE_LOG_INFO("peer ping-pong timeout");
                 this->worker_terminate(conn);
             } catch (...) { worker->error_callback(std::current_exception()); }
         });
@@ -735,8 +740,7 @@ void PeerNetwork<O, _, __>::replace_conn(const conn_t &conn) {
         auto &old_conn = it->second;
         if (old_conn != conn)
         {
-            if (old_conn->get_mode() != Conn::ConnMode::DEAD)
-                this->disp_terminate(old_conn);
+            this->disp_terminate(old_conn);
             pending_peers.erase(it);
         }
     }
@@ -768,12 +772,11 @@ template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
     this->disp_tcall->async_call([this, conn, msg=std::move(msg)](ThreadCall::Handle &) {
         try {
-            auto conn_mode = conn->get_mode();
-            if (conn_mode == ConnPool::Conn::DEAD) return;
+            if (conn->is_terminated()) return;
             if (!msg.claimed_addr.is_null())
             {
                 auto peer_id = gen_peer_id(conn, msg.claimed_addr, msg.nonce);
-                if (conn_mode == Conn::ConnMode::PASSIVE)
+                if (conn->get_mode() == Conn::ConnMode::PASSIVE)
                 {
                     pinfo_slock_t _g(known_peers_lock);
                     pinfo_ulock_t __g(pid2peer_lock);
@@ -799,7 +802,7 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                             return;
                         }
                         auto &old_conn = p->inbound_conn;
-                        if (old_conn && old_conn->get_mode() != Conn::ConnMode::DEAD)
+                        if (old_conn && !old_conn->is_terminated())
                         {
                             SALTICIDAE_LOG_DEBUG("%s terminating old connection %s",
                                     std::string(listen_addr).c_str(),
@@ -839,12 +842,11 @@ template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
     this->disp_tcall->async_call([this, conn, msg=std::move(msg)](ThreadCall::Handle &) {
         try {
-            auto conn_mode = conn->get_mode();
-            if (conn_mode == ConnPool::Conn::DEAD) return;
+            if (conn->is_terminated()) return;
             if (!msg.claimed_addr.is_null())
             {
                 auto peer_id = gen_peer_id(conn, msg.claimed_addr, msg.nonce);
-                if (conn_mode == Conn::ConnMode::ACTIVE)
+                if (conn->get_mode() == Conn::ConnMode::ACTIVE)
                 {
                     pinfo_ulock_t _g(known_peers_lock);
                     pinfo_ulock_t __g(pid2peer_lock);
@@ -861,7 +863,7 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
                             return;
                         }
                         auto &old_conn = p->outbound_conn;
-                        if (old_conn && old_conn->get_mode() != Conn::ConnMode::DEAD)
+                        if (old_conn && !old_conn->is_terminated())
                         {
                             SALTICIDAE_LOG_DEBUG("%s terminating old connection %s",
                                     std::string(listen_addr).c_str(),
@@ -895,7 +897,7 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
                     {
                         SALTICIDAE_LOG_WARN("multiple peer addresses share the same identity");
                         known_peers.erase(old_peer_addr);
-                        if (p->conn && p->conn->get_mode() != Conn::ConnMode::DEAD)
+                        if (p->conn && !p->conn->is_terminated())
                             this->disp_terminate(p->conn);
                     }
                     old_peer_addr = peer_addr;
@@ -1182,7 +1184,6 @@ typedef struct clientnetwork_conn_t clientnetwork_conn_t;
 typedef enum msgnetwork_conn_mode_t {
     CONN_MODE_ACTIVE,
     CONN_MODE_PASSIVE,
-    CONN_MODE_DEAD
 } msgnetwork_conn_mode_t;
 
 typedef enum peernetwork_id_mode_t {

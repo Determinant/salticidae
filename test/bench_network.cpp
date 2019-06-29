@@ -106,7 +106,7 @@ struct MyNet: public MsgNetworkByteOp {
                     /* send the first message through this connection */
                     trigger = [this, conn](ThreadCall::Handle &) {
                         send_msg(MsgBytes(256), salticidae::static_pointer_cast<Conn>(conn));
-                        if (conn->get_mode() != MyNet::Conn::DEAD)
+                        if (!conn->is_terminated())
                             tcall.async_call(trigger);
                     };
                     tcall.async_call(trigger);

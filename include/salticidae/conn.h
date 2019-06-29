@@ -68,7 +68,6 @@ class ConnPool {
         enum ConnMode {
             ACTIVE, /**< the connection is established by connect() */
             PASSIVE, /**< the connection is established by accept() */
-            DEAD, /**< the connection is dead */
         };
     
         protected:
@@ -77,7 +76,7 @@ class ConnPool {
         int fd;
         Worker *worker;
         ConnPool *cpool;
-        std::atomic<ConnMode> mode;
+        ConnMode mode;
         NetAddr addr;
 
         MPSCWriteBuffer send_buffer;
@@ -115,7 +114,7 @@ class ConnPool {
         Conn(Conn &&other) = delete;
     
         virtual ~Conn() {
-            std::atomic_thread_fence(std::memory_order_acquire);
+            //std::atomic_thread_fence(std::memory_order_acquire);
             SALTICIDAE_LOG_INFO("destroyed %s", std::string(*this).c_str());
         }
 
@@ -132,7 +131,6 @@ class ConnPool {
         const X509 *get_peer_cert() const { return peer_cert.get(); }
         ConnMode get_mode() const { return mode; }
         ConnPool *get_pool() const { return cpool; }
-        MPSCWriteBuffer &get_send_buffer() { return send_buffer; }
 
         /** Write data to the connection (non-blocking). The data will be sent
          * whenever I/O is available. */
@@ -234,8 +232,7 @@ class ConnPool {
         }
 
         void enable_send_buffer(const conn_t &conn, int client_fd) {
-            conn->get_send_buffer()
-                    .get_queue()
+            conn->send_buffer.get_queue()
                     .reg_handler(this->ec, [conn, client_fd]
                                 (MPSCWriteBuffer::queue_t &) {
                 if (conn->ready_send)
@@ -252,7 +249,6 @@ class ConnPool {
             /* the caller should finalize all the preparation */
             tcall.async_call([this, conn, client_fd](ThreadCall::Handle &) {
                 try {
-                    assert(conn->mode != Conn::ConnMode::DEAD);
                     auto cpool = conn->cpool;
                     if (cpool->enable_tls)
                     {

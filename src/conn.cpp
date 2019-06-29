@@ -45,7 +45,6 @@ ConnPool::Conn::operator std::string() const {
     {
         case Conn::ACTIVE: s << "active"; break;
         case Conn::PASSIVE: s << "passive"; break;
-        case Conn::DEAD: s << "dead"; break;
     }
     s << ">";
     return std::move(s);
@@ -244,15 +243,10 @@ void ConnPool::Conn::_recv_data_tls_handshake(const conn_t &conn, int, int) {
 void ConnPool::Conn::_recv_data_dummy(const conn_t &, int, int) {}
 
 void ConnPool::Conn::stop() {
-    if (mode != ConnMode::DEAD)
-    {
-        if (worker) worker->unfeed();
-        if (tls) tls->shutdown();
-        ev_socket.clear();
-        ev_connect.clear();
-        send_buffer.get_queue().unreg_handler();
-        mode = ConnMode::DEAD;
-    }
+    if (worker) worker->unfeed();
+    if (tls) tls->shutdown();
+    ev_socket.clear();
+    send_buffer.get_queue().unreg_handler();
 }
 
 void ConnPool::worker_terminate(const conn_t &conn) {
@@ -414,13 +408,14 @@ void ConnPool::del_conn(const conn_t &conn) {
     pool.erase(it);
     update_conn(conn, false);
     release_conn(conn);
+    //std::atomic_thread_fence(std::memory_order_release);
 }
 
 void ConnPool::release_conn(const conn_t &conn) {
     /* inform the upper layer the connection will be destroyed */
+    conn->ev_connect.clear();
     on_teardown(conn);
     ::close(conn->fd);
-    std::atomic_thread_fence(std::memory_order_release);
 }
 
 ConnPool::conn_t ConnPool::add_conn(const conn_t &conn) {
