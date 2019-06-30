@@ -284,7 +284,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         NetAddr get_peer_addr() {
             auto ret = *(static_cast<NetAddr *>(
                 get_net()->disp_tcall->call([this](ThreadCall::Handle &h) {
-                    h.set_result(peer ? peer->peer_addr : NetAddr());
+                    h.set_result(peer ? NetAddr(peer->peer_addr) : NetAddr());
                 }).get()));
             return ret;
         }
@@ -650,6 +650,7 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
         known_peers[p->peer_addr] = std::make_pair(uint256_t(), TimerEvent());
         {
             pinfo_ulock_t __g(pid2peer_lock);
+            p->conn->peer = nullptr;
             pid2peer.erase(p->peer_id);
         }
         this->user_tcall->async_call([this, conn](ThreadCall::Handle &) {

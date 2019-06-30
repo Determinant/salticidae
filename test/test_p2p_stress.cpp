@@ -118,6 +118,9 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
         tc.hash = msg.hash;
         net.send_msg(std::move(msg), conn);
     };
+    net.reg_conn_handler([](const ConnPool::conn_t &conn, bool connected) {
+        return true;
+    });
     net.reg_peer_handler([&, send_rand](const MyNet::conn_t &conn, bool connected) {
         if (connected)
         {
@@ -143,7 +146,12 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
     });
     net.reg_handler([&, send_rand](MsgAck &&msg, const MyNet::conn_t &conn) {
         auto addr = conn->get_peer_addr();
-        assert(!addr.is_null());
+        if (addr.is_null()) return;
+        if (app.tc.find(addr) == app.tc.end())
+        {
+            SALTICIDAE_LOG_WARN("%s\n", std::string(addr).c_str());
+            throw std::runtime_error("violation");
+        }
         auto &tc = app.tc[addr];
         if (msg.view != tc.view)
         {
