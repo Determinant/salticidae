@@ -48,6 +48,7 @@ uint16_t netaddr_get_port(const netaddr_t *self) { return self->port; }
 netaddr_array_t *netaddr_array_new() { return new netaddr_array_t(); }
 netaddr_array_t *netaddr_array_new_from_addrs(const netaddr_t * const *addrs, size_t naddrs) {
     auto res = new netaddr_array_t();
+    res->resize(naddrs);
     for (size_t i = 0; i < naddrs; i++)
         (*res)[i] = *addrs[i];
     return res;

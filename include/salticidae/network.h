@@ -1241,6 +1241,7 @@ msgnetwork_t *msgnetwork_conn_get_net(const msgnetwork_conn_t *conn);
 msgnetwork_conn_mode_t msgnetwork_conn_get_mode(const msgnetwork_conn_t *conn);
 const netaddr_t *msgnetwork_conn_get_addr(const msgnetwork_conn_t *conn);
 const x509_t *msgnetwork_conn_get_peer_cert(const msgnetwork_conn_t *conn);
+bool msgnetwork_conn_is_terminated(const msgnetwork_conn_t *conn);
 
 /* PeerNetwork */
 

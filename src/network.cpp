@@ -155,6 +155,10 @@ const x509_t *msgnetwork_conn_get_peer_cert(const msgnetwork_conn_t *conn) {
     return (*conn)->get_peer_cert();
 }
 
+bool msgnetwork_conn_is_terminated(const msgnetwork_conn_t *conn) {
+    return (*conn)->is_terminated();
+}
+
 // PeerNetwork
 
 peernetwork_config_t *peernetwork_config_new() {

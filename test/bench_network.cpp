@@ -71,7 +71,6 @@ using MsgNetworkByteOp = MsgNetwork<opcode_t>;
 
 struct MyNet: public MsgNetworkByteOp {
     const std::string name;
-    const NetAddr peer;
     TimerEvent ev_period_stat;
     ThreadCall tcall;
     size_t nrecv;
@@ -79,12 +78,10 @@ struct MyNet: public MsgNetworkByteOp {
 
     MyNet(const salticidae::EventContext &ec,
             const std::string name,
-            const NetAddr &peer,
             double stat_timeout = -1):
             MsgNetworkByteOp(ec, MsgNetworkByteOp::Config(
                 ConnPool::Config().queue_capacity(65536)).burst_size(1000)),
             name(name),
-            peer(peer),
             ev_period_stat(ec, [this, stat_timeout](TimerEvent &) {
                 SALTICIDAE_LOG_INFO("%.2f mps", nrecv / (double)stat_timeout);
                 fflush(stderr);
@@ -134,13 +131,13 @@ NetAddr alice_addr("127.0.0.1:1234");
 NetAddr bob_addr("127.0.0.1:1235");
 
 int main() {
-    salticidae::BoxObj<MyNet> alice = new MyNet(ec, "Alice", bob_addr, 10);
+    salticidae::BoxObj<MyNet> alice = new MyNet(ec, "Alice", 10);
     alice->start();
     alice->listen(alice_addr);
     salticidae::EventContext tec;
     salticidae::BoxObj<ThreadCall> tcall = new ThreadCall(tec);
     std::thread bob_thread([&tec]() {
-        MyNet bob(tec, "Bob", alice_addr);
+        MyNet bob(tec, "Bob");
         bob.start();
         bob.connect(alice_addr);
         try {
