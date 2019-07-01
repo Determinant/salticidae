@@ -513,6 +513,7 @@ class ConnPool {
         {
             auto &conn = it.second;
             conn->stop();
+            conn->set_terminated();
             release_conn(conn);
         }
     }
