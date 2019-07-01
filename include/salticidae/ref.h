@@ -98,6 +98,11 @@ class _BoxObj {
 
     T &operator *() const { return *obj; }
     T *get() const { return obj; }
+    T *unwrap() {
+        auto ret = obj;
+        obj = nullptr;
+        return ret;
+    }
     operator bool() const { return obj != nullptr; }
     bool operator==(const _BoxObj &other) const { return obj == other.obj; }
     bool operator!=(const _BoxObj &other) const { return obj != other.obj; }

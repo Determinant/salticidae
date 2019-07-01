@@ -671,6 +671,7 @@ class ThreadCall {
         friend ThreadCall;
         public:
         Handle(): notifier(nullptr) {}
+        Handle(const Handle &) = delete;
         void exec() {
             callback(*this);
             if (notifier)
@@ -707,16 +708,16 @@ class ThreadCall {
     }
 
     template<typename Func>
-    void async_call(Func callback) {
+    void async_call(Func &&callback) {
         auto h = new Handle();
-        h->callback = callback;
+        h->callback = std::forward<Func>(callback);
         q.enqueue(h);
     }
 
     template<typename Func>
-    Result call(Func callback) {
+    Result call(Func &&callback) {
         auto h = new Handle();
-        h->callback = callback;
+        h->callback = std::forward<Func>(callback);
         ThreadNotifier<Result> notifier;
         h->notifier = &notifier;
         q.enqueue(h);

@@ -183,19 +183,21 @@ class MsgNetwork: public ConnPool {
 
     template<typename Func>
     typename std::enable_if<std::is_constructible<
-        typename callback_traits<Func>::msg_type, DataStream &&>::value>::type
-    reg_handler(Func handler) {
-        using callback_t = callback_traits<Func>;
+        typename callback_traits<
+            typename std::remove_reference<Func>::type>::msg_type,
+        DataStream &&>::value>::type
+    reg_handler(Func &&handler) {
+        using callback_t = callback_traits<typename std::remove_reference<Func>::type>;
         set_handler(callback_t::msg_type::opcode,
-            [handler](const Msg &msg, const conn_t &conn) {
+            [handler=std::forward<Func>(handler)](const Msg &msg, const conn_t &conn) {
             handler(typename callback_t::msg_type(msg.get_payload()),
                     static_pointer_cast<typename callback_t::conn_type>(conn));
         });
     }
 
     template<typename Func>
-    inline void set_handler(OpcodeType opcode, Func handler) {
-        handler_map[opcode] = handler;
+    inline void set_handler(OpcodeType opcode, Func &&handler) {
+        handler_map[opcode] = std::forward<Func>(handler);
     }
 
     template<typename MsgType>
@@ -275,12 +277,13 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     class Conn: public MsgNet::Conn {
         friend PeerNetwork;
         Peer *peer;
+        BoxObj<Peer> _dead_peer;
         TimerEvent ev_timeout;
 
         void reset_timeout(double timeout);
 
         public:
-        Conn(): MsgNet::Conn(), peer(nullptr) {}
+        Conn(): MsgNet::Conn(), peer(nullptr), _dead_peer(nullptr) {}
         NetAddr get_peer_addr() {
             auto ret = *(static_cast<NetAddr *>(
                 get_net()->disp_tcall->call([this](ThreadCall::Handle &h) {
@@ -507,9 +510,9 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     void listen(NetAddr listen_addr);
     conn_t connect(const NetAddr &addr) = delete;
     template<typename Func>
-    void reg_unknown_peer_handler(Func cb) { unknown_peer_cb = cb; }
+    void reg_unknown_peer_handler(Func &&cb) { unknown_peer_cb = std::forward<Func>(cb); }
     template<typename Func>
-    void reg_peer_handler(Func cb) { peer_cb = cb; }
+    void reg_peer_handler(Func &&cb) { peer_cb = std::forward<Func>(cb); }
 };
 
 /* this callback is run by a worker */
@@ -630,11 +633,6 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
     SALTICIDAE_LOG_INFO("connection lost: %s", std::string(*conn).c_str());
     auto p = conn->peer;
     if (p) addr = p->peer_addr;
-    TimerEvent retry_timer(this->disp_ec, [this, addr](TimerEvent &) {
-        try {
-            start_active_conn(addr);
-        } catch (...) { this->disp_error_cb(std::current_exception()); }
-    });
     pinfo_ulock_t _g(known_peers_lock);
     auto it = known_peers.find(addr);
     if (it == known_peers.end()) return;
@@ -648,12 +646,16 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
         p->outbound_handshake = false;
         p->inbound_handshake = false;
         known_peers[p->peer_addr] = std::make_pair(uint256_t(), TimerEvent());
+        Peer *peer = nullptr;
         {
             pinfo_ulock_t __g(pid2peer_lock);
-            p->conn->peer = nullptr;
-            pid2peer.erase(p->peer_id);
+            auto it2 = pid2peer.find(p->peer_id);
+            peer = it2->second.unwrap();
+            pid2peer.erase(it2);
         }
-        this->user_tcall->async_call([this, conn](ThreadCall::Handle &) {
+        peer->conn = nullptr;
+        conn->_dead_peer = peer;
+        this->user_tcall->async_call([this, conn, peer](ThreadCall::Handle &) {
             if (peer_cb) peer_cb(conn, false);
         });
     }
@@ -662,7 +664,11 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
         if (!it->second.first.is_null()) return;
     }
     auto &ev_retry_timer = it->second.second;
-    ev_retry_timer = std::move(retry_timer);
+    ev_retry_timer = TimerEvent(this->disp_ec, [this, addr](TimerEvent &) {
+        try {
+            start_active_conn(addr);
+        } catch (...) { this->disp_error_cb(std::current_exception()); }
+    });
     ev_retry_timer.add(gen_conn_timeout());
 }
 
@@ -809,7 +815,7 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                             SALTICIDAE_LOG_DEBUG("%s terminating old connection %s",
                                     std::string(listen_addr).c_str(),
                                     std::string(*old_conn).c_str());
-                            old_conn->peer = nullptr;
+                            assert(old_conn->peer == nullptr);
                             old_conn->get_net()->disp_terminate(old_conn);
                         }
                         old_conn = conn;
@@ -870,7 +876,7 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
                             SALTICIDAE_LOG_DEBUG("%s terminating old connection %s",
                                     std::string(listen_addr).c_str(),
                                     std::string(*old_conn).c_str());
-                            old_conn->peer = nullptr;
+                            assert(old_conn->peer == nullptr);
                             old_conn->get_net()->disp_terminate(old_conn);
                         }
                         old_conn = conn;

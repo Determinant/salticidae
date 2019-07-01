@@ -575,10 +575,10 @@ class ConnPool {
     }
 
     template<typename Func>
-    void reg_conn_handler(Func cb) { conn_cb = cb; }
+    void reg_conn_handler(Func &&cb) { conn_cb = std::forward<Func>(cb); }
 
     template<typename Func>
-    void reg_error_handler(Func cb) { error_cb = cb; }
+    void reg_error_handler(Func &&cb) { error_cb = std::forward<Func>(cb); }
 
     void terminate(const conn_t &conn) {
         disp_tcall->async_call([this, conn](ThreadCall::Handle &) {

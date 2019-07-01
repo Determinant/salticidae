@@ -110,10 +110,7 @@ struct AppContext {
 void install_proto(AppContext &app, const size_t &seg_buff_size) {
     auto &ec = app.ec;
     auto &net = *app.net;
-    auto send_rand = [&](int size, const MyNet::conn_t &conn) {
-        auto addr = conn->get_peer_addr();
-        assert(!addr.is_null());
-        auto &tc = app.tc[addr];
+    auto send_rand = [&](int size, const MyNet::conn_t &conn, TestContext &tc) {
         MsgRand msg(tc.view, size);
         tc.hash = msg.hash;
         net.send_msg(std::move(msg), conn);
@@ -125,11 +122,10 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
         if (connected)
         {
             auto addr = conn->get_peer_addr();
-            assert(!addr.is_null());
             auto &tc = app.tc[addr];
             tc.state = 1;
             tc.view++;
-            send_rand(tc.state, conn);
+            send_rand(tc.state, conn, tc);
         }
     });
     net.reg_error_handler([ec](const std::exception_ptr _err, bool fatal) {
@@ -147,11 +143,6 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
     net.reg_handler([&, send_rand](MsgAck &&msg, const MyNet::conn_t &conn) {
         auto addr = conn->get_peer_addr();
         if (addr.is_null()) return;
-        if (app.tc.find(addr) == app.tc.end())
-        {
-            SALTICIDAE_LOG_WARN("%s\n", std::string(addr).c_str());
-            throw std::runtime_error("violation");
-        }
         auto &tc = app.tc[addr];
         if (msg.view != tc.view)
         {
@@ -166,7 +157,7 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
 
         if (tc.state == seg_buff_size * 2)
         {
-            send_rand(tc.state, conn);
+            send_rand(tc.state, conn, tc);
             tc.state = -1;
             tc.timer = TimerEvent(ec, [&, conn](TimerEvent &) {
                 tc.ncompleted++;
@@ -182,9 +173,9 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
             SALTICIDAE_LOG_INFO("rand-bomboard phase, ending in %.2f secs", t);
         }
         else if (tc.state == -1)
-            send_rand(rand() % (seg_buff_size * 10), conn);
+            send_rand(rand() % (seg_buff_size * 10), conn, tc);
         else
-            send_rand(++tc.state, conn);
+            send_rand(++tc.state, conn, tc);
     });
 }
 
