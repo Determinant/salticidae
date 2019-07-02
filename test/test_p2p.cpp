@@ -80,12 +80,12 @@ struct Net {
         net->reg_handler([this](const MsgText &msg, const PeerNetwork::conn_t &) {
             fprintf(stdout, "net %lu: peer %lu says %s\n", this->id, msg.id, msg.text.c_str());
         });
-        net->reg_error_handler([this](const std::exception_ptr _err, bool fatal) {
+        net->reg_error_handler([this](const std::exception_ptr _err, bool fatal, int32_t async_id) {
             try {
                 std::rethrow_exception(_err);
             } catch (const std::exception &err) {
-                fprintf(stdout, "net %lu: captured %s error during an async call: %s\n",
-                        this->id, fatal ? "fatal" : "recoverable", err.what());
+                fprintf(stdout, "net %lu: captured %s error during an async call %d: %s\n",
+                        this->id, fatal ? "fatal" : "recoverable", async_id, err.what());
             }
         });
         net->reg_peer_handler([this](const PeerNetwork::conn_t &conn, bool connected) {

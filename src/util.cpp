@@ -58,6 +58,7 @@ const char *SALTICIDAE_ERROR_STRINGS[] = {
     "tls fail to get peer cert",
     "fd error",
     "rand source is not available, try again",
+    "connection is not ready",
     "unknown error"
 };
 

@@ -303,7 +303,7 @@ void ConnPool::accept_client(int fd, int) {
             conn->worker = &worker;
             worker.feed(conn, client_fd);
         }
-    } catch (...) { recoverable_error(std::current_exception()); }
+    } catch (...) { recoverable_error(std::current_exception(), -1); }
 }
 
 void ConnPool::conn_server(const conn_t &conn, int fd, int events) {
@@ -324,7 +324,7 @@ void ConnPool::conn_server(const conn_t &conn, int fd, int events) {
         }
     } catch (...) {
         disp_terminate(conn);
-        recoverable_error(std::current_exception());
+        recoverable_error(std::current_exception(), -1);
     }
 }
 

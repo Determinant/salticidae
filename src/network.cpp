@@ -67,20 +67,24 @@ void msgnetwork_config_tls_cert_by_move(msgnetwork_config_t *self, x509_t *cert)
     self->tls_cert(new x509_t(std::move(*cert)));
 }
 
-void msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_conn_t *conn) {
-    self->_send_msg(*msg, *conn);
+bool msgnetwork_send_msg(msgnetwork_t *self, const msg_t *msg, const msgnetwork_conn_t *conn) {
+    return self->_send_msg(*msg, *conn);
 }
 
-void msgnetwork_send_msg_deferred_by_move(msgnetwork_t *self,
+int32_t msgnetwork_send_msg_deferred_by_move(msgnetwork_t *self,
                                         msg_t *_moved_msg, const msgnetwork_conn_t *conn) {
-    self->_send_msg_deferred(std::move(*_moved_msg), *conn);
+    return self->_send_msg_deferred(std::move(*_moved_msg), *conn);
 }
 
-msgnetwork_conn_t *msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr, bool blocking, SalticidaeCError *cerror) {
+msgnetwork_conn_t *msgnetwork_connect_sync(msgnetwork_t *self, const netaddr_t *addr, SalticidaeCError *cerror) {
     SALTICIDAE_CERROR_TRY(cerror)
-    return new msgnetwork_conn_t(self->connect(*addr, blocking));
+    return new msgnetwork_conn_t(self->connect_sync(*addr));
     SALTICIDAE_CERROR_CATCH(cerror)
     return nullptr;
+}
+
+int32_t msgnetwork_connect(msgnetwork_t *self, const netaddr_t *addr) {
+    return self->connect(*addr);
 }
 
 msgnetwork_conn_t *msgnetwork_conn_copy(const msgnetwork_conn_t *self) {
@@ -126,7 +130,7 @@ void msgnetwork_reg_conn_handler(msgnetwork_t *self,
 void msgnetwork_reg_error_handler(msgnetwork_t *self,
                                 msgnetwork_error_callback_t cb,
                                 void *userdata) {
-    self->reg_error_handler([=](const std::exception_ptr _err, bool fatal) {
+    self->reg_error_handler([=](const std::exception_ptr _err, bool fatal, int32_t async_id) {
         SalticidaeCError cerror;
         try {
             std::rethrow_exception(_err);
@@ -135,7 +139,7 @@ void msgnetwork_reg_error_handler(msgnetwork_t *self,
         } catch (...) {
             cerror = salticidae_cerror_unknown();
         }
-        cb(&cerror, fatal, userdata);
+        cb(&cerror, fatal, async_id, userdata);
     });
 }
 
@@ -194,12 +198,12 @@ peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_confi
 
 void peernetwork_free(const peernetwork_t *self) { delete self; }
 
-void peernetwork_add_peer(peernetwork_t *self, const netaddr_t *addr) {
-    self->add_peer(*addr);
+int32_t peernetwork_add_peer(peernetwork_t *self, const netaddr_t *addr) {
+    return self->add_peer(*addr);
 }
 
-void peernetwork_del_peer(peernetwork_t *self, const netaddr_t *addr) {
-    self->del_peer(*addr);
+int32_t peernetwork_del_peer(peernetwork_t *self, const netaddr_t *addr) {
+    return self->del_peer(*addr);
 }
 
 bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *addr) {
@@ -248,14 +252,14 @@ bool peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_
     }
 }
 
-void peernetwork_send_msg_deferred_by_move(peernetwork_t *self,
+int32_t peernetwork_send_msg_deferred_by_move(peernetwork_t *self,
                                         msg_t *_moved_msg, const netaddr_t *addr) {
-    self->_send_msg_deferred(std::move(*_moved_msg), *addr);
+    return self->_send_msg_deferred(std::move(*_moved_msg), *addr);
 }
 
-void peernetwork_multicast_msg_by_move(peernetwork_t *self,
+int32_t peernetwork_multicast_msg_by_move(peernetwork_t *self,
                                     msg_t *_moved_msg, const netaddr_array_t *addrs) {
-    self->_multicast_msg(std::move(*_moved_msg), *addrs);
+    return self->_multicast_msg(std::move(*_moved_msg), *addrs);
 }
 
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *cerror) {
@@ -318,8 +322,8 @@ bool clientnetwork_send_msg(clientnetwork_t *self, const msg_t * msg, const neta
     }
 }
 
-void clientnetwork_send_msg_deferred_by_move(clientnetwork_t *self, msg_t *_moved_msg, const netaddr_t *addr) {
-    self->_send_msg_deferred(std::move(*_moved_msg), *addr);
+int32_t clientnetwork_send_msg_deferred_by_move(clientnetwork_t *self, msg_t *_moved_msg, const netaddr_t *addr) {
+    return self->_send_msg_deferred(std::move(*_moved_msg), *addr);
 }
 
 }

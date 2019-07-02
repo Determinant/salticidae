@@ -128,12 +128,12 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
             send_rand(tc.state, conn, tc);
         }
     });
-    net.reg_error_handler([ec](const std::exception_ptr _err, bool fatal) {
+    net.reg_error_handler([ec](const std::exception_ptr _err, bool fatal, int32_t async_id) {
         try {
             std::rethrow_exception(_err);
         } catch (const std::exception & err) {
-            SALTICIDAE_LOG_WARN("captured %s error: %s",
-                fatal ? "fatal" : "recoverable", err.what());
+            SALTICIDAE_LOG_WARN("captured %s error during async call %d: %s",
+                fatal ? "fatal" : "recoverable", async_id, err.what());
         }
     });
     net.reg_handler([&](MsgRand &&msg, const MyNet::conn_t &conn) {
