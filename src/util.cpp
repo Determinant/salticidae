@@ -260,7 +260,7 @@ void Config::update(const std::string &optname, const char *optval) {
 }
 
 bool Config::load(const std::string &fname) {
-    static const size_t BUFF_SIZE = 1024;
+    static const size_t BUFF_SIZE = 65536;
     FILE *conf_f = fopen(fname.c_str(), "r");
     char buff[BUFF_SIZE];
     /* load configuration from file */
