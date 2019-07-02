@@ -241,7 +241,7 @@ class Blob: public Serializable {
 
     public:
 
-    Blob(): loaded(false) {}
+    Blob(): loaded(false) { memset(data, 0, sizeof(data)); }
     Blob(const bytearray_t &arr) {
         if (arr.size() != N / 8)
             throw std::invalid_argument("incorrect Blob size");

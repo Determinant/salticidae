@@ -1061,13 +1061,13 @@ PeerNetwork<O, _, __>::get_peer_conn(const NetAddr &addr) const {
             if (it == known_peers.end())
                 throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
             if (it->second->peer_id.is_null())
-            {
                 conn = nullptr;
-                return;
+            else
+            {
+                auto it2 = pid2peer.find(it->second->peer_id);
+                assert(it2 != pid2peer.end());
+                conn = it2->second->conn;
             }
-            auto it2 = pid2peer.find(it->second->peer_id);
-            assert(it2 != pid2peer.end());
-            conn = it2->second->conn;
         } catch (...) {
             err = std::current_exception();
         }
@@ -1194,7 +1194,7 @@ template<typename OpcodeType>
 inline bool ClientNetwork<OpcodeType>::_send_msg(const Msg &msg, const NetAddr &addr) {
     auto it = addr2conn.find(addr);
     if (it == addr2conn.end())
-        throw ClientNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
+        throw ClientNetworkError(SALTI_ERROR_CLIENT_NOT_EXIST);
     return MsgNet::_send_msg(msg, it->second);
 }
 
