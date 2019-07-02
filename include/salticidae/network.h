@@ -763,6 +763,10 @@ void PeerNetwork<O, _, __>::check_handshake(PeerConn *p) {
             else
                 this->disp_terminate(old_conn);
         }
+        else
+            this->user_tcall->async_call([this, conn](ThreadCall::Handle &) {
+                if (peer_cb) peer_cb(conn, true);
+            });
     }
     pending_peers.erase(p->conn->get_addr());
     auto color_begin = "";
