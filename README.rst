@@ -1,5 +1,5 @@
 Salticidae: minimal C++ asynchronous network library.
-=======================================================
+=====================================================
 
 .. image:: https://img.shields.io/badge/License-MIT-yellow.svg
    :target: https://opensource.org/licenses/MIT
@@ -9,7 +9,10 @@ Features
 --------
 
 - Simplicity. The library is self-contained, small in code base, and only
-  relies on libuv and libcrypo (OpenSSL, for SHA256 purpose).
+  relies on libuv and libssl/libcrypto (OpenSSL, for SHA256 purpose).
+  Despite the multi-threaded nature of the library, a user only needs to
+  understand the callbacks are invoked in a sequential order driven by a single
+  user-initiated event loop.
 
 - Clarity. With moderate use of C++ template and new features, the vast
   majority of the code is self-documenting.
@@ -24,6 +27,13 @@ Features
 
 - Utilities. The library also provides with some useful gadgets, such as
   command-line parser, libuv abstraction, etc.
+
+- Security. It supports SSL/TLS, with customized certificate verification (as
+  part of the connection callback).
+
+- Bindings for other languages. The library itself supports C APIs and the
+  other project ``salticidae-go`` supports invoking the library in Go through
+  cgo.
 
 Functionalities
 ---------------
@@ -62,7 +72,7 @@ Dependencies
 
 - CMake >= 3.9
 - C++14
-- libuv
+- libuv >= 1.10.0
 - openssl >= 1.1.0
 
 Minimal working P2P network
@@ -75,7 +85,7 @@ Minimal working P2P network
    
    using Net = salticidae::PeerNetwork<uint8_t>;
    
-   int main() { /* exampmle of 4 peer nodes pinging each other */
+   int main() { /* example of 4 peer nodes pinging each other */
        std::vector<std::pair<salticidae::NetAddr, std::unique_ptr<Net>>> nodes;
        Net::Config config;
        salticidae::EventContext ec;
