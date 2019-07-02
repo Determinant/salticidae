@@ -117,6 +117,7 @@ class _BoxObj {
 template<typename T, typename D = default_delete<T>>
 class BoxObj: public _BoxObj<T, D> {
     using base_t = _BoxObj<T, D>;
+    friend std::hash<BoxObj>;
     template<typename T__, typename D__, typename T_, typename D_>
     friend BoxObj<T__, D__> static_pointer_cast(BoxObj<T_, D_> &&other);
 
@@ -133,6 +134,7 @@ class BoxObj: public _BoxObj<T, D> {
 template<typename T, typename D>
 class BoxObj<T[], D>: public _BoxObj<T, D> {
     using base_t = _BoxObj<T, D>;
+    friend std::hash<BoxObj>;
     template<typename T__, typename D__, typename T_, typename D_>
     friend BoxObj<T__, D__> static_pointer_cast(BoxObj<T_, D_> &&other);
 
