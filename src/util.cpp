@@ -58,8 +58,11 @@ const char *SALTICIDAE_ERROR_STRINGS[] = {
     "tls key does not match the cert",
     "tls fail to get peer cert",
     "fd error",
+    "libuv init failed",
+    "libuv start failed",
     "rand source is not available, try again",
     "connection is not ready",
+    "operation not available",
     "unknown error"
 };
 

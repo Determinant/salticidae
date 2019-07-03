@@ -460,13 +460,13 @@ class ConnPool {
         disp_tcall = workers[0].get_tcall();
         workers[0].set_dispatcher();
         disp_error_cb = [this](const std::exception_ptr err) {
+            workers[0].stop_tcall();
+            disp_ec.stop();
             user_tcall->async_call([this, err](ThreadCall::Handle &) {
                 stop_workers();
                 //std::rethrow_exception(err);
                 if (error_cb) error_cb(err, true, -1);
             });
-            disp_ec.stop();
-            workers[0].stop_tcall();
         };
 
         worker_error_cb = [this](const std::exception_ptr err) {

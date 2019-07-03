@@ -55,7 +55,12 @@ using _event_context_ot = ArcObj<uv_loop_t, _event_context_deleter>;
 class EventContext: public _event_context_ot {
     public:
     EventContext(): _event_context_ot(new uv_loop_t()) {
-        uv_loop_init(get());
+        if (uv_loop_init(get()) < 0)
+        {
+            delete obj;
+            obj = nullptr;
+            throw SalticidaeError(SALTI_ERROR_LIBUV_INIT);
+        }
     }
     EventContext(uv_loop_t *eb): _event_context_ot(eb) {}
     EventContext(const EventContext &) = default;
@@ -96,7 +101,8 @@ class FdEvent {
     FdEvent(const EventContext &ec, int fd, callback_t callback):
             ec(ec), fd(fd), ev_fd(new uv_poll_t()),
             callback(std::move(callback)) {
-        uv_poll_init(ec.get(), ev_fd, fd);
+        if (uv_poll_init(ec.get(), ev_fd, fd) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_INIT);
         ev_fd->data = this;
     }
 
@@ -147,7 +153,8 @@ class FdEvent {
 
     void add(int events) {
         assert(ev_fd != nullptr);
-        uv_poll_start(ev_fd, events, FdEvent::fd_then);
+        if (uv_poll_start(ev_fd, events, FdEvent::fd_then) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_START);
     }
 
     void del() {
@@ -177,7 +184,8 @@ class TimerEvent {
     TimerEvent(const EventContext &ec, callback_t callback):
             ec(ec), ev_timer(new uv_timer_t()),
             callback(std::move(callback)) {
-        uv_timer_init(ec.get(), ev_timer);
+        if (uv_timer_init(ec.get(), ev_timer) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_INIT);
         ev_timer->data = this;
     }
 
@@ -227,7 +235,8 @@ class TimerEvent {
 
     void add(double t_sec) {
         assert(ev_timer != nullptr);
-        uv_timer_start(ev_timer, TimerEvent::timer_then, uint64_t(t_sec * 1000), 0);
+        if (uv_timer_start(ev_timer, TimerEvent::timer_then, uint64_t(t_sec * 1000), 0) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_START);
     }
 
     void del() {
@@ -258,8 +267,9 @@ class TimedFdEvent: public FdEvent, public TimerEvent {
             events |= ERROR;
         auto event = static_cast<TimedFdEvent *>(h->data);
         event->TimerEvent::del();
-        uv_timer_start(event->ev_timer, TimedFdEvent::timer_then,
-                        event->timeout, 0);
+        if (uv_timer_start(event->ev_timer, TimedFdEvent::timer_then,
+                            event->timeout, 0) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_START);
         event->callback(event->fd, events);
     }
 
@@ -324,9 +334,11 @@ class TimedFdEvent: public FdEvent, public TimerEvent {
 
     void add(int events, double t_sec) {
         assert(ev_fd != nullptr && ev_timer != nullptr);
-        uv_timer_start(ev_timer, TimedFdEvent::timer_then,
-                        timeout = uint64_t(t_sec * 1000), 0);
-        uv_poll_start(ev_fd, events, TimedFdEvent::fd_then);
+        auto ret1 = uv_timer_start(ev_timer, TimedFdEvent::timer_then,
+                                    timeout = uint64_t(t_sec * 1000), 0);
+        auto ret2 = uv_poll_start(ev_fd, events, TimedFdEvent::fd_then);
+        if (ret1 < 0 || ret2 < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_START);
     }
 
     void del() {
@@ -354,7 +366,8 @@ class SigEvent {
     SigEvent(const EventContext &ec, callback_t callback):
             ec(ec), ev_sig(new uv_signal_t()),
             callback(std::move(callback)) {
-        uv_signal_init(ec.get(), ev_sig);
+        if (uv_signal_init(ec.get(), ev_sig) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_INIT);
         ev_sig->data = this;
     }
 
@@ -404,12 +417,14 @@ class SigEvent {
 
     void add(int signum) {
         assert(ev_sig != nullptr);
-        uv_signal_start(ev_sig, SigEvent::sig_then, signum);
+        if (uv_signal_start(ev_sig, SigEvent::sig_then, signum) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_START);
     }
 
     void add_once(int signum) {
         assert(ev_sig != nullptr);
-        uv_signal_start_oneshot(ev_sig, SigEvent::sig_then, signum);
+        if (uv_signal_start_oneshot(ev_sig, SigEvent::sig_then, signum) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_START);
     }
 
     void del() {
@@ -438,7 +453,8 @@ class CheckEvent {
     CheckEvent(const EventContext &ec, callback_t callback):
             ec(ec), ev_check(new uv_check_t()),
             callback(std::move(callback)) {
-        uv_check_init(ec.get(), ev_check);
+        if (uv_check_init(ec.get(), ev_check) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_INIT);
         ev_check->data = this;
     }
 
@@ -488,7 +504,8 @@ class CheckEvent {
 
     void add() {
         assert(ev_check != nullptr);
-        uv_check_start(ev_check, CheckEvent::check_then);
+        if (uv_check_start(ev_check, CheckEvent::check_then) < 0)
+            throw SalticidaeError(SALTI_ERROR_LIBUV_START);
     }
 
     void del() {
@@ -708,14 +725,17 @@ class ThreadCall {
     }
 
     template<typename Func>
-    void async_call(Func &&callback) {
+    bool async_call(Func &&callback) {
+        if (stopped) return false;
         auto h = new Handle();
         h->callback = std::forward<Func>(callback);
         q.enqueue(h);
+        return true;
     }
 
     template<typename Func>
     Result call(Func &&callback) {
+        if (stopped) throw SalticidaeError(SALTI_ERROR_NOT_AVAIL);
         auto h = new Handle();
         h->callback = std::forward<Func>(callback);
         ThreadNotifier<Result> notifier;
