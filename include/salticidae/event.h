@@ -656,6 +656,7 @@ class ThreadCall {
     public:
     struct Result {
         void *data;
+        std::exception_ptr error;
         std::function<void(void *)> deleter;
         Result(): data(nullptr) {}
         Result(void *data, std::function<void(void *)> &&deleter):
@@ -663,11 +664,14 @@ class ThreadCall {
         ~Result() { if (data != nullptr) deleter(data); }
         Result(const Result &) = delete;
         Result(Result &&other):
-                data(other.data), deleter(std::move(other.deleter)) {
+                data(other.data),
+                error(std::move(other.error)),
+                deleter(std::move(other.deleter)) {
             other.data = nullptr;
         }
         void swap(Result &other) {
             std::swap(data, other.data);
+            std::swap(error, other.error);
             std::swap(deleter, other.deleter);
         }
         Result &operator=(const Result &other) = delete;
@@ -679,7 +683,10 @@ class ThreadCall {
             }
             return *this;
         }
-        void *get() { return data; }
+        void *get() {
+            if (error) std::rethrow_exception(error);
+            return data;
+        }
     };
     class Handle {
         std::function<void(Handle &)> callback;
@@ -689,15 +696,18 @@ class ThreadCall {
         public:
         Handle(): notifier(nullptr) {}
         Handle(const Handle &) = delete;
-        void exec() {
-            callback(*this);
+        void return_sync() {
             if (notifier)
                 notifier->notify(std::move(result));
         }
+        void exec() {
+            callback(*this);
+            return_sync();
+        }
         template<typename T>
-        void set_result(T &&data) {
+        Result &set_result(T &&data) {
             using _T = std::remove_reference_t<T>;
-            result = Result(new _T(std::forward<T>(data)),
+            return result = Result(new _T(std::forward<T>(data)),
                             [](void *ptr) {delete static_cast<_T *>(ptr);});
         }
     };
@@ -711,7 +721,13 @@ class ThreadCall {
             Handle *h;
             while (q.try_dequeue(h))
             {
-                if (!stopped) h->exec();
+                try {
+                    if (!stopped) h->exec();
+                    else throw SalticidaeError(SALTI_ERROR_NOT_AVAIL);
+                } catch (...) {
+                    h->set_result(0).error = std::current_exception();
+                    h->return_sync();
+                }
                 delete h;
                 if (++cnt == burst_size) return true;
             }
@@ -726,7 +742,6 @@ class ThreadCall {
 
     template<typename Func>
     bool async_call(Func &&callback) {
-        if (stopped) return false;
         auto h = new Handle();
         h->callback = std::forward<Func>(callback);
         q.enqueue(h);
@@ -735,7 +750,6 @@ class ThreadCall {
 
     template<typename Func>
     Result call(Func &&callback) {
-        if (stopped) throw SalticidaeError(SALTI_ERROR_NOT_AVAIL);
         auto h = new Handle();
         h->callback = std::forward<Func>(callback);
         ThreadNotifier<Result> notifier;
@@ -746,6 +760,7 @@ class ThreadCall {
 
     const EventContext &get_ec() const { return ec; }
     void stop() { stopped = true; }
+    bool is_stopped() { return stopped; }
 };
 
 }

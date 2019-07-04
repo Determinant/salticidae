@@ -273,15 +273,19 @@ void ConnPool::disp_terminate(const conn_t &conn) {
         });
 }
 
-void ConnPool::accept_client(int fd, int) {
+void ConnPool::accept_client(int fd, int events) {
     int client_fd;
     struct sockaddr client_addr;
     try {
         socklen_t addr_size = sizeof(struct sockaddr_in);
         if ((client_fd = accept(fd, &client_addr, &addr_size)) < 0)
+        {
+            ev_listen.del();
             throw ConnPoolError(SALTI_ERROR_ACCEPT, errno);
+        }
         else
         {
+            SALTICIDAE_LOG_INFO("%d\n", events);
             int one = 1;
             if (setsockopt(client_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
                 throw ConnPoolError(SALTI_ERROR_ACCEPT, errno);

@@ -978,22 +978,14 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
 
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::listen(NetAddr _listen_addr) {
-    auto ret = *(static_cast<std::exception_ptr *>(
-            this->disp_tcall->call([this, _listen_addr](ThreadCall::Handle &h) {
-        std::exception_ptr err = nullptr;
-        try {
-            MsgNet::_listen(_listen_addr);
-            listen_addr = _listen_addr;
-            uint8_t rand_bytes[32];
-            if (!RAND_bytes(rand_bytes, 32))
-                throw PeerNetworkError(SALTI_ERROR_RAND_SOURCE);
-            my_nonce.load(rand_bytes);
-        } catch (...) {
-            err = std::current_exception();
-        }
-        h.set_result(std::move(err));
-    }).get()));
-    if (ret) std::rethrow_exception(ret);
+    this->disp_tcall->call([this, _listen_addr](ThreadCall::Handle &) {
+        MsgNet::_listen(_listen_addr);
+        listen_addr = _listen_addr;
+        uint8_t rand_bytes[32];
+        if (!RAND_bytes(rand_bytes, 32))
+            throw PeerNetworkError(SALTI_ERROR_RAND_SOURCE);
+        my_nonce.load(rand_bytes);
+    }).get();
 }
 
 template<typename O, O _, O __>
@@ -1054,31 +1046,25 @@ int32_t PeerNetwork<O, _, __>::del_peer(const NetAddr &addr) {
 template<typename O, O _, O __>
 typename PeerNetwork<O, _, __>::conn_t
 PeerNetwork<O, _, __>::get_peer_conn(const NetAddr &addr) const {
-    auto ret = *(static_cast<std::pair<conn_t, std::exception_ptr> *>(
+    auto ret = *(static_cast<conn_t *>(
             this->disp_tcall->call([this, addr](ThreadCall::Handle &h) {
         conn_t conn;
-        std::exception_ptr err = nullptr;
-        try {
-            pinfo_slock_t _g(known_peers_lock);
-            pinfo_slock_t __g(pid2peer_lock);
-            auto it = known_peers.find(addr);
-            if (it == known_peers.end())
-                throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
-            if (it->second->peer_id.is_null())
-                conn = nullptr;
-            else
-            {
-                auto it2 = pid2peer.find(it->second->peer_id);
-                assert(it2 != pid2peer.end());
-                conn = it2->second->conn;
-            }
-        } catch (...) {
-            err = std::current_exception();
+        pinfo_slock_t _g(known_peers_lock);
+        pinfo_slock_t __g(pid2peer_lock);
+        auto it = known_peers.find(addr);
+        if (it == known_peers.end())
+            throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
+        if (it->second->peer_id.is_null())
+            conn = nullptr;
+        else
+        {
+            auto it2 = pid2peer.find(it->second->peer_id);
+            assert(it2 != pid2peer.end());
+            conn = it2->second->conn;
         }
-        h.set_result(std::make_pair(std::move(conn), err));
+        h.set_result(std::move(conn));
     }).get()));
-    if (ret.second) std::rethrow_exception(ret.second);
-    return std::move(ret.first);
+    return std::move(ret);
 }
 
 template<typename O, O _, O __>
