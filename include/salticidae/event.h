@@ -38,13 +38,21 @@
 
 namespace salticidae {
 
+static void _on_uv_handle_close(uv_handle_t *h) { if (h) delete h; }
+
 struct _event_context_deleter {
     constexpr _event_context_deleter() = default;
+    static void _on_uv_walk(uv_handle_t *handle, void *) {
+        if (!uv_is_closing(handle))
+            uv_close(handle, _on_uv_handle_close);
+    }
     void operator()(uv_loop_t *ptr) {
         if (ptr != nullptr)
         {
-            while (uv_loop_close(ptr) == UV_EBUSY)
-                uv_run(ptr, UV_RUN_NOWAIT);
+            uv_walk(ptr, _on_uv_walk, nullptr);
+            uv_run(ptr, UV_RUN_DEFAULT);
+            if (uv_loop_close(ptr))
+                SALTICIDAE_LOG_WARN("failed to close libuv loop");
             delete ptr;
         }
     }
@@ -73,8 +81,6 @@ class EventContext: public _event_context_ot {
     }
     void stop() const { uv_stop(get()); }
 };
-
-static void _on_uv_handle_close(uv_handle_t *h) { delete h; }
 
 class FdEvent {
     public:
