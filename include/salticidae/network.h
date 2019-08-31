@@ -553,7 +553,7 @@ void MsgNetwork<OpcodeType>::on_read(const ConnPool::conn_t &_conn) {
                 return;
             }
 #endif
-            while (!incoming_msgs.enqueue(std::make_pair(msg, conn), false))
+            while (!incoming_msgs.enqueue(std::make_pair(msg, conn), true))
                 std::this_thread::yield();
         }
     }
