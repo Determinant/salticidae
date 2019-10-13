@@ -75,14 +75,16 @@ struct MyNet: public MsgNetworkByteOp {
     ThreadCall tcall;
     size_t nrecv;
     std::function<void(ThreadCall::Handle &)> trigger;
+    std::atomic<bool> stopped;
 
     MyNet(const salticidae::EventContext &ec,
             const std::string name,
             double stat_timeout = -1):
             MsgNetworkByteOp(ec, MsgNetworkByteOp::Config(
                 ConnPool::Config()
-                    .queue_capacity(65536)
-                ).burst_size(1000)),
+                    .max_recv_buff_size(10)
+                    .queue_capacity(10)
+                ).burst_size(10)),
             name(name),
             ev_period_stat(ec, [this, stat_timeout](TimerEvent &) {
                 SALTICIDAE_LOG_INFO("%.2f mps", nrecv / (double)stat_timeout);
@@ -91,7 +93,7 @@ struct MyNet: public MsgNetworkByteOp {
                 ev_period_stat.add(stat_timeout);
             }),
             tcall(ec),
-            nrecv(0) {
+            nrecv(0), stopped(false) {
         /* message handler could be a bound method */
         reg_handler(salticidae::generic_bind(&MyNet::on_receive_bytes, this, _1, _2));
         if (stat_timeout > 0)
@@ -104,7 +106,16 @@ struct MyNet: public MsgNetworkByteOp {
                     printf("[%s] connected, sending bytes.\n", this->name.c_str());
                     /* send the first message through this connection */
                     trigger = [this, conn](ThreadCall::Handle &) {
-                        send_msg(MsgBytes(256), salticidae::static_pointer_cast<Conn>(conn));
+                        while (!send_msg(MsgBytes(256), salticidae::static_pointer_cast<Conn>(conn)))
+                        {
+                            if (stopped)
+                            {
+                                stop();
+                                return;
+                            }
+                            fprintf(stderr, "cannot send message, retrying\n");
+                            sleep(1);
+                        }
                         if (!conn->is_terminated())
                             tcall.async_call(trigger);
                     };
@@ -123,10 +134,18 @@ struct MyNet: public MsgNetworkByteOp {
         });
     }
 
-    void on_receive_bytes(MsgBytes &&msg, const conn_t &conn) { nrecv++; }
+    void on_receive_bytes(MsgBytes &&msg, const conn_t &conn) {
+        if (stopped)
+        {
+            conn->get_pool()->stop();
+            return;
+        }
+        sleep(1);
+        nrecv++;
+    }
 };
 
-salticidae::EventContext ec;
+salticidae::EventContext aec, bec, ec;
 NetAddr alice_addr("127.0.0.1:1234");
 NetAddr bob_addr("127.0.0.1:1235");
 
@@ -138,23 +157,31 @@ void masksigs() {
 }
 
 int main() {
-    salticidae::BoxObj<MyNet> alice = new MyNet(ec, "Alice", 10);
-    alice->start();
-    alice->listen(alice_addr);
-    salticidae::EventContext tec;
-    MyNet bob(tec, "Bob");
+    MyNet alice(aec, "Alice", 10), bob(bec, "Bob");
+    std::thread alice_thread([&]() {
+        masksigs();
+        alice.start();
+        alice.listen(alice_addr);
+        aec.dispatch();
+    });
     std::thread bob_thread([&]() {
         masksigs();
         bob.start();
         bob.connect(alice_addr);
-        tec.dispatch();
+        bec.dispatch();
     });
     auto shutdown = [&](int) {
+        bob.stopped = true;
         bob.tcall.async_call([&](salticidae::ThreadCall::Handle &) {
-            tec.stop();
+            bec.stop();
         });
-        ec.stop();
         bob_thread.join();
+        alice.stopped = true;
+        alice.tcall.async_call([&](salticidae::ThreadCall::Handle &) {
+            aec.stop();
+        });
+        alice_thread.join();
+        ec.stop();
     };
     salticidae::SigEvent ev_sigint(ec, shutdown);
     salticidae::SigEvent ev_sigterm(ec, shutdown);

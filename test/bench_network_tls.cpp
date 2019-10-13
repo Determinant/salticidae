@@ -132,6 +132,13 @@ salticidae::EventContext ec;
 NetAddr alice_addr("127.0.0.1:1234");
 NetAddr bob_addr("127.0.0.1:1235");
 
+void masksigs() {
+	sigset_t mask;
+	sigemptyset(&mask);
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+}
+
 int main() {
     salticidae::BoxObj<MyNet> alice = new MyNet(ec, "Alice", 10);
     alice->start();
@@ -139,6 +146,7 @@ int main() {
     salticidae::EventContext tec;
     MyNet bob(tec, "Bob");
     std::thread bob_thread([&]() {
+        masksigs();
         bob.start();
         bob.connect(alice_addr);
         tec.dispatch();

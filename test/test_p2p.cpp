@@ -28,6 +28,7 @@
 #include <functional>
 #include <unordered_map>
 #include <unistd.h>
+#include <signal.h>
 
 #include "salticidae/msg.h"
 #include "salticidae/event.h"
@@ -67,6 +68,13 @@ struct MsgText {
 
 const uint8_t MsgText::opcode;
 
+void masksigs() {
+	sigset_t mask;
+	sigemptyset(&mask);
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+}
+
 struct Net {
     uint64_t id;
     EventContext ec;
@@ -98,6 +106,7 @@ struct Net {
                     this->id, std::string(claimed_addr).c_str());
         });
         th = std::thread([=](){
+            masksigs();
             try {
                 net->start();
                 net->listen(NetAddr(listen_addr));

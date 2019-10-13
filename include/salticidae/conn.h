@@ -69,10 +69,11 @@ class ConnPool {
             ACTIVE, /**< the connection is established by connect() */
             PASSIVE, /**< the connection is established by accept() */
         };
-    
+
         protected:
         std::atomic<bool> terminated;
         size_t seg_buff_size;
+        size_t max_recv_buff_size;
         int fd;
         Worker *worker;
         ConnPool *cpool;
@@ -86,13 +87,14 @@ class ConnPool {
         FdEvent ev_socket;
         /** does not need to wait if true */
         bool ready_send;
+        bool ready_recv;
 
         typedef void (socket_io_func)(const conn_t &, int, int);
         socket_io_func *send_data_func;
         socket_io_func *recv_data_func;
         BoxObj<TLS> tls;
         BoxObj<const X509> peer_cert;
-    
+
         static socket_io_func _recv_data;
         static socket_io_func _send_data;
 
@@ -107,12 +109,13 @@ class ConnPool {
         virtual void stop();
 
         public:
-        Conn(): terminated(false), worker(nullptr), ready_send(false),
+        Conn(): terminated(false), worker(nullptr),
+            ready_send(false), ready_recv(false),
             send_data_func(nullptr), recv_data_func(nullptr),
             tls(nullptr), peer_cert(nullptr) {}
         Conn(const Conn &) = delete;
         Conn(Conn &&other) = delete;
-    
+
         virtual ~Conn() {
             SALTICIDAE_LOG_INFO("destroyed %s", std::string(*this).c_str());
         }
@@ -139,6 +142,7 @@ class ConnPool {
     };
 
     protected:
+    int system_state;
     EventContext ec;
     EventContext disp_ec;
     ThreadCall* disp_tcall;
@@ -178,6 +182,7 @@ class ConnPool {
     const int max_listen_backlog;
     const double conn_server_timeout;
     const size_t seg_buff_size;
+    const size_t max_recv_buff_size;
     const size_t queue_capacity;
     tls_context_t tls_ctx;
 
@@ -230,7 +235,12 @@ class ConnPool {
 
         /* the following functions are called by the dispatcher */
         void start() {
-            handle = std::thread([this]() { ec.dispatch(); });
+            handle = std::thread([this]() {
+                sigset_t mask;
+                sigfillset(&mask);
+                pthread_sigmask(SIG_BLOCK, &mask, NULL);
+                ec.dispatch();
+            });
         }
 
         void enable_send_buffer(const conn_t &conn, int client_fd) {
@@ -240,7 +250,8 @@ class ConnPool {
                 if (conn->ready_send)
                 {
                     conn->ev_socket.del();
-                    conn->ev_socket.add(FdEvent::READ | FdEvent::WRITE);
+                    conn->ev_socket.add((conn->ready_recv ? 0 : FdEvent::READ) |
+                                        FdEvent::WRITE);
                     conn->send_data_func(conn, client_fd, FdEvent::WRITE);
                 }
                 return false;
@@ -318,7 +329,6 @@ class ConnPool {
     /* related to workers */
     size_t nworker;
     salticidae::BoxObj<Worker[]> workers;
-    int system_state;
 
     void accept_client(int, int);
     void conn_server(const conn_t &conn, int, int);
@@ -348,6 +358,7 @@ class ConnPool {
         int _max_listen_backlog;
         double _conn_server_timeout;
         size_t _seg_buff_size;
+        size_t _max_recv_buff_size;
         size_t _nworker;
         size_t _queue_capacity;
         bool _enable_tls;
@@ -363,6 +374,7 @@ class ConnPool {
             _max_listen_backlog(10),
             _conn_server_timeout(2),
             _seg_buff_size(4096),
+            _max_recv_buff_size(4096),
             _nworker(1),
             _queue_capacity(0),
             _enable_tls(false),
@@ -385,6 +397,11 @@ class ConnPool {
 
         Config &seg_buff_size(size_t x) {
             _seg_buff_size = x;
+            return *this;
+        }
+
+        Config &max_recv_buff_size(size_t x) {
+            _max_recv_buff_size = x;
             return *this;
         }
 
@@ -435,17 +452,17 @@ class ConnPool {
     };
 
     ConnPool(const EventContext &ec, const Config &config):
-            ec(ec),
+            system_state(0), ec(ec),
             enable_tls(config._enable_tls),
             async_id(0),
             max_listen_backlog(config._max_listen_backlog),
             conn_server_timeout(config._conn_server_timeout),
             seg_buff_size(config._seg_buff_size),
+            max_recv_buff_size(config._max_recv_buff_size),
             queue_capacity(config._queue_capacity),
             tls_ctx(nullptr),
             listen_fd(-1),
-            nworker(config._nworker),
-            system_state(0) {
+            nworker(config._nworker) {
         if (enable_tls)
         {
             tls_ctx = new TLSContext();

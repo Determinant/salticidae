@@ -29,6 +29,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <unistd.h>
+#include <signal.h>
 
 #include "salticidae/msg.h"
 #include "salticidae/event.h"
@@ -68,6 +69,13 @@ struct MsgText {
 };
 
 const uint8_t MsgText::opcode;
+
+void masksigs() {
+	sigset_t mask;
+	sigemptyset(&mask);
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+}
 
 std::unordered_set<uint256_t> valid_certs;
 
@@ -124,6 +132,7 @@ struct Net {
                     this->id, std::string(claimed_addr).c_str());
         });
         th = std::thread([=](){
+            masksigs();
             try {
                 net->start();
                 net->listen(NetAddr(listen_addr));

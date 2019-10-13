@@ -91,7 +91,7 @@ void ConnPool::Conn::_send_data(const conn_t &conn, int fd, int events) {
         }
     }
     conn->ev_socket.del();
-    conn->ev_socket.add(FdEvent::READ);
+    conn->ev_socket.add(conn->ready_recv ? 0 : FdEvent::READ);
     /* consumed the buffer but endpoint still seems to be writable */
     conn->ready_send = true;
 }
@@ -106,6 +106,14 @@ void ConnPool::Conn::_recv_data(const conn_t &conn, int fd, int events) {
     ssize_t ret = seg_buff_size;
     while (ret == (ssize_t)seg_buff_size)
     {
+        if (conn->recv_buffer.size() >= conn->max_recv_buff_size)
+        {
+            /* receive buffer is full, disable READ event */
+            conn->ev_socket.del();
+            conn->ev_socket.add(conn->ready_send ? 0 : FdEvent::WRITE);
+            conn->ready_recv = true;
+            return;
+        }
         bytearray_t buff_seg;
         buff_seg.resize(seg_buff_size);
         ret = recv(fd, buff_seg.data(), seg_buff_size, 0);
@@ -171,7 +179,7 @@ void ConnPool::Conn::_send_data_tls(const conn_t &conn, int fd, int events) {
         }
     }
     conn->ev_socket.del();
-    conn->ev_socket.add(FdEvent::READ);
+    conn->ev_socket.add(conn->ready_recv ? : FdEvent::READ);
     /* consumed the buffer but endpoint still seems to be writable */
     conn->ready_send = true;
 }
@@ -187,6 +195,14 @@ void ConnPool::Conn::_recv_data_tls(const conn_t &conn, int fd, int events) {
     auto &tls = conn->tls;
     while (ret == (ssize_t)seg_buff_size)
     {
+        if (conn->recv_buffer.size() >= conn->max_recv_buff_size)
+        {
+            /* receive buffer is full, disable READ event */
+            conn->ev_socket.del();
+            conn->ev_socket.add(conn->ready_send ? 0 : FdEvent::WRITE);
+            conn->ready_recv = true;
+            return;
+        }
         bytearray_t buff_seg;
         buff_seg.resize(seg_buff_size);
         ret = tls->recv(buff_seg.data(), seg_buff_size);
@@ -295,6 +311,7 @@ void ConnPool::accept_client(int fd, int) {
             conn_t conn = create_conn();
             conn->send_buffer.set_capacity(queue_capacity);
             conn->seg_buff_size = seg_buff_size;
+            conn->max_recv_buff_size = max_recv_buff_size;
             conn->fd = client_fd;
             conn->cpool = this;
             conn->mode = Conn::PASSIVE;
@@ -375,6 +392,7 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
     conn_t conn = create_conn();
     conn->send_buffer.set_capacity(queue_capacity);
     conn->seg_buff_size = seg_buff_size;
+    conn->max_recv_buff_size = max_recv_buff_size;
     conn->fd = fd;
     conn->cpool = this;
     conn->mode = Conn::ACTIVE;

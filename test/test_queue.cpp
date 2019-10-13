@@ -8,6 +8,13 @@
 using salticidae::TimerEvent;
 using salticidae::Config;
 
+void masksigs() {
+	sigset_t mask;
+	sigemptyset(&mask);
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+}
+
 void test_mpsc(int nproducers, int nops, size_t burst_size, bool test_rewind) {
     size_t total = nproducers * nops;
     salticidae::EventContext ec;
@@ -33,6 +40,7 @@ void test_mpsc(int nproducers, int nops, size_t burst_size, bool test_rewind) {
     });
     std::vector<std::thread> producers;
     std::thread consumer([&collected, total, &ec]() {
+        masksigs();
         TimerEvent timer(ec, [&ec, &collected, total](TimerEvent &timer) {
             if (collected.load() == total) ec.stop();
             timer.add(1);
@@ -44,6 +52,7 @@ void test_mpsc(int nproducers, int nops, size_t burst_size, bool test_rewind) {
     for (int i = 0; i < nproducers; i++)
     {
         producers.emplace(producers.end(), std::thread([&q, nops, i, nproducers]() {
+            masksigs();
             int x = i;
             for (int j = 0; j < nops; j++)
             {
@@ -89,6 +98,7 @@ void test_mpmc(int nproducers, int nconsumers, int nops, size_t burst_size) {
     {
         consumers.emplace(consumers.end(), std::thread(
                 [&collected, total, &ec = ecs[i]]() {
+            masksigs();
             TimerEvent timer(ec, [&ec, &collected, total](TimerEvent &timer) {
                 if (collected.load() == total) ec.stop();
                 timer.add(1);
@@ -100,6 +110,7 @@ void test_mpmc(int nproducers, int nconsumers, int nops, size_t burst_size) {
     for (int i = 0; i < nproducers; i++)
     {
         producers.emplace(producers.end(), std::thread([&q, nops, i, nproducers]() {
+            masksigs();
             int x = i;
             for (int j = 0; j < nops; j++)
             {

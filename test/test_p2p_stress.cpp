@@ -179,6 +179,13 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
     });
 }
 
+void masksigs() {
+	sigset_t mask;
+	sigemptyset(&mask);
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+}
+
 int main(int argc, char **argv) {
     Config config;
     auto opt_no_msg = Config::OptValFlag::create(false);
@@ -225,6 +232,7 @@ int main(int argc, char **argv) {
 
     for (auto &a: apps)
         threads.push_back(std::thread([&]() {
+            masksigs();
             a.net->listen(a.addr);
             for (auto &paddr: addrs)
                 if (paddr != a.addr) a.net->add_peer(paddr);
