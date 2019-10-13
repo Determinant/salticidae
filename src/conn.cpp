@@ -179,7 +179,7 @@ void ConnPool::Conn::_send_data_tls(const conn_t &conn, int fd, int events) {
         }
     }
     conn->ev_socket.del();
-    conn->ev_socket.add(conn->ready_recv ? : FdEvent::READ);
+    conn->ev_socket.add(conn->ready_recv ? 0 : FdEvent::READ);
     /* consumed the buffer but endpoint still seems to be writable */
     conn->ready_send = true;
 }

@@ -590,7 +590,7 @@ void MsgNetwork<OpcodeType>::on_read(const ConnPool::conn_t &_conn) {
         conn->ev_socket.del();
         conn->ev_socket.add(FdEvent::READ |
                             (conn->ready_send ? 0: FdEvent::WRITE));
-        conn->send_data_func(conn, conn->fd, FdEvent::READ);
+        conn->recv_data_func(conn, conn->fd, FdEvent::READ);
     }
 }
 

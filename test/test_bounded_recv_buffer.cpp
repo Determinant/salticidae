@@ -116,6 +116,7 @@ struct MyNet: public MsgNetworkByteOp {
                             fprintf(stderr, "cannot send message, retrying\n");
                             sleep(1);
                         }
+                        printf("sent message\n");
                         if (!conn->is_terminated())
                             tcall.async_call(trigger);
                     };
@@ -140,7 +141,8 @@ struct MyNet: public MsgNetworkByteOp {
             conn->get_pool()->stop();
             return;
         }
-        sleep(1);
+        sleep(5);
+        printf("got message\n");
         nrecv++;
     }
 };
