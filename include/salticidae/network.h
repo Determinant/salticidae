@@ -584,7 +584,7 @@ void MsgNetwork<OpcodeType>::on_read(const ConnPool::conn_t &_conn) {
             }
         }
     }
-    if (conn->ready_recv && recv_buffer.size() < conn->max_recv_buff_size)
+    if (conn->ready_recv && recv_buffer.len() < conn->max_recv_buff_size)
     {
         /* resume reading from socket */
         conn->ev_socket.del();

@@ -106,7 +106,7 @@ void ConnPool::Conn::_recv_data(const conn_t &conn, int fd, int events) {
     ssize_t ret = seg_buff_size;
     while (ret == (ssize_t)seg_buff_size)
     {
-        if (conn->recv_buffer.size() >= conn->max_recv_buff_size)
+        if (conn->recv_buffer.len() >= conn->max_recv_buff_size)
         {
             /* receive buffer is full, disable READ event */
             conn->ev_socket.del();
@@ -195,7 +195,7 @@ void ConnPool::Conn::_recv_data_tls(const conn_t &conn, int fd, int events) {
     auto &tls = conn->tls;
     while (ret == (ssize_t)seg_buff_size)
     {
-        if (conn->recv_buffer.size() >= conn->max_recv_buff_size)
+        if (conn->recv_buffer.len() >= conn->max_recv_buff_size)
         {
             /* receive buffer is full, disable READ event */
             conn->ev_socket.del();

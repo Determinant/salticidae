@@ -108,6 +108,7 @@ class SegBuffer {
     }
     
     size_t size() const { return _size; }
+    size_t len() const { return buffer.size(); }
     bool empty() const { return buffer.empty(); }
     
     void clear() {
