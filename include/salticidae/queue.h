@@ -9,6 +9,7 @@
 namespace salticidae {
 
 static size_t const cacheline_size = 64;
+using cacheline_pad = uint8_t[cacheline_size];
 
 class FreeList {
     public:
@@ -21,7 +22,7 @@ class FreeList {
     };
 
     private:
-    alignas(cacheline_size) std::atomic<Node *> top;
+    std::atomic<Node *> top;
 
     public:
     FreeList(): top(nullptr) {}
@@ -92,8 +93,9 @@ template<typename T>
 class MPMCQueue {
     protected:
     struct Block: public FreeList::Node {
-        alignas(cacheline_size) std::atomic<uint32_t> head;
-        alignas(cacheline_size) std::atomic<uint32_t> tail;
+        std::atomic<uint32_t> head;
+        cacheline_pad _pad0;
+        std::atomic<uint32_t> tail;
         T elem[MPMCQ_SIZE];
         std::atomic<bool> avail[MPMCQ_SIZE];
         std::atomic<Block *> next;
@@ -101,8 +103,9 @@ class MPMCQueue {
 
     FreeList blks;
 
-    alignas(cacheline_size) std::atomic<Block *> head;
-    alignas(cacheline_size) std::atomic<Block *> tail;
+    std::atomic<Block *> head;
+    cacheline_pad _pad0;
+    std::atomic<Block *> tail;
 
     template<typename U>
     bool _enqueue(U &&e, bool unbounded = true) {
