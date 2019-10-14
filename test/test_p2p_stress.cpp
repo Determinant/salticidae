@@ -151,7 +151,9 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
         }
         if (msg.hash != tc.hash)
         {
-            SALTICIDAE_LOG_ERROR("corrupted I/O!");
+            SALTICIDAE_LOG_ERROR("%s corrupted I/O: from=%s view=%d state=%d",
+                std::string(app.addr).c_str(),
+                std::string(addr).c_str(), msg.view, tc.state);
             exit(1);
         }
 

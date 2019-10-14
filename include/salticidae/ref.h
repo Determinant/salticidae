@@ -151,7 +151,7 @@ template<typename T, typename D = default_delete<T>, typename T_, typename D_>
 BoxObj<T, D> static_pointer_cast(BoxObj<T_, D_> &&other) {
     BoxObj<T, D> box{};
     box.obj = static_cast<typename BoxObj<T, D>::type *>(other.obj);
-    return std::move(box);
+    return box;
 }
 
 struct _RCCtl {
@@ -447,7 +447,7 @@ RcObjBase<T, R_, D> static_pointer_cast(const RcObjBase<T_, R_, D_> &other) {
     rc.obj = static_cast<typename RcObjBase<T, R_, D>::type *>(other.obj);
     if ((rc.ctl = other.ctl))
         rc.ctl->add_ref();
-    return std::move(rc);
+    return rc;
 }
 
 template<typename T, typename D = default_delete<T>,
@@ -457,7 +457,7 @@ RcObjBase<T, R_, D> static_pointer_cast(RcObjBase<T_, R_, D_> &&other) {
     rc.obj = static_cast<typename RcObjBase<T, R_, D>::type *>(other.obj);
     rc.ctl = other.ctl;
     other.ctl = nullptr;
-    return std::move(rc);
+    return rc;
 }
 
 template<typename T, typename R>

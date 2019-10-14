@@ -73,7 +73,7 @@ class SHA256 {
     bytearray_t digest() {
         bytearray_t md(32);
         _digest(md);
-        return std::move(md);
+        return md;
     }
 };
 
@@ -115,7 +115,7 @@ class SHA1 {
     bytearray_t digest() {
         bytearray_t md(32);
         _digest(md);
-        return std::move(md);
+        return md;
     }
 };
 
@@ -200,7 +200,7 @@ class PKey {
         bytearray_t res(der, der + ret);
         OPENSSL_cleanse(der, ret);
         OPENSSL_free(der);
-        return std::move(res);
+        return res;
     }
 
     bytearray_t get_privkey_der() const {
@@ -211,7 +211,7 @@ class PKey {
         bytearray_t res(der, der + ret);
         OPENSSL_cleanse(der, ret);
         OPENSSL_free(der);
-        return std::move(res);
+        return res;
     }
 
     void save_privkey_to_file(const std::string &fname) {
@@ -295,7 +295,7 @@ class X509 {
         bytearray_t res(der, der + ret);
         OPENSSL_cleanse(der, ret);
         OPENSSL_free(der);
-        return std::move(res);
+        return res;
     }
 
     void save_to_file(const std::string &fname) {

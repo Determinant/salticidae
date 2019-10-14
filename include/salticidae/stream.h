@@ -188,7 +188,7 @@ class DataStream {
     }
 
     operator bytearray_t () && {
-        return std::move(buffer);
+        return buffer;
     }
 
     operator std::string () const & {
@@ -224,7 +224,7 @@ class Serializable {
     bytearray_t to_bytes() const {
         DataStream s;
         s << *this;
-        return std::move(s);
+        return bytearray_t(std::move(s));
     }
 
     inline std::string to_hex() const;
@@ -310,7 +310,7 @@ class Blob: public Serializable {
     operator bytearray_t () const & {
         DataStream s;
         s << *this;
-        return std::move(s);
+        return bytearray_t(std::move(s));
     }
 };
 
@@ -393,7 +393,7 @@ class _Bits {
     operator bytearray_t () const & {
         DataStream s;
         s << *this;
-        return std::move(s);
+        return bytearray_t(std::move(s));
     }
 
     uint8_t get(uint32_t idx) const {
@@ -453,7 +453,7 @@ template<typename T> inline std::string get_hex(const T &x) {
 inline bytearray_t from_hex(const std::string &hex_str) {
     DataStream s;
     s.load_hex(hex_str);
-    return std::move(s);
+    return bytearray_t(std::move(s));
 }
 
 inline std::string Serializable::to_hex() const { return get_hex(*this); }

@@ -172,7 +172,7 @@ class MsgBase {
             throw std::runtime_error("payload not available");
         no_payload = true;
 #endif
-        return std::move(payload);
+        return DataStream(std::move(payload));
     }
 
     void set_payload(DataStream &&s) {
@@ -203,7 +203,7 @@ class MsgBase {
           << "checksum=" << get_hex(checksum) << " "
 #endif
           << "payload=" << get_hex(payload) << ">";
-        return std::move(s);
+        return std::string(std::move(s));
     }
 
 #ifndef SALTICIDAE_NOCHECKSUM
@@ -239,7 +239,7 @@ class MsgBase {
           << htole(checksum)
 #endif
           << payload;
-        return std::move(s);
+        return bytearray_t(std::move(s));
     }
 
     void gen_hash_list(DataStream &s,

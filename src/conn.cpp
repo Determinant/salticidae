@@ -47,7 +47,7 @@ ConnPool::Conn::operator std::string() const {
         case Conn::PASSIVE: s << "passive"; break;
     }
     s << ">";
-    return std::move(s);
+    return std::string(std::move(s));
 }
 
 /* the following functions are executed by exactly one worker per Conn object */

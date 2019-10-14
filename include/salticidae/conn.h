@@ -563,7 +563,7 @@ class ConnPool {
             conn = _connect(addr);
             h.set_result(conn);
         }).get()));
-        return std::move(ret);
+        return ret;
     }
 
     /** Actively connect to remote addr (async). */

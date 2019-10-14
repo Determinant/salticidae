@@ -87,7 +87,7 @@ class SegBuffer {
         auto res = std::move(buffer.front().data);
         buffer.pop_front();
         _size -= res.size();
-        return std::move(res);
+        return res;
     }
     
     bytearray_t pop(size_t len) {
@@ -104,7 +104,7 @@ class SegBuffer {
         }
         buffer.erase(buffer.begin(), i);
         _size -= res.size();
-        return std::move(res);
+        return res;
     }
     
     size_t size() const { return _size; }
@@ -140,7 +140,7 @@ struct MPSCWriteBuffer {
     bytearray_t move_pop() {
         buffer_entry_t res;
         buffer.try_dequeue(res);
-        return std::move(res.data);
+        return res.data;
     }
     
     queue_t &get_queue() { return buffer; }

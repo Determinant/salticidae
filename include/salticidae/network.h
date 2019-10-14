@@ -1099,7 +1099,7 @@ PeerNetwork<O, _, __>::get_peer_conn(const NetAddr &addr) const {
         }
         h.set_result(std::move(conn));
     }).get()));
-    return std::move(ret);
+    return ret;
 }
 
 template<typename O, O _, O __>

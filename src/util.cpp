@@ -126,7 +126,7 @@ std::string vstringprintf(const char *fmt, va_list _ap) {
         }
     }
     va_end(ap);
-    return std::move(buff);
+    return buff;
 }
 
 std::string stringprintf(const char *fmt, ...) {
@@ -134,7 +134,7 @@ std::string stringprintf(const char *fmt, ...) {
     va_start(ap, fmt);
     auto ret = vstringprintf(fmt, ap);
     va_end(ap);
-    return std::move(ret);
+    return ret;
 }
 
 const std::string get_current_datetime() {
