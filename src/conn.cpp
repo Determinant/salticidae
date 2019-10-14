@@ -136,6 +136,7 @@ void ConnPool::Conn::_recv_data(const conn_t &conn, int fd, int events) {
         conn->recv_buffer.push(std::move(buff_seg));
     }
     //ev_read.add();
+    conn->ready_recv = false;
     conn->cpool->on_read(conn);
 }
 
@@ -223,6 +224,7 @@ void ConnPool::Conn::_recv_data_tls(const conn_t &conn, int fd, int events) {
         buff_seg.resize(ret);
         conn->recv_buffer.push(std::move(buff_seg));
     }
+    conn->ready_recv = false;
     conn->cpool->on_read(conn);
 }
 
