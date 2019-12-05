@@ -33,6 +33,14 @@
 #include "salticidae/util.h"
 #include "salticidae/conn.h"
 
+#if !defined(SOL_TCP) && defined(IPPROTO_TCP)
+#define SOL_TCP IPPROTO_TCP
+#endif
+
+#if !defined(TCP_KEEPIDLE) && defined(TCP_KEEPALIVE)
+#define TCP_KEEPIDLE TCP_KEEPALIVE
+#endif
+
 namespace salticidae {
 
 ConnPool::Conn::operator std::string() const {
@@ -64,7 +72,7 @@ void ConnPool::Conn::_send_data(const conn_t &conn, int fd, int events) {
         bytearray_t buff_seg = conn->send_buffer.move_pop();
         ssize_t size = buff_seg.size();
         if (!size) break;
-        ret = send(fd, buff_seg.data(), size, MSG_NOSIGNAL);
+        ret = send(fd, buff_seg.data(), size, 0);
         SALTICIDAE_LOG_DEBUG("socket sent %zd bytes", ret);
         size -= ret;
         if (size > 0)
@@ -330,7 +338,7 @@ void ConnPool::accept_client(int fd, int) {
 
 void ConnPool::conn_server(const conn_t &conn, int fd, int events) {
     try {
-        if (send(fd, "", 0, MSG_NOSIGNAL) == 0)
+        if (send(fd, "", 0, 0) == 0)
         {
             conn->ev_connect.del();
             SALTICIDAE_LOG_INFO("connected to remote %s", std::string(*conn).c_str());

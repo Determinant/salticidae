@@ -38,6 +38,8 @@
 #include <functional>
 #include <mutex>
 
+#include "salticidae/endian.h"
+
 namespace salticidae {
 
 const auto _1 = std::placeholders::_1;

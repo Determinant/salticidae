@@ -52,7 +52,9 @@ namespace salticidae {
 
 /** Abstraction for connection management. */
 class ConnPool {
+    protected:
     class Worker;
+
     public:
     class Conn;
     /** The handle to a bi-directional connection. */
@@ -212,6 +214,7 @@ class ConnPool {
         });
     }
 
+    protected:
     class Worker {
         EventContext ec;
         ThreadCall tcall;
@@ -326,6 +329,7 @@ class ConnPool {
         void stop_tcall() { tcall.stop(); }
     };
 
+    private:
     /* related to workers */
     size_t nworker;
     salticidae::BoxObj<Worker[]> workers;

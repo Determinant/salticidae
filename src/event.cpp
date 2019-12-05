@@ -2,6 +2,10 @@
 #ifdef SALTICIDAE_CBINDINGS
 #include "salticidae/event.h"
 
+#if defined(__linux__)
+const uint64_t salticidae::NotifyFd::dummy = 1;
+#endif
+
 extern "C" {
 
 eventcontext_t *eventcontext_new() { return new eventcontext_t(); }

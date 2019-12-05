@@ -349,7 +349,7 @@ class _Bits {
         ndata = (nbits + bit_per_datum - 1) / bit_per_datum;
         data = new _impl_type[ndata];
 
-        uint8_t *end = arr + len;
+        const uint8_t *end = arr + len;
         for (_impl_type *ptr = data.get(); ptr < data.get() + ndata;)
         {
             _impl_type x = 0;
