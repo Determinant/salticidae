@@ -48,10 +48,12 @@ if(BUILD_SHARED)
     add_library(salticidae_shared SHARED $<TARGET_OBJECTS:salticidae>)
     set_target_properties(salticidae_shared PROPERTIES OUTPUT_NAME "salticidae")
     target_link_libraries(salticidae_shared uv crypto ssl pthread)
+    install(TARGETS salticidae_shared DESTINATION lib)
 endif()
 add_library(salticidae_static STATIC $<TARGET_OBJECTS:salticidae>)
 set_target_properties(salticidae_static PROPERTIES OUTPUT_NAME "salticidae")
 target_link_libraries(salticidae_static uv crypto ssl pthread)
+install(TARGETS salticidae_static DESTINATION lib)
 
 option(BUILD_TEST "build test binaries." OFF)
 if(BUILD_TEST)
@@ -73,3 +75,5 @@ configure_file(src/config.h.in include/salticidae/config.h @ONLY)
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -W -Wall -Wextra -pedantic -Wsuggest-override")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -W -Wall -Wextra -pedantic -Wsuggest-override")
+
+install(DIRECTORY include/ DESTINATION include)
