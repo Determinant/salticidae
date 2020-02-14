@@ -120,6 +120,8 @@ class MsgNetwork: public ConnPool {
 #endif
 
     private:
+    const size_t max_msg_size;
+    const size_t max_msg_queue_size;
     std::unordered_map<
         typename Msg::opcode_t,
         std::function<void(const Msg &msg, const conn_t &)>> handler_map;
@@ -170,8 +172,10 @@ class MsgNetwork: public ConnPool {
     virtual ~MsgNetwork() { stop(); }
 
     MsgNetwork(const EventContext &ec, const Config &config):
-            ConnPool(ec, config) {
-        incoming_msgs.set_capacity(65536);
+            ConnPool(ec, config),
+            max_msg_size(config._max_msg_size),
+            max_msg_queue_size(config._max_msg_queue_size) {
+        incoming_msgs.set_capacity(max_msg_queue_size);
         incoming_msgs.reg_handler(ec, [this, burst_size=config._burst_size](queue_t &q) {
             std::pair<Msg, conn_t> item;
             size_t cnt = 0;
@@ -560,6 +564,13 @@ void MsgNetwork<OpcodeType>::on_read(const ConnPool::conn_t &_conn) {
             if (recv_buffer.size() < Msg::header_size) break;
             /* new header available */
             msg = Msg(recv_buffer.pop(Msg::header_size));
+            if (msg.get_length() > max_msg_size)
+            {
+                SALTICIDAE_LOG_WARN(
+                        "oversized message from %s, terminating the connection",
+                        std::string(*conn).c_str());
+                throw MsgNetworkError(SALTI_ERROR_CONN_OVERSIZED_MSG);
+            }
             msg_state = Conn::PAYLOAD;
         }
         if (msg_state == Conn::PAYLOAD)

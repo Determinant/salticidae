@@ -63,7 +63,8 @@ const char *SALTICIDAE_ERROR_STRINGS[] = {
     "rand source is not available, try again",
     "connection is not ready",
     "operation not available",
-    "unknown error"
+    "unknown error",
+    "oversized message",
 };
 
 const char *TTY_COLOR_RED = "\x1b[31m";

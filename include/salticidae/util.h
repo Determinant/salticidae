@@ -106,7 +106,8 @@ enum SalticidaeErrorCode {
     SALTI_ERROR_RAND_SOURCE,
     SALTI_ERROR_CONN_NOT_READY,
     SALTI_ERROR_NOT_AVAIL,
-    SALTI_ERROR_UNKNOWN
+    SALTI_ERROR_UNKNOWN,
+    SALTI_ERROR_CONN_OVERSIZED_MSG
 };
 
 extern const char *SALTICIDAE_ERROR_STRINGS[];
@@ -148,12 +149,16 @@ struct ConnPoolError: public SalticidaeError {
     using SalticidaeError::SalticidaeError;
 };
 
-class PeerNetworkError: public ConnPoolError {
+class MsgNetworkError: public ConnPoolError {
     using ConnPoolError::ConnPoolError;
 };
 
-class ClientNetworkError: public ConnPoolError {
-    using ConnPoolError::ConnPoolError;
+class PeerNetworkError: public MsgNetworkError {
+    using MsgNetworkError::MsgNetworkError;
+};
+
+class ClientNetworkError: public MsgNetworkError {
+    using MsgNetworkError::MsgNetworkError;
 };
 
 extern const char *TTY_COLOR_RED;
