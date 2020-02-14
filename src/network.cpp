@@ -23,6 +23,14 @@ msgnetwork_t *msgnetwork_new(const eventcontext_t *ec, const msgnetwork_config_t
 
 void msgnetwork_free(const msgnetwork_t *self) { delete self; }
 
+void msgnetwork_config_max_msg_size(msgnetwork_config_t *self, size_t size) {
+    self->max_msg_size(size);
+}
+
+void msgnetwork_config_max_msg_queue_size(msgnetwork_config_t *self, size_t size) {
+    self->max_msg_queue_size(size);
+}
+
 void msgnetwork_config_burst_size(msgnetwork_config_t *self, size_t burst_size) {
     self->burst_size(burst_size);
 }

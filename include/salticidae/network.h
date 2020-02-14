@@ -1308,6 +1308,8 @@ void salticidae_injected_msg_callback(const msg_t *msg, msgnetwork_conn_t *conn)
 
 msgnetwork_config_t *msgnetwork_config_new();
 void msgnetwork_config_free(const msgnetwork_config_t *self);
+void msgnetwork_config_max_msg_size(msgnetwork_config_t *self, size_t size);
+void msgnetwork_config_max_msg_queue_size(msgnetwork_config_t *self, size_t size);
 void msgnetwork_config_burst_size(msgnetwork_config_t *self, size_t burst_size);
 void msgnetwork_config_max_listen_backlog(msgnetwork_config_t *self, int backlog);
 void msgnetwork_config_conn_server_timeout(msgnetwork_config_t *self, double timeout);
