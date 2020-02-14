@@ -1313,7 +1313,8 @@ void msgnetwork_config_max_listen_backlog(msgnetwork_config_t *self, int backlog
 void msgnetwork_config_conn_server_timeout(msgnetwork_config_t *self, double timeout);
 void msgnetwork_config_seg_buff_size(msgnetwork_config_t *self, size_t size);
 void msgnetwork_config_nworker(msgnetwork_config_t *self, size_t nworker);
-void msgnetwork_config_queue_capacity(msgnetwork_config_t *self, size_t cap);
+void msgnetwork_config_max_recv_buff_size(msgnetwork_config_t *self, size_t size);
+void msgnetwork_config_max_send_buff_size(msgnetwork_config_t *self, size_t size);
 void msgnetwork_config_enable_tls(msgnetwork_config_t *self, bool enabled);
 void msgnetwork_config_tls_key_file(msgnetwork_config_t *self, const char *pem_fname);
 void msgnetwork_config_tls_cert_file(msgnetwork_config_t *self, const char *pem_fname);

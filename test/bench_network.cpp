@@ -81,7 +81,7 @@ struct MyNet: public MsgNetworkByteOp {
             double stat_timeout = -1):
             MsgNetworkByteOp(ec, MsgNetworkByteOp::Config(
                 ConnPool::Config()
-                    .queue_capacity(65536)
+                    .max_send_buff_size(65536)
                 ).burst_size(1000)),
             name(name),
             ev_period_stat(ec, [this, stat_timeout](TimerEvent &) {

@@ -83,7 +83,7 @@ struct MyNet: public MsgNetworkByteOp {
             MsgNetworkByteOp(ec, MsgNetworkByteOp::Config(
                 ConnPool::Config()
                     .max_recv_buff_size(10)
-                    .queue_capacity(10)
+                    .max_send_buff_size(10)
                 ).burst_size(10)),
             name(name),
             ev_period_stat(ec, [this, stat_timeout](TimerEvent &) {

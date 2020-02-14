@@ -139,7 +139,7 @@ class ConnPool {
         /** Write data to the connection (non-blocking). The data will be sent
          * whenever I/O is available. */
         bool write(bytearray_t &&data) {
-            return send_buffer.push(std::move(data), !cpool->queue_capacity);
+            return send_buffer.push(std::move(data), !cpool->max_send_buff_size);
         }
     };
 
@@ -185,7 +185,7 @@ class ConnPool {
     const double conn_server_timeout;
     const size_t seg_buff_size;
     const size_t max_recv_buff_size;
-    const size_t queue_capacity;
+    const size_t max_send_buff_size;
     tls_context_t tls_ctx;
 
     conn_callback_t conn_cb;
@@ -363,8 +363,8 @@ class ConnPool {
         double _conn_server_timeout;
         size_t _seg_buff_size;
         size_t _max_recv_buff_size;
+        size_t _max_send_buff_size;
         size_t _nworker;
-        size_t _queue_capacity;
         bool _enable_tls;
         std::string _tls_cert_file;
         std::string _tls_key_file;
@@ -379,8 +379,8 @@ class ConnPool {
             _conn_server_timeout(2),
             _seg_buff_size(4096),
             _max_recv_buff_size(4096),
+            _max_send_buff_size(0),
             _nworker(1),
-            _queue_capacity(0),
             _enable_tls(false),
             _tls_cert_file(""),
             _tls_key_file(""),
@@ -404,18 +404,18 @@ class ConnPool {
             return *this;
         }
 
-        Config &max_recv_buff_size(size_t x) {
-            _max_recv_buff_size = x;
-            return *this;
-        }
-
         Config &nworker(size_t x) {
             _nworker = std::max((size_t)1, x);
             return *this;
         }
 
-        Config &queue_capacity(size_t x) {
-            _queue_capacity = x;
+        Config &max_recv_buff_size(size_t x) {
+            _max_recv_buff_size = x;
+            return *this;
+        }
+
+        Config &max_send_buff_size(size_t x) {
+            _max_send_buff_size = x;
             return *this;
         }
 
@@ -463,7 +463,7 @@ class ConnPool {
             conn_server_timeout(config._conn_server_timeout),
             seg_buff_size(config._seg_buff_size),
             max_recv_buff_size(config._max_recv_buff_size),
-            queue_capacity(config._queue_capacity),
+            max_send_buff_size(config._max_send_buff_size),
             tls_ctx(nullptr),
             listen_fd(-1),
             nworker(config._nworker) {

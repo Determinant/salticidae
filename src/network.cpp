@@ -43,8 +43,12 @@ void msgnetwork_config_nworker(msgnetwork_config_t *self, size_t nworker) {
     self->nworker(nworker);
 }
 
-void msgnetwork_config_queue_capacity(msgnetwork_config_t *self, size_t cap) {
-    self->queue_capacity(cap);
+void msgnetwork_config_max_recv_buff_size(msgnetwork_config_t *self, size_t size) {
+    self->max_recv_buff_size(size);
+}
+
+void msgnetwork_config_max_send_buff_size(msgnetwork_config_t *self, size_t size) {
+    self->max_send_buff_size(size);
 }
 
 void msgnetwork_config_enable_tls(msgnetwork_config_t *self, bool enabled) {

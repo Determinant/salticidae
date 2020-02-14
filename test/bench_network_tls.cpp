@@ -81,7 +81,7 @@ struct MyNet: public MsgNetworkByteOp {
             double stat_timeout = -1):
             MsgNetworkByteOp(ec, MsgNetworkByteOp::Config(
                 ConnPool::Config()
-                    .queue_capacity(65536)
+                    .max_send_buff_size(65536)
                     .enable_tls(true)
                     .tls_cert_file("alice.pem")
                     .tls_key_file("alice.pem")).burst_size(1000)),

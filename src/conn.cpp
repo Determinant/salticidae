@@ -319,7 +319,7 @@ void ConnPool::accept_client(int fd, int) {
 
             NetAddr addr((struct sockaddr_in *)&client_addr);
             conn_t conn = create_conn();
-            conn->send_buffer.set_capacity(queue_capacity);
+            conn->send_buffer.set_capacity(max_send_buff_size);
             conn->seg_buff_size = seg_buff_size;
             conn->max_recv_buff_size = max_recv_buff_size;
             conn->fd = client_fd;
@@ -400,7 +400,7 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
         throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
     conn_t conn = create_conn();
-    conn->send_buffer.set_capacity(queue_capacity);
+    conn->send_buffer.set_capacity(max_send_buff_size);
     conn->seg_buff_size = seg_buff_size;
     conn->max_recv_buff_size = max_recv_buff_size;
     conn->fd = fd;
