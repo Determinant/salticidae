@@ -225,7 +225,8 @@ int main(int argc, char **argv) {
                     .nworker(opt_nworker->get())
                     .seg_buff_size(seg_buff_size))
                         .conn_timeout(opt_conn_timeout->get())
-                        .ping_period(opt_ping_peroid->get()));
+                        .ping_period(opt_ping_peroid->get())
+                        .max_msg_size(65536));
         a.tcall = new ThreadCall(a.ec);
         if (!opt_no_msg->get())
             install_proto(a, seg_buff_size);

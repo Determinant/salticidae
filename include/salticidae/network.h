@@ -155,13 +155,28 @@ class MsgNetwork: public ConnPool {
     public:
 
     class Config: public ConnPool::Config {
-        friend MsgNetwork;
+        friend class MsgNetwork;
+        size_t _max_msg_size;
+        size_t _max_msg_queue_size;
         size_t _burst_size;
 
         public:
         Config(): Config(ConnPool::Config()) {}
         Config(const ConnPool::Config &config):
-            ConnPool::Config(config), _burst_size(1000) {}
+            ConnPool::Config(config),
+            _max_msg_size(1024),
+            _max_msg_queue_size(65536),
+            _burst_size(1000) {}
+
+        Config &max_msg_size(size_t x) {
+            _max_msg_size = x;
+            return *this;
+        }
+
+        Config &max_msg_queue_size(size_t x) {
+            _max_msg_queue_size = x;
+            return *this;
+        }
 
         Config &burst_size(size_t x) {
             _burst_size = x;

@@ -359,12 +359,9 @@ class ConnPool {
 
     class Config {
         friend class ConnPool;
-        template<typename OpcodeType> friend class MsgNetwork;
         int _max_listen_backlog;
         double _conn_server_timeout;
         size_t _seg_buff_size;
-        size_t _max_msg_size;
-        size_t _max_msg_queue_size;
         size_t _max_recv_buff_size;
         size_t _nworker;
         size_t _queue_capacity;
@@ -381,8 +378,6 @@ class ConnPool {
             _max_listen_backlog(10),
             _conn_server_timeout(2),
             _seg_buff_size(4096),
-            _max_msg_size(1024),
-            _max_msg_queue_size(65536),
             _max_recv_buff_size(4096),
             _nworker(1),
             _queue_capacity(0),
@@ -406,16 +401,6 @@ class ConnPool {
 
         Config &seg_buff_size(size_t x) {
             _seg_buff_size = x;
-            return *this;
-        }
-
-        Config &max_msg_size(size_t x) {
-            _max_msg_size = x;
-            return *this;
-        }
-
-        Config &max_msg_queue_size(size_t x) {
-            _max_msg_queue_size = x;
             return *this;
         }
 
