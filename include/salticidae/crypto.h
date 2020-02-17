@@ -376,7 +376,9 @@ class TLS {
     TLS(const TLS &) = delete;
     TLS(TLS &&other): ssl(other.ssl) { other.ssl = nullptr; }
 
-    bool do_handshake(int &want_io_type) { /* 0 for read, 1 for write */
+    bool do_handshake(int &want_io_type) {
+        /* want_io_type: 0 for read, 1 for write */
+        /* return true if handshake is completed */
         auto ret = SSL_do_handshake(ssl);
         if (ret == 1) return true;
         auto err = SSL_get_error(ssl, ret);

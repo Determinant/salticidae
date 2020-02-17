@@ -107,7 +107,7 @@ struct AppContext {
     std::unordered_map<NetAddr, TestContext> tc;
 };
 
-void install_proto(AppContext &app, const size_t &seg_buff_size) {
+void install_proto(AppContext &app, const size_t &recv_chunk_size) {
     auto &ec = app.ec;
     auto &net = *app.net;
     auto send_rand = [&](int size, const MyNet::conn_t &conn, TestContext &tc) {
@@ -157,7 +157,7 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
             exit(1);
         }
 
-        if (tc.state == seg_buff_size * 2)
+        if (tc.state == recv_chunk_size * 2)
         {
             send_rand(tc.state, conn, tc);
             tc.state = -1;
@@ -175,7 +175,7 @@ void install_proto(AppContext &app, const size_t &seg_buff_size) {
             SALTICIDAE_LOG_INFO("rand-bomboard phase, ending in %.2f secs", t);
         }
         else if (tc.state == -1)
-            send_rand(rand() % (seg_buff_size * 10), conn, tc);
+            send_rand(rand() % (recv_chunk_size * 10), conn, tc);
         else
             send_rand(++tc.state, conn, tc);
     });
@@ -192,14 +192,14 @@ int main(int argc, char **argv) {
     Config config;
     auto opt_no_msg = Config::OptValFlag::create(false);
     auto opt_npeers = Config::OptValInt::create(5);
-    auto opt_seg_buff_size = Config::OptValInt::create(4096);
+    auto opt_recv_chunk_size = Config::OptValInt::create(4096);
     auto opt_nworker = Config::OptValInt::create(2);
     auto opt_conn_timeout = Config::OptValDouble::create(5);
     auto opt_ping_peroid = Config::OptValDouble::create(2);
     auto opt_help = Config::OptValFlag::create(false);
     config.add_opt("no-msg", opt_no_msg, Config::SWITCH_ON);
     config.add_opt("npeers", opt_npeers, Config::SET_VAL);
-    config.add_opt("seg-buff-size", opt_seg_buff_size, Config::SET_VAL);
+    config.add_opt("seg-buff-size", opt_recv_chunk_size, Config::SET_VAL);
     config.add_opt("nworker", opt_nworker, Config::SET_VAL);
     config.add_opt("conn-timeout", opt_conn_timeout, Config::SET_VAL);
     config.add_opt("ping-period", opt_ping_peroid, Config::SET_VAL);
@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
         config.print_help();
         exit(0);
     }
-    size_t seg_buff_size = opt_seg_buff_size->get();
+    size_t recv_chunk_size = opt_recv_chunk_size->get();
     for (int i = 0; i < opt_npeers->get(); i++)
         addrs.push_back(NetAddr("127.0.0.1:" + std::to_string(12345 + i)));
     std::vector<AppContext> apps;
@@ -223,13 +223,13 @@ int main(int argc, char **argv) {
         a.net = new MyNet(a.ec, MyNet::Config(
                 salticidae::ConnPool::Config()
                     .nworker(opt_nworker->get())
-                    .seg_buff_size(seg_buff_size))
+                    .recv_chunk_size(recv_chunk_size))
                         .conn_timeout(opt_conn_timeout->get())
                         .ping_period(opt_ping_peroid->get())
                         .max_msg_size(65536));
         a.tcall = new ThreadCall(a.ec);
         if (!opt_no_msg->get())
-            install_proto(a, seg_buff_size);
+            install_proto(a, recv_chunk_size);
         a.net->start();
     }
 

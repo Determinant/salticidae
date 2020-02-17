@@ -74,7 +74,7 @@ class ConnPool {
 
         protected:
         std::atomic<bool> terminated;
-        size_t seg_buff_size;
+        size_t recv_chunk_size;
         size_t max_recv_buff_size;
         int fd;
         Worker *worker;
@@ -112,6 +112,13 @@ class ConnPool {
 
         public:
         Conn(): terminated(false), worker(nullptr),
+            // recv_chunk_size initialized later
+            // max_recv_buff_size initialized later
+            // fd initialized later
+            // worker initialized later
+            // cpool initialized later
+            // mode initialized later
+            // addr initialized later
             ready_send(false), ready_recv(false),
             send_data_func(nullptr), recv_data_func(nullptr),
             tls(nullptr), peer_cert(nullptr) {}
@@ -183,7 +190,7 @@ class ConnPool {
     private:
     const int max_listen_backlog;
     const double conn_server_timeout;
-    const size_t seg_buff_size;
+    const size_t recv_chunk_size;
     const size_t max_recv_buff_size;
     const size_t max_send_buff_size;
     tls_context_t tls_ctx;
@@ -361,7 +368,7 @@ class ConnPool {
         friend class ConnPool;
         int _max_listen_backlog;
         double _conn_server_timeout;
-        size_t _seg_buff_size;
+        size_t _recv_chunk_size;
         size_t _max_recv_buff_size;
         size_t _max_send_buff_size;
         size_t _nworker;
@@ -377,7 +384,7 @@ class ConnPool {
         Config():
             _max_listen_backlog(10),
             _conn_server_timeout(2),
-            _seg_buff_size(4096),
+            _recv_chunk_size(4096),
             _max_recv_buff_size(4096),
             _max_send_buff_size(0),
             _nworker(1),
@@ -399,8 +406,8 @@ class ConnPool {
             return *this;
         }
 
-        Config &seg_buff_size(size_t x) {
-            _seg_buff_size = x;
+        Config &recv_chunk_size(size_t x) {
+            _recv_chunk_size = x;
             return *this;
         }
 
@@ -461,7 +468,7 @@ class ConnPool {
             async_id(0),
             max_listen_backlog(config._max_listen_backlog),
             conn_server_timeout(config._conn_server_timeout),
-            seg_buff_size(config._seg_buff_size),
+            recv_chunk_size(config._recv_chunk_size),
             max_recv_buff_size(config._max_recv_buff_size),
             max_send_buff_size(config._max_send_buff_size),
             tls_ctx(nullptr),

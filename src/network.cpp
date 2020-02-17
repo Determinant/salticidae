@@ -43,8 +43,8 @@ void msgnetwork_config_conn_server_timeout(msgnetwork_config_t *self, double tim
     self->conn_server_timeout(timeout);
 }
 
-void msgnetwork_config_seg_buff_size(msgnetwork_config_t *self, size_t size) {
-    self->seg_buff_size(size);
+void msgnetwork_config_recv_chunk_size(msgnetwork_config_t *self, size_t size) {
+    self->recv_chunk_size(size);
 }
 
 void msgnetwork_config_nworker(msgnetwork_config_t *self, size_t nworker) {
@@ -182,10 +182,6 @@ peernetwork_config_t *peernetwork_config_new() {
 }
 
 void peernetwork_config_free(const peernetwork_config_t *self) { delete self; }
-
-void peernetwork_config_retry_conn_delay(peernetwork_config_t *self, double t) {
-    self->retry_conn_delay(t);
-}
 
 void peernetwork_config_ping_period(peernetwork_config_t *self, double t) {
     self->ping_period(t);
