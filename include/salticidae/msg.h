@@ -58,14 +58,10 @@ class MsgBase {
     mutable bool no_payload;
 
     public:
-    MsgBase(): magic(0x0), opcode(0xff), no_payload(true) {}
+    MsgBase(uint32_t magic = 0x0): magic(magic), opcode(0xff), no_payload(true) {}
 
-    template<typename MsgType,
-            typename = typename std::enable_if<
-                !std::is_same<MsgType, MsgBase>::value &&
-                !std::is_same<MsgType, bytearray_t>::value &&
-                !std::is_same<MsgType, DataStream>::value>::type>
-    MsgBase(const MsgType &msg): magic(0x0) {
+    template<typename MsgType>
+    MsgBase(const MsgType &msg, uint32_t magic): magic(magic) {
         set_opcode(MsgType::opcode);
         set_payload(std::move(msg.serialized));
         set_checksum();

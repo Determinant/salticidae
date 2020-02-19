@@ -77,6 +77,11 @@ std::vector<std::string> trim_all(const std::vector<std::string> &ss);
 std::string vstringprintf(const char *fmt, va_list ap);
 std::string stringprintf(const char *fmt, ...);
 
+template<typename SerialType>
+inline std::string get_hex10(const SerialType &x) {
+    return get_hex(x).substr(0, 10);
+}
+
 enum SalticidaeErrorCode {
     SALTI_NORMAL,
     SALTI_ERROR_GENERIC,

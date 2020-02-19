@@ -177,6 +177,27 @@ bool msgnetwork_conn_is_terminated(const msgnetwork_conn_t *conn) {
 
 // PeerNetwork
 
+void peerid_free(const peerid_t *self) { delete self; }
+peerid_t *peerid_new_from_netaddr(const netaddr_t *addr) {
+    return new peerid_t(*addr);
+}
+
+peerid_t *peerid_new_from_x509(const x509_t *cert) {
+    return new peerid_t(*cert);
+}
+
+peerid_array_t *peerid_array_new() { return new peerid_array_t(); }
+peerid_array_t *peerid_array_new_from_peerids(const peerid_t * const *peers, size_t npeers) {
+    auto res = new peerid_array_t();
+    res->resize(npeers);
+    for (size_t i = 0; i < npeers; i++)
+        (*res)[i] = *peers[i];
+    return res;
+}
+
+void peerid_array_free(peerid_array_t *self) { delete self; }
+
+
 peernetwork_config_t *peernetwork_config_new() {
     return new peernetwork_config_t();
 }
@@ -206,23 +227,23 @@ peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_confi
 
 void peernetwork_free(const peernetwork_t *self) { delete self; }
 
-int32_t peernetwork_add_peer(peernetwork_t *self, const netaddr_t *addr) {
-    return self->add_peer(*addr);
+int32_t peernetwork_add_peer(peernetwork_t *self, const peerid_t *pid) {
+    return self->add_peer(*pid);
 }
 
-int32_t peernetwork_del_peer(peernetwork_t *self, const netaddr_t *addr) {
-    return self->del_peer(*addr);
+int32_t peernetwork_del_peer(peernetwork_t *self, const peerid_t *pid) {
+    return self->del_peer(*pid);
 }
 
-bool peernetwork_has_peer(const peernetwork_t *self, const netaddr_t *addr) {
-    return self->has_peer(*addr);
+bool peernetwork_has_peer(const peernetwork_t *self, const peerid_t *pid) {
+    return self->has_peer(*pid);
 }
 
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self,
-                                                    const netaddr_t *addr,
+                                                    const peerid_t *pid,
                                                     SalticidaeCError *cerror) {
     SALTICIDAE_CERROR_TRY(cerror)
-    return new peernetwork_conn_t(self->get_peer_conn(*addr));
+    return new peernetwork_conn_t(self->get_peer_conn(*pid));
     SALTICIDAE_CERROR_CATCH(cerror)
     return nullptr;
 }
@@ -251,9 +272,9 @@ netaddr_t *peernetwork_conn_get_peer_addr(const peernetwork_conn_t *self) {
 
 void peernetwork_conn_free(const peernetwork_conn_t *self) { delete self; }
 
-bool peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_t *addr) {
+bool peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const peerid_t *peer) {
     try {
-        self->_send_msg(*msg, *addr);
+        self->_send_msg(*msg, *peer);
         return true;
     } catch (...) {
         return false;
@@ -261,13 +282,13 @@ bool peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const netaddr_
 }
 
 int32_t peernetwork_send_msg_deferred_by_move(peernetwork_t *self,
-                                        msg_t *_moved_msg, const netaddr_t *addr) {
-    return self->_send_msg_deferred(std::move(*_moved_msg), *addr);
+                                        msg_t *_moved_msg, const peerid_t *peer) {
+    return self->_send_msg_deferred(std::move(*_moved_msg), *peer);
 }
 
 int32_t peernetwork_multicast_msg_by_move(peernetwork_t *self,
-                                    msg_t *_moved_msg, const netaddr_array_t *addrs) {
-    return self->_multicast_msg(std::move(*_moved_msg), *addrs);
+                                    msg_t *_moved_msg, const peerid_array_t *peers) {
+    return self->_multicast_msg(std::move(*_moved_msg), *peers);
 }
 
 void peernetwork_listen(peernetwork_t *self, const netaddr_t *listen_addr, SalticidaeCError *cerror) {

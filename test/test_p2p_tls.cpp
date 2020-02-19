@@ -296,7 +296,7 @@ int main(int argc, char **argv) {
             return;
         }
         scanf("%64s", buff);
-        it->second->net->send_msg(MsgText(id, buff), it2->second->listen_addr);
+        it->second->net->send_msg(MsgText(id, buff), NetAddr(it2->second->listen_addr));
     };
 
     auto cmd_sleep = [](char *buff) {
