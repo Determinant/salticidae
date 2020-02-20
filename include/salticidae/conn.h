@@ -206,17 +206,24 @@ class ConnPool {
     void update_conn(const conn_t &conn, bool connected) {
         user_tcall->async_call([this, conn, connected](ThreadCall::Handle &) {
             bool ret = !conn_cb || conn_cb(conn, connected);
-            if (enable_tls && connected)
+            if (connected)
             {
-                conn->worker->get_tcall()->async_call([this, conn, ret](ThreadCall::Handle &) {
-                    if (ret)
-                    {
-                        conn->recv_data_func = Conn::_recv_data_tls;
-                        conn->ev_socket.del();
+                if (enable_tls)
+                {
+                    conn->worker->get_tcall()->async_call([this, conn, ret](ThreadCall::Handle &) {
+                        if (ret)
+                        {
+                            conn->recv_data_func = Conn::_recv_data_tls;
+                            conn->ev_socket.del();
+                            conn->ev_socket.add(FdEvent::READ | FdEvent::WRITE);
+                        }
+                        else worker_terminate(conn);
+                    });
+                }
+                else
+                    conn->worker->get_tcall()->async_call([conn](ThreadCall::Handle &) {
                         conn->ev_socket.add(FdEvent::READ | FdEvent::WRITE);
-                    }
-                    else worker_terminate(conn);
-                });
+                    });
             }
         });
     }
@@ -272,6 +279,17 @@ class ConnPool {
             /* the caller should finalize all the preparation */
             tcall.async_call([this, conn, client_fd](ThreadCall::Handle &) {
                 try {
+                    conn->ev_socket = FdEvent(ec, client_fd, [this, conn](int fd, int what) {
+                        try {
+                            if (what & FdEvent::READ)
+                                conn->recv_data_func(conn, fd, what);
+                            else
+                                conn->send_data_func(conn, fd, what);
+                        } catch (...) {
+                            conn->cpool->recoverable_error(std::current_exception(), -1);
+                            conn->cpool->worker_terminate(conn);
+                        }
+                    });
                     auto cpool = conn->cpool;
                     if (cpool->enable_tls)
                     {
@@ -280,6 +298,7 @@ class ConnPool {
                                 conn->mode == Conn::ConnMode::PASSIVE);
                         conn->send_data_func = Conn::_send_data_tls_handshake;
                         conn->recv_data_func = Conn::_recv_data_tls_handshake;
+                        conn->ev_socket.add(FdEvent::READ | FdEvent::WRITE);
                     }
                     else
                     {
@@ -296,18 +315,6 @@ class ConnPool {
                     SALTICIDAE_LOG_INFO("worker %x got %s",
                             std::this_thread::get_id(),
                             std::string(*conn).c_str());
-                    conn->ev_socket = FdEvent(ec, client_fd, [this, conn](int fd, int what) {
-                        try {
-                            if (what & FdEvent::READ)
-                                conn->recv_data_func(conn, fd, what);
-                            else
-                                conn->send_data_func(conn, fd, what);
-                        } catch (...) {
-                            conn->cpool->recoverable_error(std::current_exception(), -1);
-                            conn->cpool->worker_terminate(conn);
-                        }
-                    });
-                    conn->ev_socket.add(FdEvent::READ | FdEvent::WRITE);
                     nconn++;
                 } catch (...) { on_fatal_error(std::current_exception()); }
             });
