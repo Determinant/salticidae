@@ -43,7 +43,14 @@ int main() {
     for (size_t i = 0; i < nodes.size(); i++)
         for (size_t j = 0; j < nodes.size(); j++)
             if (i != j)
-                nodes[i].second->add_peer(nodes[j].first);
+            {
+                auto &node = nodes[i].second;
+                auto &peer_addr = nodes[j].first;
+                salticidae::PeerId pid{peer_addr};
+                node->add_peer(pid);
+                node->set_peer_addr(pid, peer_addr);
+                node->conn_peer(pid);
+            }
     ec.dispatch();
     return 0;
 }

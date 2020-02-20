@@ -238,7 +238,13 @@ int main(int argc, char **argv) {
             masksigs();
             a.net->listen(a.addr);
             for (auto &paddr: addrs)
-                if (paddr != a.addr) a.net->add_peer(paddr);
+                if (paddr != a.addr)
+                {
+                    salticidae::PeerId pid{paddr};
+                    a.net->add_peer(pid);
+                    a.net->set_peer_addr(pid, paddr);
+                    a.net->conn_peer(pid);
+                }
             a.ec.dispatch();}));
     
     EventContext ec;

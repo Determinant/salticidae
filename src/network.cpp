@@ -227,25 +227,33 @@ peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_confi
 
 void peernetwork_free(const peernetwork_t *self) { delete self; }
 
-int32_t peernetwork_add_peer(peernetwork_t *self, const peerid_t *pid) {
-    return self->add_peer(*pid);
+int32_t peernetwork_add_peer(peernetwork_t *self, const peerid_t *peer) {
+    return self->add_peer(*peer);
 }
 
-int32_t peernetwork_del_peer(peernetwork_t *self, const peerid_t *pid) {
-    return self->del_peer(*pid);
+int32_t peernetwork_del_peer(peernetwork_t *self, const peerid_t *peer) {
+    return self->del_peer(*peer);
 }
 
-bool peernetwork_has_peer(const peernetwork_t *self, const peerid_t *pid) {
-    return self->has_peer(*pid);
+int32_t peernetwork_conn_peer(peernetwork_t *self, const peerid_t *peer, ssize_t ntry, double retry_delay) {
+    return self->conn_peer(*peer, ntry, retry_delay);
+}
+
+bool peernetwork_has_peer(const peernetwork_t *self, const peerid_t *peer) {
+    return self->has_peer(*peer);
 }
 
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self,
-                                                    const peerid_t *pid,
+                                                    const peerid_t *peer,
                                                     SalticidaeCError *cerror) {
     SALTICIDAE_CERROR_TRY(cerror)
-    return new peernetwork_conn_t(self->get_peer_conn(*pid));
+    return new peernetwork_conn_t(self->get_peer_conn(*peer));
     SALTICIDAE_CERROR_CATCH(cerror)
     return nullptr;
+}
+
+int32_t peernetwork_set_peer_addr(peernetwork_t *self, const peerid_t *peer, const netaddr_t *addr) {
+    return self->set_peer_addr(*peer, *addr);
 }
 
 msgnetwork_t *peernetwork_as_msgnetwork(peernetwork_t *self) { return self; }
