@@ -349,6 +349,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
 
     private:
     struct Peer;
+    static const uint32_t passive_nonce = 0xffff;
 
     public:
     class Conn: public MsgNet::Conn {
@@ -414,6 +415,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
 
         Peer(const PeerId &pid, const PeerNetwork *pn):
             id(pid),
+            nonce(passive_nonce),
             id_hex(get_hex10(id)),
             retry_delay(0), ntry(0),
             ev_ping_timer(
@@ -467,7 +469,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     double conn_timeout;
     NetAddr listen_addr;
     bool allow_unknown_peer;
-    uint32_t passive_nonce;
+    PeerId id;
     std::string id_hex;
     const char *tty_primary_color;
     const char *tty_secondary_color;
@@ -575,7 +577,6 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
             tty_primary_color(""),
             tty_secondary_color(""),
             tty_reset_color("") {
-        passive_nonce = 0xffff;
         if (logger.is_tty())
         {
             tty_primary_color = TTY_COLOR_BLUE;
@@ -599,6 +600,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     /* check if a peer is registered */
     bool has_peer(const PeerId &peer) const;
 
+    const PeerId &get_peer_id() const { return id; }
     size_t get_npending() const;
     conn_t get_peer_conn(const PeerId &addr) const;
     using MsgNet::send_msg;
@@ -782,6 +784,7 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
     bool reset = p->state == Peer::State::RESET;
     if (p->conn == conn)
     {
+        assert(p->state == Peer::State::CONNECTED);
         p->state = Peer::State::DISCONNECTED;
         p->inbound_conn = nullptr;
         p->outbound_conn = nullptr;
@@ -935,9 +938,7 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                     SALTICIDAE_LOG_INFO("%s%s%s: inbound handshake from %s%s%s",
                         tty_secondary_color, id_hex.c_str(), tty_reset_color,
                         tty_secondary_color, p->id_hex.c_str(), tty_reset_color);
-                    send_msg(MsgPong(
-                        listen_addr,
-                        p->addr.is_null() ? passive_nonce : p->get_nonce()), conn);
+                    send_msg(MsgPong(listen_addr, p->get_nonce()), conn);
                     auto &old_conn = p->inbound_conn;
                     if (old_conn && old_conn != conn)
                     {
@@ -1031,7 +1032,6 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
                         SALTICIDAE_LOG_INFO("%s%s%s: terminates one side (%04x >= %04x)",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
                             p->get_nonce(), msg.nonce);
-                        p->nonce = 0;
                         this->disp_terminate(conn);
                     }
                 }
@@ -1066,7 +1066,8 @@ void PeerNetwork<O, _, __>::listen(NetAddr _listen_addr) {
         MsgNet::_listen(_listen_addr);
         listen_addr = _listen_addr;
         auto my_cert = this->tls_cert;
-        id_hex = get_hex10(_get_peer_id(my_cert ? my_cert.get() : nullptr, listen_addr));
+        id = _get_peer_id(my_cert ? my_cert.get() : nullptr, listen_addr);
+        id_hex = get_hex10(id);
     }).get();
 }
 
@@ -1129,7 +1130,9 @@ int32_t PeerNetwork<O, _, __>::set_peer_addr(const PeerId &pid, const NetAddr &a
             auto it = known_peers.find(pid);
             if (it == known_peers.end())
                 throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
-            it->second->addr = addr;
+            auto &p = it->second;
+            p->addr = addr;
+            p->nonce = addr.is_null() ? passive_nonce : 0;
         } catch (const PeerNetworkError &) {
             this->recoverable_error(std::current_exception(), id);
         } catch (...) { this->disp_error_cb(std::current_exception()); }

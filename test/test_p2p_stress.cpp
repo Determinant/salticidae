@@ -167,8 +167,9 @@ void install_proto(AppContext &app, const size_t &recv_chunk_size) {
                 std::string s;
                 for (const auto &p: app.tc)
                     s += salticidae::stringprintf(" %d(%d)", ntohs(p.first.port), p.second.ncompleted);
-                SALTICIDAE_LOG_INFO("%d completed:%s", ntohs(app.addr.port), s.c_str());
-                SALTICIDAE_LOG_INFO("%d npending: %lu", ntohs(app.addr.port), net.get_npending());
+                std::string id_hex = salticidae::get_hex10(net.get_peer_id());
+                SALTICIDAE_LOG_INFO("%s(%d) completed:%s", id_hex.c_str(), ntohs(app.addr.port), s.c_str());
+                SALTICIDAE_LOG_INFO("%s(%d) npending: %lu", id_hex.c_str(), ntohs(app.addr.port), net.get_npending());
             });
             double t = salticidae::gen_rand_timeout(5);
             tc.timer.add(t);
