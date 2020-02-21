@@ -85,7 +85,9 @@ class ConnPool {
         MPSCWriteBuffer send_buffer;
         SegBuffer recv_buffer;
 
+        /* initialized and destroyed by the dispatcher */
         TimedFdEvent ev_connect;
+        /* initialized and destroyed by the worker */
         FdEvent ev_socket;
         /** does not need to wait if true */
         bool ready_send;
@@ -125,7 +127,7 @@ class ConnPool {
         Conn(Conn &&other) = delete;
 
         virtual ~Conn() {
-            SALTICIDAE_LOG_INFO("destroyed %s", std::string(*this).c_str());
+            SALTICIDAE_LOG_DEBUG("destroyed %s", std::string(*this).c_str());
         }
 
         bool is_terminated() const {
@@ -311,7 +313,7 @@ class ConnPool {
                     }
                     assert(conn->fd != -1);
                     assert(conn->worker == this);
-                    SALTICIDAE_LOG_INFO("worker %x got %s",
+                    SALTICIDAE_LOG_DEBUG("worker %x got %s",
                             std::this_thread::get_id(),
                             std::string(*conn).c_str());
                     nconn++;

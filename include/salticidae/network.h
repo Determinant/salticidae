@@ -79,6 +79,7 @@ class MsgNetwork: public ConnPool {
         Msg msg;
         MsgState msg_state;
         bool msg_sleep;
+        /* initialized and destroyed by the worker */
         TimerEvent ev_enqueue_poll;
 
         protected:
@@ -88,6 +89,10 @@ class MsgNetwork: public ConnPool {
         mutable std::atomic<size_t> nsentb;
         mutable std::atomic<size_t> nrecvb;
 #endif
+        void stop() override {
+            ev_enqueue_poll.clear();
+            ConnPool::Conn::stop();
+        }
 
         public:
         Conn(): msg_state(HEADER), msg_sleep(false)
@@ -135,22 +140,20 @@ class MsgNetwork: public ConnPool {
 
     void on_setup(const ConnPool::conn_t &_conn) override {
         auto conn = static_pointer_cast<Conn>(_conn);
-        conn->ev_enqueue_poll = TimerEvent(conn->worker->get_ec(),
-                [this, conn](TimerEvent &) {
-            if (!incoming_msgs.enqueue(std::make_pair(conn->msg, conn), false))
-            {
-                conn->msg_sleep = true;
-                conn->ev_enqueue_poll.add(0);
-                return;
-            }
-            conn->msg_sleep = false;
-            on_read(conn);
+        auto worker = conn->worker;
+        worker->get_tcall()->async_call([this, conn, worker](ThreadCall::Handle &) {
+            conn->ev_enqueue_poll = TimerEvent(worker->get_ec(),
+                    [this, conn](TimerEvent &) {
+                if (!incoming_msgs.enqueue(std::make_pair(conn->msg, conn), false))
+                {
+                    conn->msg_sleep = true;
+                    conn->ev_enqueue_poll.add(0);
+                    return;
+                }
+                conn->msg_sleep = false;
+                on_read(conn);
+            });
         });
-    }
-
-    void on_teardown(const ConnPool::conn_t &_conn) override {
-        auto conn = static_pointer_cast<Conn>(_conn);
-        conn->ev_enqueue_poll.clear();
     }
 
     public:
@@ -355,6 +358,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     class Conn: public MsgNet::Conn {
         friend PeerNetwork;
         Peer *peer;
+        /* initialized and destroyed by the worker */
         TimerEvent ev_timeout;
 
         void reset_timeout(double timeout);
