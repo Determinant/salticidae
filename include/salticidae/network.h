@@ -763,7 +763,6 @@ void PeerNetwork<O, _, __>::on_setup(const ConnPool::conn_t &_conn) {
     });
     /* the initial ping-pong to set up the connection */
     tcall_reset_timeout(worker, conn, conn_timeout);
-    replace_pending_conn(conn);
     if (conn->get_mode() == Conn::ConnMode::ACTIVE)
     {
         auto pid = get_peer_id(conn, conn->get_addr());
@@ -772,6 +771,8 @@ void PeerNetwork<O, _, __>::on_setup(const ConnPool::conn_t &_conn) {
             listen_addr,
             known_peers.find(pid)->second->get_nonce()), conn);
     }
+    else
+        replace_pending_conn(conn);
 }
 
 template<typename O, O _, O __>
@@ -851,10 +852,13 @@ template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::finish_handshake(Peer *p) {
     assert(p->state == Peer::State::DISCONNECTED);
     p->clear_all_events();
-    if (p->inbound_conn && p->inbound_conn != p->chosen_conn)
-        p->inbound_conn->peer = nullptr;
-    if (p->outbound_conn && p->outbound_conn != p->chosen_conn)
+    if (p->inbound_conn)
+        p->inbound_conn = nullptr;
+    if (p->outbound_conn)
+    {
         p->outbound_conn->peer = nullptr;
+        p->outbound_conn = nullptr;
+    }
     p->state = Peer::State::CONNECTED;
     p->reset_ping_timer();
     p->send_ping();
@@ -914,7 +918,6 @@ void PeerNetwork<O, _, __>::start_active_conn(Peer *p) {
     conn->peer = p;
     p->outbound_conn = conn;
     assert(pending_peers.count(conn->get_addr()) == 0);
-    //replace_pending_conn(conn);
 }
 
 template<typename O, O _, O __>
@@ -1183,17 +1186,12 @@ int32_t PeerNetwork<O, _, __>::del_peer(const PeerId &pid) {
             auto it = known_peers.find(pid);
             if (it == known_peers.end())
                 throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
-            auto addr = it->second->addr;
-            this->disp_terminate(it->second->conn);
+            auto &p = it->second;
+            p->conn->peer = nullptr;
+            this->disp_terminate(p->conn);
+            if (p->outbound_conn)
+                this->disp_terminate(p->outbound_conn);
             known_peers.erase(it);
-            auto it2 = pending_peers.find(addr);
-            if (it2 != pending_peers.end())
-            {
-                auto &conn = it2->second;
-                if (!conn->peer)
-                    this->disp_terminate(conn);
-                pending_peers.erase(it2);
-            }
         } catch (const PeerNetworkError &) {
             this->recoverable_error(std::current_exception(), id);
         } catch (...) { this->disp_error_cb(std::current_exception()); }
