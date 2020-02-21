@@ -108,10 +108,6 @@ class ConnPool {
         static socket_io_func _send_data_tls_handshake;
         static socket_io_func _recv_data_dummy;
 
-        /** Close the IO and clear all on-going or planned events. Remove the
-         * connection from a Worker. */
-        virtual void stop();
-
         public:
         Conn(): terminated(false),
             // recv_chunk_size initialized later
@@ -184,9 +180,18 @@ class ConnPool {
     /** Called when new data is available. */
     virtual void on_read(const conn_t &) {}
     /** Called when the underlying connection is established. */
-    virtual void on_setup(const conn_t &) {}
+    virtual void on_worker_setup(const conn_t &) {}
+    /** Called when the underlying connection is established. */
+    virtual void on_dispatcher_setup(const conn_t &) {}
     /** Called when the underlying connection breaks. */
-    virtual void on_teardown(const conn_t &) {}
+    virtual void on_worker_teardown(const conn_t &conn) {
+        if (conn->worker) conn->worker->unfeed();
+        if (conn->tls) conn->tls->shutdown();
+        conn->ev_socket.clear();
+        conn->send_buffer.get_queue().unreg_handler();
+    }
+    /** Called when the underlying connection breaks. */
+    virtual void on_dispatcher_teardown(const conn_t &) {}
 
     private:
     const int max_listen_backlog;
@@ -212,6 +217,7 @@ class ConnPool {
                 if (enable_tls)
                 {
                     conn->worker->get_tcall()->async_call([this, conn, ret](ThreadCall::Handle &) {
+                        if (conn->is_terminated()) return;
                         if (ret)
                         {
                             conn->recv_data_func = Conn::_recv_data_tls;
@@ -223,6 +229,7 @@ class ConnPool {
                 }
                 else
                     conn->worker->get_tcall()->async_call([conn](ThreadCall::Handle &) {
+                        if (conn->is_terminated()) return;
                         conn->ev_socket.add(FdEvent::READ | FdEvent::WRITE);
                     });
             }
@@ -306,9 +313,15 @@ class ConnPool {
                         conn->send_data_func = Conn::_send_data;
                         conn->recv_data_func = Conn::_recv_data;
                         enable_send_buffer(conn, client_fd);
+                        cpool->on_worker_setup(conn);
                         cpool->disp_tcall->async_call([cpool, conn](ThreadCall::Handle &) {
-                            cpool->on_setup(conn);
-                            cpool->update_conn(conn, true);
+                            try {
+                                cpool->on_dispatcher_setup(conn);
+                                cpool->update_conn(conn, true);
+                            } catch (...) {
+                                cpool->recoverable_error(std::current_exception(), -1);
+                                cpool->disp_terminate(conn);
+                            }
                         });
                     }
                     assert(conn->fd != -1);
@@ -559,7 +572,8 @@ class ConnPool {
         for (auto it: pool)
         {
             auto &conn = it.second;
-            conn->stop();
+            on_worker_teardown(conn);
+            //conn->stop();
             conn->set_terminated();
             release_conn(conn);
         }
@@ -623,6 +637,8 @@ class ConnPool {
             }
         });
     }
+
+    const X509 *get_cert() const { return tls_cert.get(); }
 };
 
 }

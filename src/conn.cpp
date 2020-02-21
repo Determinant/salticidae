@@ -251,9 +251,15 @@ void ConnPool::Conn::_recv_data_tls_handshake(const conn_t &conn, int, int) {
         conn->peer_cert = new X509(conn->tls->get_peer_cert());
         conn->worker->enable_send_buffer(conn, conn->fd);
         auto cpool = conn->cpool;
+        cpool->on_worker_setup(conn);
         cpool->disp_tcall->async_call([cpool, conn](ThreadCall::Handle &) {
-            cpool->on_setup(conn);
-            cpool->update_conn(conn, true);
+            try {
+                cpool->on_dispatcher_setup(conn);
+                cpool->update_conn(conn, true);
+            } catch (...) {
+                cpool->recoverable_error(std::current_exception(), -1);
+                cpool->disp_terminate(conn);
+            }
         });
     }
     else
@@ -266,17 +272,11 @@ void ConnPool::Conn::_recv_data_tls_handshake(const conn_t &conn, int, int) {
 
 void ConnPool::Conn::_recv_data_dummy(const conn_t &, int, int) {}
 
-void ConnPool::Conn::stop() {
-    if (worker) worker->unfeed();
-    if (tls) tls->shutdown();
-    ev_socket.clear();
-    send_buffer.get_queue().unreg_handler();
-}
-
 void ConnPool::worker_terminate(const conn_t &conn) {
     conn->worker->get_tcall()->async_call([this, conn](ThreadCall::Handle &) {
         if (!conn->set_terminated()) return;
-        conn->stop();
+        on_worker_teardown(conn);
+        //conn->stop();
         disp_tcall->async_call([this, conn](ThreadCall::Handle &) {
             del_conn(conn);
         });
@@ -292,7 +292,8 @@ void ConnPool::disp_terminate(const conn_t &conn) {
     else
         disp_tcall->async_call([this, conn](ThreadCall::Handle &) {
             if (!conn->set_terminated()) return;
-            conn->stop();
+            on_worker_teardown(conn);
+            //conn->stop();
             del_conn(conn);
         });
 }
@@ -440,7 +441,7 @@ void ConnPool::del_conn(const conn_t &conn) {
 void ConnPool::release_conn(const conn_t &conn) {
     /* inform the upper layer the connection will be destroyed */
     conn->ev_connect.clear();
-    on_teardown(conn);
+    on_dispatcher_teardown(conn);
     ::close(conn->fd);
 }
 

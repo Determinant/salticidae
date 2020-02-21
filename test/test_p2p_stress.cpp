@@ -46,6 +46,7 @@ using salticidae::static_pointer_cast;
 using salticidae::Config;
 using salticidae::ThreadCall;
 using salticidae::BoxObj;
+using salticidae::PKey;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
@@ -88,6 +89,8 @@ const uint8_t MsgAck::opcode;
 
 using MyNet = salticidae::PeerNetwork<uint8_t>;
 
+bool use_tls;
+std::unordered_set<uint256_t> valid_certs;
 std::vector<NetAddr> addrs;
 
 struct TestContext {
@@ -116,6 +119,11 @@ void install_proto(AppContext &app, const size_t &recv_chunk_size) {
         net.send_msg(std::move(msg), conn);
     };
     net.reg_conn_handler([](const ConnPool::conn_t &conn, bool connected) {
+        if (connected && use_tls)
+        {
+            auto cert_hash = salticidae::get_hash(conn->get_peer_cert()->get_der());
+            return valid_certs.count(cert_hash) > 0;
+        }
         return true;
     });
     net.reg_peer_handler([&, send_rand](const MyNet::conn_t &conn, bool connected) {
@@ -197,6 +205,7 @@ int main(int argc, char **argv) {
     auto opt_nworker = Config::OptValInt::create(2);
     auto opt_conn_timeout = Config::OptValDouble::create(5);
     auto opt_ping_peroid = Config::OptValDouble::create(2);
+    auto opt_tls = Config::OptValFlag::create(false);
     auto opt_help = Config::OptValFlag::create(false);
     config.add_opt("no-msg", opt_no_msg, Config::SWITCH_ON);
     config.add_opt("npeers", opt_npeers, Config::SET_VAL);
@@ -204,6 +213,7 @@ int main(int argc, char **argv) {
     config.add_opt("nworker", opt_nworker, Config::SET_VAL);
     config.add_opt("conn-timeout", opt_conn_timeout, Config::SET_VAL);
     config.add_opt("ping-period", opt_ping_peroid, Config::SET_VAL);
+    config.add_opt("tls", opt_tls, Config::SWITCH_ON, 't');
     config.add_opt("help", opt_help, Config::SWITCH_ON, 'h', "show this help info");
     config.parse(argc, argv);
     if (opt_help->get())
@@ -216,13 +226,24 @@ int main(int argc, char **argv) {
         addrs.push_back(NetAddr("127.0.0.1:" + std::to_string(12345 + i)));
     std::vector<AppContext> apps;
     std::vector<std::thread> threads;
+    use_tls = opt_tls->get();
     apps.resize(addrs.size());
     for (size_t i = 0; i < apps.size(); i++)
     {
         auto &a = apps[i];
         a.addr = addrs[i];
-        a.net = new MyNet(a.ec, MyNet::Config(
-                salticidae::ConnPool::Config()
+        salticidae::ConnPool::Config cfg{};
+        if (use_tls)
+        {
+            auto tls_key = new PKey(PKey::create_privkey_rsa(2048));
+            auto tls_cert = new salticidae::X509(salticidae::X509::create_self_signed_from_pubkey(*tls_key));
+            cfg.enable_tls(true)
+                .tls_key(tls_key)
+                .tls_cert(tls_cert);
+            valid_certs.insert(salticidae::get_hash(tls_cert->get_der()));
+        }
+        else cfg.enable_tls(false);
+        a.net = new MyNet(a.ec, MyNet::Config(cfg
                     .nworker(opt_nworker->get())
                     .recv_chunk_size(recv_chunk_size))
                         .conn_timeout(opt_conn_timeout->get())
@@ -238,12 +259,14 @@ int main(int argc, char **argv) {
         threads.push_back(std::thread([&]() {
             masksigs();
             a.net->listen(a.addr);
-            for (auto &paddr: addrs)
-                if (paddr != a.addr)
+            for (auto &b: apps)
+                if (b.addr != a.addr)
                 {
-                    salticidae::PeerId pid{paddr};
+                    auto pid = use_tls ?
+                        salticidae::PeerId(*b.net->get_cert()) :
+                        salticidae::PeerId(b.addr);
                     a.net->add_peer(pid);
-                    a.net->set_peer_addr(pid, paddr);
+                    a.net->set_peer_addr(pid, b.addr);
                     a.net->conn_peer(pid);
                 }
             a.ec.dispatch();}));
