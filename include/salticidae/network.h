@@ -399,6 +399,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
 
         double retry_delay;
         int32_t ntry;
+        int32_t cur_ntry;
         TimerEvent ev_retry_timer;
 
         /** the underlying connection, may be invalid when connected = false */
@@ -421,7 +422,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
             id(pid),
             nonce(passive_nonce),
             id_hex(get_hex10(id)),
-            retry_delay(0), ntry(0),
+            retry_delay(0), ntry(0), cur_ntry(0),
             ev_ping_timer(
                 TimerEvent(pn->disp_ec, std::bind(&Peer::ping_timer, this, _1))),
             ping_period(pn->ping_period),
@@ -815,8 +816,8 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
         });
     }
     /* auto retry the connection */
-    if (p->ntry > 0) p->ntry--;
-    if (p->ntry)
+    if (p->cur_ntry > 0) p->cur_ntry--;
+    if (p->cur_ntry)
         p->ev_retry_timer.add(
             p->state == Peer::State::RESET ?
             0 : gen_rand_timeout(p->retry_delay));
@@ -863,6 +864,7 @@ void PeerNetwork<O, _, __>::finish_handshake(Peer *p) {
     p->reset_ping_timer();
     p->send_ping();
     p->ev_retry_timer.del();
+    p->cur_ntry = p->ntry;
     auto &old_conn = p->conn;
     auto &new_conn = p->chosen_conn;
     if (old_conn)
@@ -1125,6 +1127,7 @@ int32_t PeerNetwork<O, _, __>::conn_peer(const PeerId &pid, int32_t ntry, double
             if (p->addr.is_null())
                 throw PeerNetworkError(SALTI_ERROR_PEER_NOT_READY);
             p->ntry = ntry;
+            p->cur_ntry = ntry;
             p->retry_delay = retry_delay;
             p->inbound_conn = nullptr;
             p->outbound_conn = nullptr;
