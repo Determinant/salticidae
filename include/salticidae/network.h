@@ -473,6 +473,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     std::string id_hex;
     const char *tty_primary_color;
     const char *tty_secondary_color;
+    const char *tty_tertiary_color;
     const char *tty_reset_color;
 
     struct MsgPing {
@@ -576,11 +577,13 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
             allow_unknown_peer(config._allow_unknown_peer),
             tty_primary_color(""),
             tty_secondary_color(""),
+            tty_tertiary_color(""),
             tty_reset_color("") {
         if (logger.is_tty())
         {
             tty_primary_color = TTY_COLOR_BLUE;
             tty_secondary_color = TTY_COLOR_CYAN;
+            tty_tertiary_color = TTY_COLOR_YELLOW;
             tty_reset_color = TTY_COLOR_RESET;
         }
         this->reg_handler(generic_bind(&PeerNetwork::ping_handler, this, _1, _2));
@@ -792,6 +795,16 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
         p->outbound_conn = nullptr;
         p->ev_ping_timer.del();
         p->nonce = 0;
+        SALTICIDAE_LOG_INFO("%sended %s%s%s <-/-> %s%s%s (via %s)%s",
+            tty_tertiary_color,
+            tty_secondary_color,
+            id_hex.c_str(),
+            tty_tertiary_color,
+            tty_secondary_color,
+            p->id_hex.c_str(),
+            tty_tertiary_color,
+            std::string(*(p->conn)).c_str(),
+            tty_reset_color);
         this->user_tcall->async_call([this, conn](ThreadCall::Handle &) {
             if (peer_cb) peer_cb(conn, false);
         });
@@ -862,7 +875,7 @@ void PeerNetwork<O, _, __>::finish_handshake(Peer *p) {
         if (peer_cb) peer_cb(conn, true);
     });
     pending_peers.erase(p->conn->get_addr());
-    SALTICIDAE_LOG_INFO("%sestablished %s%s%s <-> %s%s%s (via %s)%s",
+    SALTICIDAE_LOG_INFO("%sestablished %s%s%s <---> %s%s%s (via %s)%s",
         tty_primary_color,
         tty_secondary_color,
         id_hex.c_str(),
@@ -933,14 +946,14 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                     auto &p = pit->second;
                     if (p->state != Peer::State::DISCONNECTED ||
                         (!p->addr.is_null() && p->addr != msg.claimed_addr)) return;
-                    SALTICIDAE_LOG_INFO("%s%s%s: inbound handshake from %s%s%s",
+                    SALTICIDAE_LOG_DEBUG("%s%s%s: inbound handshake from %s%s%s",
                         tty_secondary_color, id_hex.c_str(), tty_reset_color,
                         tty_secondary_color, p->id_hex.c_str(), tty_reset_color);
                     send_msg(MsgPong(listen_addr, p->get_nonce()), conn);
                     auto &old_conn = p->inbound_conn;
                     if (old_conn && old_conn != conn)
                     {
-                        SALTICIDAE_LOG_INFO("%s%s%s: terminating stale handshake connection %s",
+                        SALTICIDAE_LOG_DEBUG("%s%s%s: terminating stale handshake connection %s",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
                             std::string(*old_conn).c_str());
                         assert(old_conn->peer == nullptr);
@@ -949,7 +962,7 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                     old_conn = conn;
                     if (msg.nonce < p->get_nonce() || p->addr.is_null())
                     {
-                        SALTICIDAE_LOG_INFO("%s%s%s: choses connection %s",
+                        SALTICIDAE_LOG_DEBUG("%s%s%s: choses connection %s",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
                             std::string(*conn).c_str());
                         p->chosen_conn = conn;
@@ -957,7 +970,7 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                     }
                     else
                     {
-                        SALTICIDAE_LOG_INFO("%s%s%s: terminates one side (%04x >= %04x)",
+                        SALTICIDAE_LOG_DEBUG("%s%s%s: terminates one side (%04x >= %04x)",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
                             msg.nonce, p->get_nonce());
                         this->disp_terminate(conn);
@@ -1003,13 +1016,13 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
                     assert(!p->addr.is_null() && p->addr == conn->get_addr());
                     if (p->state != Peer::State::DISCONNECTED ||
                         p->addr != msg.claimed_addr) return;
-                    SALTICIDAE_LOG_INFO("%s%s%s: outbound handshake to %s%s%s",
+                    SALTICIDAE_LOG_DEBUG("%s%s%s: outbound handshake to %s%s%s",
                         tty_secondary_color, id_hex.c_str(), tty_reset_color,
                         tty_secondary_color, p->id_hex.c_str(), tty_reset_color);
                     auto &old_conn = p->outbound_conn;
                     if (old_conn && old_conn != conn)
                     {
-                        SALTICIDAE_LOG_INFO("%s%s%s: terminating stale handshake connection %s",
+                        SALTICIDAE_LOG_DEBUG("%s%s%s: terminating stale handshake connection %s",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
                             std::string(*old_conn).c_str());
                         assert(old_conn->peer == nullptr);
@@ -1018,7 +1031,7 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
                     old_conn = conn;
                     if (p->get_nonce() < msg.nonce)
                     {
-                        SALTICIDAE_LOG_INFO("%s%s%s: choses connection %s",
+                        SALTICIDAE_LOG_DEBUG("%s%s%s: choses connection %s",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
                             std::string(*conn).c_str());
                         p->chosen_conn = conn;
@@ -1027,7 +1040,7 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
                     }
                     else
                     {
-                        SALTICIDAE_LOG_INFO("%s%s%s: terminates one side (%04x >= %04x)",
+                        SALTICIDAE_LOG_DEBUG("%s%s%s: terminates one side (%04x >= %04x)",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
                             p->get_nonce(), msg.nonce);
                         this->disp_terminate(conn);
