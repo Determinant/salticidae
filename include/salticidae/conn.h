@@ -111,14 +111,13 @@ class ConnPool {
         virtual void stop();
 
         public:
-        Conn(): terminated(false), worker(nullptr),
+        Conn(): terminated(false),
             // recv_chunk_size initialized later
             // max_recv_buff_size initialized later
-            // fd initialized later
-            // worker initialized later
-            // cpool initialized later
-            // mode initialized later
-            // addr initialized later
+            fd(-1),
+            worker(nullptr),
+            cpool(nullptr),
+            mode(ConnMode::PASSIVE),
             ready_send(false), ready_recv(false),
             send_data_func(nullptr), recv_data_func(nullptr),
             tls(nullptr), peer_cert(nullptr) {}

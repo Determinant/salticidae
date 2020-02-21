@@ -120,9 +120,8 @@ struct Net {
     }
 
     void add_peer(const std::string &listen_addr) {
-        NetAddr addr(listen_addr);
         try {
-            net->add_peer(addr);
+            net->add_peer(NetAddr(listen_addr));
         } catch (std::exception &err) {
             fprintf(stdout, "net %lu: got error during a sync call: %s\n", id, err.what());
         }

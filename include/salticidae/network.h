@@ -394,7 +394,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         std::string id_hex;
 
         double retry_delay;
-        ssize_t ntry;
+        int32_t ntry;
         TimerEvent ev_retry_timer;
 
         /** the underlying connection, may be invalid when connected = false */
@@ -596,7 +596,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     /* set the peer's public IP */
     int32_t set_peer_addr(const PeerId &peer, const NetAddr &addr);
     /* try to connect to the peer: once (ntry = 1), indefinitely (ntry = -1), give up retry (ntry = 0) */
-    int32_t conn_peer(const PeerId &peer, ssize_t ntry = -1, double retry_delay = 2);
+    int32_t conn_peer(const PeerId &peer, int32_t ntry = -1, double retry_delay = 2);
     /* check if a peer is registered */
     bool has_peer(const PeerId &peer) const;
 
@@ -780,11 +780,13 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
             std::string(*conn).c_str());
     auto p = conn->peer;
     if (!p) return;
-    /* if this connect was the active peer connection */
-    bool reset = p->state == Peer::State::RESET;
-    if (p->conn == conn)
+    /* there are only two possible cases where p != nullptr:
+     * 1. p2p is connected
+     * 2. p2p is disconnected, but it is trying to do an active connection by
+     * start_active_conn() */
+    if (p->state != Peer::State::DISCONNECTED)
     {
-        assert(p->state == Peer::State::CONNECTED);
+        assert(p->conn == conn);
         p->state = Peer::State::DISCONNECTED;
         p->inbound_conn = nullptr;
         p->outbound_conn = nullptr;
@@ -797,15 +799,9 @@ void PeerNetwork<O, _, __>::on_teardown(const ConnPool::conn_t &_conn) {
     /* auto retry the connection */
     if (p->ntry > 0) p->ntry--;
     if (p->ntry)
-    {
-        p->ev_retry_timer = TimerEvent(this->disp_ec, [this, addr=p->addr, p](TimerEvent &) {
-            try {
-                start_active_conn(p);
-                p->ev_retry_timer.add(gen_rand_timeout(p->retry_delay));
-            } catch (...) { this->disp_error_cb(std::current_exception()); }
-        });
-        p->ev_retry_timer.add(reset ? 0 : gen_rand_timeout(p->retry_delay));
-    }
+        p->ev_retry_timer.add(
+            p->state == Peer::State::RESET ?
+            0 : gen_rand_timeout(p->retry_delay));
 }
 
 template<typename O, O _, O __>
@@ -898,8 +894,10 @@ template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::start_active_conn(Peer *p) {
     assert(!p->addr.is_null());
     auto conn = static_pointer_cast<Conn>(MsgNet::_connect(p->addr));
+    conn->peer = p;
     p->outbound_conn = conn;
-    replace_pending_conn(conn);
+    assert(pending_peers.count(conn->get_addr()) == 0);
+    //replace_pending_conn(conn);
 }
 
 template<typename O, O _, O __>
@@ -1079,7 +1077,14 @@ int32_t PeerNetwork<O, _, __>::add_peer(const PeerId &pid) {
             pinfo_ulock_t _g(known_peers_lock);
             if (known_peers.count(pid))
                 throw PeerNetworkError(SALTI_ERROR_PEER_ALREADY_EXISTS);
-            known_peers.insert(std::make_pair(pid, new Peer(pid, this)));
+            auto p = new Peer(pid, this);
+            conn_t conn{new Conn()};
+            conn->cpool = this;
+            conn->set_terminated();
+            conn->peer = p;
+            p->conn = conn;
+            p->state = Peer::State::DISCONNECTED;
+            known_peers.insert(std::make_pair(pid, p));
         } catch (const PeerNetworkError &) {
             this->recoverable_error(std::current_exception(), id);
         } catch (...) { this->disp_error_cb(std::current_exception()); }
@@ -1088,7 +1093,7 @@ int32_t PeerNetwork<O, _, __>::add_peer(const PeerId &pid) {
 }
 
 template<typename O, O _, O __>
-int32_t PeerNetwork<O, _, __>::conn_peer(const PeerId &pid, ssize_t ntry, double retry_delay) {
+int32_t PeerNetwork<O, _, __>::conn_peer(const PeerId &pid, int32_t ntry, double retry_delay) {
     auto id = this->gen_async_id();
     this->disp_tcall->async_call([this, pid, ntry, retry_delay, id](ThreadCall::Handle &) {
         try {
@@ -1105,15 +1110,26 @@ int32_t PeerNetwork<O, _, __>::conn_peer(const PeerId &pid, ssize_t ntry, double
             p->outbound_conn = nullptr;
             p->ev_ping_timer.del();
             p->nonce = 0;
+            p->ev_retry_timer = TimerEvent(this->disp_ec,
+                    [this, addr=p->addr, p=p.get()](TimerEvent &) {
+                try {
+                    start_active_conn(p);
+                    p->ev_retry_timer.add(gen_rand_timeout(p->retry_delay));
+                } catch (...) { this->disp_error_cb(std::current_exception()); }
+            });
+
             /* has to terminate established connection *before* making the next
              * attempt */
-            if (!p->conn || p->state == Peer::State::DISCONNECTED)
+            if (p->state == Peer::State::DISCONNECTED && ntry)
                 start_active_conn(p.get());
             else if (p->state == Peer::State::CONNECTED)
             {
                 p->state = Peer::State::RESET;
                 this->disp_terminate(p->conn);
             }
+            // else ntry == 0 but state is not connected
+            // or state is RESET
+            // then it does nothing
         } catch (const PeerNetworkError &) {
             this->recoverable_error(std::current_exception(), id);
         } catch (...) { this->disp_error_cb(std::current_exception()); }
@@ -1333,7 +1349,7 @@ using clientnetwork_conn_t = clientnetwork_t::conn_t;
 
 #ifdef SALTICIDAE_CBINDINGS
 typedef struct peerid_t peerid_t;
-typedef struct peerid_t_array_t peerid_array_t;
+typedef struct peerid_array_t peerid_array_t;
 
 typedef struct msgnetwork_t msgnetwork_t;
 typedef struct msgnetwork_config_t msgnetwork_config_t;
@@ -1420,7 +1436,7 @@ void peerid_free(const peerid_t *self);
 peerid_t *peerid_new_from_netaddr(const netaddr_t *addr);
 peerid_t *peerid_new_from_x509(const x509_t *cert);
 peerid_array_t *peerid_array_new();
-peerid_array_t *peerid_array_new_from_peerids(const peerid_t * const *pids, size_t npids);
+peerid_array_t *peerid_array_new_from_peers(const peerid_t * const *peers, size_t npeers);
 void peerid_array_free(peerid_array_t *self);
 
 peernetwork_config_t *peernetwork_config_new();
@@ -1434,7 +1450,7 @@ peernetwork_t *peernetwork_new(const eventcontext_t *ec, const peernetwork_confi
 void peernetwork_free(const peernetwork_t *self);
 int32_t peernetwork_add_peer(peernetwork_t *self, const peerid_t *peer);
 int32_t peernetwork_del_peer(peernetwork_t *self, const peerid_t *peer);
-int32_t peernetwork_conn_peer(peernetwork_t *self, const peerid_t *peer, ssize_t ntry, double retry_delay);
+int32_t peernetwork_conn_peer(peernetwork_t *self, const peerid_t *peer, int32_t ntry, double retry_delay);
 bool peernetwork_has_peer(const peernetwork_t *self, const peerid_t *peer);
 const peernetwork_conn_t *peernetwork_get_peer_conn(const peernetwork_t *self, const peerid_t *peer, SalticidaeCError *cerror);
 int32_t peernetwork_set_peer_addr(peernetwork_t *self, const peerid_t *peer, const netaddr_t *addr);

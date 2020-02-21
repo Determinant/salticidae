@@ -187,7 +187,7 @@ peerid_t *peerid_new_from_x509(const x509_t *cert) {
 }
 
 peerid_array_t *peerid_array_new() { return new peerid_array_t(); }
-peerid_array_t *peerid_array_new_from_peerids(const peerid_t * const *peers, size_t npeers) {
+peerid_array_t *peerid_array_new_from_peers(const peerid_t * const *peers, size_t npeers) {
     auto res = new peerid_array_t();
     res->resize(npeers);
     for (size_t i = 0; i < npeers; i++)
@@ -235,7 +235,7 @@ int32_t peernetwork_del_peer(peernetwork_t *self, const peerid_t *peer) {
     return self->del_peer(*peer);
 }
 
-int32_t peernetwork_conn_peer(peernetwork_t *self, const peerid_t *peer, ssize_t ntry, double retry_delay) {
+int32_t peernetwork_conn_peer(peernetwork_t *self, const peerid_t *peer, int32_t ntry, double retry_delay) {
     return self->conn_peer(*peer, ntry, retry_delay);
 }
 
