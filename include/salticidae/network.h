@@ -813,7 +813,6 @@ void PeerNetwork<O, _, __>::on_dispatcher_teardown(const ConnPool::conn_t &_conn
         p->inbound_conn = nullptr;
         p->outbound_conn = nullptr;
         p->ev_ping_timer.del();
-        p->nonce = 0;
         SALTICIDAE_LOG_INFO("%sended %s%s%s <-/-> %s%s%s (via %s)%s",
             tty_tertiary_color,
             tty_secondary_color,
@@ -831,9 +830,14 @@ void PeerNetwork<O, _, __>::on_dispatcher_teardown(const ConnPool::conn_t &_conn
     /* auto retry the connection */
     if (p->cur_ntry > 0) p->cur_ntry--;
     if (p->cur_ntry)
+    {
+        p->nonce = 0;
         p->ev_retry_timer.add(
             p->state == Peer::State::RESET ?
             0 : gen_rand_timeout(p->retry_delay));
+    }
+    else
+        p->nonce = passive_nonce;
 }
 
 template<typename O, O _, O __>
@@ -962,7 +966,12 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                         this->user_tcall->async_call([this, addr=msg.claimed_addr, conn](ThreadCall::Handle &) {
                             if (unknown_peer_cb) unknown_peer_cb(addr, conn->get_peer_cert());
                         });
-                        throw PeerNetworkError(SALTI_ERROR_PEER_NOT_MATCH);
+                        SALTICIDAE_LOG_WARN(
+                            "%s%s%s: %s%s%s does not match the record",
+                            tty_secondary_color, id_hex.c_str(), tty_reset_color,
+                            tty_secondary_color, get_hex10(pid).c_str(), tty_reset_color);
+                        this->disp_terminate(conn);
+                        return;
                     }
                     auto &p = pit->second;
                     if (p->state != Peer::State::DISCONNECTED ||
@@ -1028,9 +1037,11 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
                     if (pit == known_peers.end())
                     {
                         SALTICIDAE_LOG_WARN(
-                            "%s%s%s: unexpected pong from an unknown peer",
-                            tty_secondary_color, id_hex.c_str(), tty_reset_color);
-                        throw PeerNetworkError(SALTI_ERROR_PEER_NOT_MATCH);
+                            "%s%s%s: %s%s%s does not match the record",
+                            tty_secondary_color, id_hex.c_str(), tty_reset_color,
+                            tty_secondary_color, get_hex10(pid).c_str(), tty_reset_color);
+                        this->disp_terminate(conn);
+                        return;
                     }
                     auto &p = pit->second;
                     assert(!p->addr.is_null() && p->addr == conn->get_addr());
@@ -1182,7 +1193,7 @@ int32_t PeerNetwork<O, _, __>::set_peer_addr(const PeerId &pid, const NetAddr &a
                 throw PeerNetworkError(SALTI_ERROR_PEER_NOT_EXIST);
             auto &p = it->second;
             p->addr = addr;
-            p->nonce = addr.is_null() ? passive_nonce : 0;
+            //p->nonce = addr.is_null() ? passive_nonce : 0;
         } catch (const PeerNetworkError &) {
             this->recoverable_error(std::current_exception(), id);
         } catch (...) { this->disp_error_cb(std::current_exception()); }
@@ -1203,6 +1214,8 @@ int32_t PeerNetwork<O, _, __>::del_peer(const PeerId &pid) {
             auto &p = it->second;
             p->conn->peer = nullptr;
             this->disp_terminate(p->conn);
+            if (p->inbound_conn)
+                this->disp_terminate(p->inbound_conn);
             if (p->outbound_conn)
                 this->disp_terminate(p->outbound_conn);
             known_peers.erase(it);

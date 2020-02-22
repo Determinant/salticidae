@@ -73,7 +73,7 @@ void ConnPool::Conn::_send_data(const conn_t &conn, int fd, int events) {
         ssize_t size = buff_seg.size();
         if (!size) break;
         ret = send(fd, buff_seg.data(), size, 0);
-        SALTICIDAE_LOG_DEBUG("socket sent %zd bytes", ret);
+        SALTICIDAE_LOG_DEBUG("socket(%d) sent %zd bytes", fd, ret);
         size -= ret;
         if (size > 0)
         {
@@ -125,7 +125,7 @@ void ConnPool::Conn::_recv_data(const conn_t &conn, int fd, int events) {
         bytearray_t buff_seg;
         buff_seg.resize(recv_chunk_size);
         ret = recv(fd, buff_seg.data(), recv_chunk_size, 0);
-        SALTICIDAE_LOG_DEBUG("socket read %zd bytes", ret);
+        SALTICIDAE_LOG_DEBUG("socket(%d) read %zd bytes", fd, ret);
         if (ret < 0)
         {
             if (errno == EWOULDBLOCK) break;
@@ -163,7 +163,7 @@ void ConnPool::Conn::_send_data_tls(const conn_t &conn, int fd, int events) {
         ssize_t size = buff_seg.size();
         if (!size) break;
         ret = tls->send(buff_seg.data(), size);
-        SALTICIDAE_LOG_DEBUG("ssl sent %zd bytes", ret);
+        SALTICIDAE_LOG_DEBUG("ssl(%d) sent %zd bytes", fd, ret);
         size -= ret;
         if (size > 0)
         {
@@ -213,7 +213,7 @@ void ConnPool::Conn::_recv_data_tls(const conn_t &conn, int fd, int events) {
         bytearray_t buff_seg;
         buff_seg.resize(recv_chunk_size);
         ret = tls->recv(buff_seg.data(), recv_chunk_size);
-        SALTICIDAE_LOG_DEBUG("ssl read %zd bytes", ret);
+        SALTICIDAE_LOG_DEBUG("ssl(%d) read %zd bytes", fd, ret);
         if (ret < 0)
         {
             if (tls->get_error(ret) == SSL_ERROR_WANT_READ) break;
