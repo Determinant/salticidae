@@ -1155,7 +1155,7 @@ int32_t PeerNetwork<O, _, __>::conn_peer(const PeerId &pid, int32_t ntry, double
             /* has to terminate established connection *before* making the next
              * attempt */
             if (p->state == Peer::State::DISCONNECTED && ntry)
-                start_active_conn(p.get());
+                p->ev_retry_timer.add(0);
             else if (p->state == Peer::State::CONNECTED)
             {
                 p->state = Peer::State::RESET;

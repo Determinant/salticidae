@@ -247,7 +247,7 @@ void ConnPool::Conn::_recv_data_tls_handshake(const conn_t &conn, int, int) {
         /* do not start receiving data immediately */
         conn->recv_data_func = _recv_data_dummy;
         conn->ev_socket.del();
-        conn->ev_socket.add(FdEvent::WRITE);
+        //conn->ev_socket.add(FdEvent::WRITE);
         conn->peer_cert = new X509(conn->tls->get_peer_cert());
         conn->worker->enable_send_buffer(conn, conn->fd);
         auto cpool = conn->cpool;
