@@ -372,6 +372,14 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
             return ret;
         }
 
+        PeerId get_peer_id() {
+            auto ret = *(static_cast<PeerId *>(
+                get_net()->disp_tcall->call([this](ThreadCall::Handle &h) {
+                    h.set_result(peer ? PeerId(peer->id) : PeerId());
+                }).get()));
+            return ret;
+        }
+
         PeerNetwork *get_net() {
             return static_cast<PeerNetwork *>(ConnPool::Conn::get_pool());
         }
