@@ -1510,6 +1510,7 @@ msgnetwork_conn_t *msgnetwork_conn_new_from_peernetwork_conn(const peernetwork_c
 peernetwork_conn_t *peernetwork_conn_new_from_msgnetwork_conn_unsafe(const msgnetwork_conn_t *conn);
 peernetwork_conn_t *peernetwork_conn_copy(const peernetwork_conn_t *self);
 netaddr_t *peernetwork_conn_get_peer_addr(const peernetwork_conn_t *self);
+peerid_t *peernetwork_conn_get_peer_id(const peernetwork_conn_t *self);
 void peernetwork_conn_free(const peernetwork_conn_t *self);
 bool peernetwork_send_msg(peernetwork_t *self, const msg_t * msg, const peerid_t *peer);
 int32_t peernetwork_send_msg_deferred_by_move(peernetwork_t *self, msg_t * _moved_msg, const peerid_t *peer);
