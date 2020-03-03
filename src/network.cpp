@@ -186,6 +186,14 @@ peerid_t *peerid_new_from_x509(const x509_t *cert) {
     return new peerid_t(*cert);
 }
 
+peerid_t *peerid_new_moved_from_uint256(uint256_t *_moved_rawid) {
+    return new peerid_t(std::move(*_moved_rawid));
+}
+
+peerid_t *peerid_new_copied_from_uint256(const uint256_t *rawid) {
+    return new peerid_t(*rawid);
+}
+
 peerid_array_t *peerid_array_new() { return new peerid_array_t(); }
 peerid_array_t *peerid_array_new_from_peers(const peerid_t * const *peers, size_t npeers) {
     auto res = new peerid_array_t();
@@ -195,8 +203,9 @@ peerid_array_t *peerid_array_new_from_peers(const peerid_t * const *peers, size_
     return res;
 }
 
-void peerid_array_free(peerid_array_t *self) { delete self; }
+const uint256_t *peerid_as_uint256(const peerid_t *self) { return self; }
 
+void peerid_array_free(const peerid_array_t *self) { delete self; }
 
 peernetwork_config_t *peernetwork_config_new() {
     return new peernetwork_config_t();

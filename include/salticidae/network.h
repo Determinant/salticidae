@@ -1485,9 +1485,12 @@ bool msgnetwork_conn_is_terminated(const msgnetwork_conn_t *conn);
 void peerid_free(const peerid_t *self);
 peerid_t *peerid_new_from_netaddr(const netaddr_t *addr);
 peerid_t *peerid_new_from_x509(const x509_t *cert);
+peerid_t *peerid_new_moved_from_uint256(uint256_t *_moved_rawid);
+peerid_t *peerid_new_copied_from_uint256(const uint256_t *rawid);
 peerid_array_t *peerid_array_new();
 peerid_array_t *peerid_array_new_from_peers(const peerid_t * const *peers, size_t npeers);
-void peerid_array_free(peerid_array_t *self);
+const uint256_t *peerid_as_uint256(const peerid_t *);
+void peerid_array_free(const peerid_array_t *self);
 
 peernetwork_config_t *peernetwork_config_new();
 void peernetwork_config_free(const peernetwork_config_t *self);
