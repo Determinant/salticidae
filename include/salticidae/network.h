@@ -359,11 +359,13 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
         Peer *peer;
         /* initialized and destroyed by the worker */
         TimerEvent ev_timeout;
+        bool manual; /* whether it is a temporary connection manually initiated
+                        by the user, only meanful in ACTIVE mode. */
 
         void reset_timeout(double timeout);
 
         public:
-        Conn(): MsgNet::Conn(), peer(nullptr) {}
+        Conn(): MsgNet::Conn(), peer(nullptr), manual(true) {}
         NetAddr get_peer_addr() {
             auto ret = *(static_cast<NetAddr *>(
                 get_net()->disp_tcall->call([this](ThreadCall::Handle &h) {
@@ -626,7 +628,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     inline int32_t _multicast_msg(Msg &&msg, const std::vector<PeerId> &peers);
 
     void listen(NetAddr listen_addr);
-    conn_t connect(const NetAddr &addr) = delete;
+    //conn_t connect(const NetAddr &addr) = delete;
     template<typename Func>
     void reg_unknown_peer_handler(Func &&cb) { unknown_peer_cb = std::forward<Func>(cb); }
     template<typename Func>
@@ -784,7 +786,12 @@ void PeerNetwork<O, _, __>::on_dispatcher_setup(const ConnPool::conn_t &_conn) {
         auto pid = get_peer_id(conn, conn->get_addr());
         auto it = known_peers.find(pid);
         if (it == known_peers.end())
-            throw PeerNetworkError(SALTI_ERROR_PEER_NOT_MATCH);
+        {
+            if (conn->manual)
+                send_msg(MsgPing(listen_addr, passive_nonce), conn);
+            else
+                throw PeerNetworkError(SALTI_ERROR_PEER_NOT_MATCH);
+        }
         else
         {
             pinfo_slock_t _g(known_peers_lock);
@@ -943,6 +950,7 @@ void PeerNetwork<O, _, __>::start_active_conn(Peer *p) {
     assert(!p->addr.is_null());
     auto conn = static_pointer_cast<Conn>(MsgNet::_connect(p->addr));
     conn->peer = p;
+    conn->manual = false;
     p->outbound_conn = conn;
     assert(pending_peers.count(conn->get_addr()) == 0);
 }
@@ -1044,6 +1052,7 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
                     auto pit = known_peers.find(pid);
                     if (pit == known_peers.end())
                     {
+                        if (conn->manual) return;
                         SALTICIDAE_LOG_WARN(
                             "%s%s%s: %s%s%s does not match the record",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,

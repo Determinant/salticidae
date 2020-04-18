@@ -46,6 +46,9 @@ using std::placeholders::_2;
 
 using PeerNetwork = salticidae::PeerNetwork<uint8_t>;
 
+std::unordered_map<size_t, PeerNetwork::MsgNet::conn_t> msgnet_conns;
+size_t msgnet_conns_id = 0;
+
 struct MsgText {
     static const uint8_t opcode = 0x0;
     DataStream serialized;
@@ -140,6 +143,15 @@ struct Net {
             net->conn_peer(addr);
         } catch (std::exception &err) {
             fprintf(stdout, "net %lu: got error during a sync call: %s\n", id, err.what());
+        }
+    }
+
+    PeerNetwork::MsgNet::conn_t connect_sync(const NetAddr &addr) {
+        try {
+            return net->connect_sync(addr);
+        } catch (std::exception &err) {
+            fprintf(stdout, "net %lu: got error during a sync call: %s\n", id, err.what());
+            return PeerNetwork::MsgNet::conn_t(nullptr);
         }
     }
 
@@ -305,6 +317,32 @@ int main(int argc, char **argv) {
         it->second->conn_peer(it2->second->listen_addr);
     };
 
+    auto cmd_connpeer2 = [](char *buff) {
+        int id = read_int(buff);
+        if (id < 0) return;
+        auto it = nets.find(id);
+        if (it == nets.end())
+        {
+            fprintf(stdout, "net id does not exist\n");
+            return;
+        }
+        int id2 = read_int(buff);
+        if (id2 < 0) return;
+        auto it2 = nets.find(id2);
+        if (it2 == nets.end())
+        {
+            fprintf(stdout, "net id does not exist\n");
+            return;
+        }
+        size_t mn_conn_id = msgnet_conns_id++;
+        auto conn = it->second->connect_sync(it2->second->listen_addr);
+        if (conn)
+        {
+            msgnet_conns[mn_conn_id] = conn;
+            fprintf(stdout, "msgnet conn %zu created\n", mn_conn_id);
+        }
+    };
+
     auto cmd_msg = [](char *buff) {
         int id = read_int(buff);
         if (id < 0) return;
@@ -337,7 +375,8 @@ int main(int argc, char **argv) {
             "add <node-id> <port> -- start a node (create a PeerNetwork instance)\n"
             "addpeer <node-id> <peer-id> -- add a peer to a given node\n"
             "setpeeraddr <node-id> <peer-id> -- set the peer addr\n"
-            "connpeer <node-id> <peer-id> -- try to connect to the peer\n"
+            "connpeer <node-id> <peer-id> -- try to connect to the peer by PeerId\n"
+            "connpeer2 <node-id> <peer-id> -- try to connect to the peer by NetAddr\n"
             "delpeer <node-id> <peer-id> -- add a peer to a given node\n"
             "del <node-id> -- remove a node (destroy a PeerNetwork instance)\n"
             "msg <node-id> <peer-id> <msg> -- send a text message to a node\n"
@@ -352,6 +391,7 @@ int main(int argc, char **argv) {
     cmd_map.insert(std::make_pair("addpeer", cmd_addpeer));
     cmd_map.insert(std::make_pair("setpeeraddr", cmd_setpeeraddr));
     cmd_map.insert(std::make_pair("connpeer", cmd_connpeer));
+    cmd_map.insert(std::make_pair("connpeer2", cmd_connpeer2));
     cmd_map.insert(std::make_pair("del", cmd_del));
     cmd_map.insert(std::make_pair("delpeer", cmd_delpeer));
     cmd_map.insert(std::make_pair("msg", cmd_msg));
