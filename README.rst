@@ -85,7 +85,7 @@ Minimal working P2P network
    
    using Net = salticidae::PeerNetwork<uint8_t>;
    
-   int main() { /* example of 4 peer nodes pinging each other */
+   int main() {
        std::vector<std::pair<salticidae::NetAddr, std::unique_ptr<Net>>> nodes;
        Net::Config config;
        salticidae::EventContext ec;
@@ -101,7 +101,14 @@ Minimal working P2P network
        for (size_t i = 0; i < nodes.size(); i++)
            for (size_t j = 0; j < nodes.size(); j++)
                if (i != j)
-                   nodes[i].second->add_peer(nodes[j].first);
+               {
+                   auto &node = nodes[i].second;
+                   auto &peer_addr = nodes[j].first;
+                   salticidae::PeerId pid{peer_addr};
+                   node->add_peer(pid);
+                   node->set_peer_addr(pid, peer_addr);
+                   node->conn_peer(pid);
+               }
        ec.dispatch();
        return 0;
    }

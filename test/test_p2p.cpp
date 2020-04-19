@@ -99,6 +99,12 @@ struct Net {
                         this->id, fatal ? "fatal" : "recoverable", async_id, err.what());
             }
         });
+        net->reg_conn_handler([](const salticidae::ConnPool::conn_t &conn, bool connected) {
+            fprintf(stdout, "%s: conn pool %s\n",
+                    std::string(conn->get_addr()).c_str(),
+                    connected ? "connected" : "disconnected");
+            return true;
+        });
         net->reg_peer_handler([this](const PeerNetwork::conn_t &conn, bool connected) {
             fprintf(stdout, "net %lu: %s peer %s\n", this->id,
                     connected ? "connected to" : "disconnected from",

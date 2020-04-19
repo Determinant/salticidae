@@ -237,9 +237,16 @@ class MsgNetwork: public ConnPool {
     reg_handler(Func &&handler) {
         using callback_t = callback_traits<typename std::remove_reference<Func>::type>;
         set_handler(callback_t::msg_type::opcode,
-            [handler=std::forward<Func>(handler)](const Msg &msg, const conn_t &conn) {
-            handler(typename callback_t::msg_type(msg.get_payload()),
-                    static_pointer_cast<typename callback_t::conn_type>(conn));
+            [this, handler=std::forward<Func>(handler)](const Msg &msg, const conn_t &conn) {
+            try {
+                handler(typename callback_t::msg_type(msg.get_payload()),
+                        static_pointer_cast<typename callback_t::conn_type>(conn));
+            } catch (std::exception &e) {
+                SALTICIDAE_LOG_WARN(
+                    "error while parsing: %s, terminating the connection",
+                    e.what());
+                this->worker_terminate(conn);
+            }
         });
     }
 
