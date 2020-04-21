@@ -1054,12 +1054,12 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
             {
                 if (conn->get_mode() == Conn::ConnMode::ACTIVE)
                 {
+                    if (conn->manual) return;
                     auto pid = get_peer_id(conn, conn->get_addr());
                     pinfo_slock_t _g(known_peers_lock);
                     auto pit = known_peers.find(pid);
                     if (pit == known_peers.end())
                     {
-                        if (conn->manual) return;
                         SALTICIDAE_LOG_WARN(
                             "%s%s%s: %s%s%s does not match the record",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
