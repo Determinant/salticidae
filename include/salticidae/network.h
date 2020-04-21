@@ -823,7 +823,8 @@ void PeerNetwork<O, _, __>::on_dispatcher_teardown(const ConnPool::conn_t &_conn
             tty_reset_color,
             std::string(*conn).c_str());
     auto p = conn->peer;
-    if (!p) return;
+    if (!p || (conn->get_mode() == Conn::ConnMode::ACTIVE && conn->manual))
+        return;
     /* there are only two possible cases where p != nullptr:
      * 1. p2p is connected
      * 2. p2p is disconnected, but it is trying to do an active connection by
@@ -1054,12 +1055,12 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
             {
                 if (conn->get_mode() == Conn::ConnMode::ACTIVE)
                 {
+                    if (conn->manual) return;
                     auto pid = get_peer_id(conn, conn->get_addr());
                     pinfo_slock_t _g(known_peers_lock);
                     auto pit = known_peers.find(pid);
                     if (pit == known_peers.end())
                     {
-                        if (conn->manual) return;
                         SALTICIDAE_LOG_WARN(
                             "%s%s%s: %s%s%s does not match the record",
                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
