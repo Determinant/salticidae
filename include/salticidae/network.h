@@ -795,7 +795,7 @@ void PeerNetwork<O, _, __>::on_dispatcher_setup(const ConnPool::conn_t &_conn) {
         if (it == known_peers.end())
         {
             if (conn->manual)
-                send_msg(MsgPing(listen_addr, passive_nonce), conn);
+                send_msg(MsgPing(listen_addr, 0), conn);
             else
                 throw PeerNetworkError(SALTI_ERROR_PEER_NOT_MATCH);
         }
@@ -997,6 +997,7 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                         this->disp_terminate(conn);
                         return;
                     }
+                    if (!msg.nonce) return; // ignore manual connection
                     auto &p = pit->second;
                     if (p->state != Peer::State::DISCONNECTED ||
                         (!p->addr.is_null() && p->addr != msg.claimed_addr)) return;
@@ -1055,7 +1056,6 @@ void PeerNetwork<O, _, __>::pong_handler(MsgPong &&msg, const conn_t &conn) {
             {
                 if (conn->get_mode() == Conn::ConnMode::ACTIVE)
                 {
-                    if (conn->manual) return;
                     auto pid = get_peer_id(conn, conn->get_addr());
                     pinfo_slock_t _g(known_peers_lock);
                     auto pit = known_peers.find(pid);
