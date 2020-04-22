@@ -366,6 +366,7 @@ void ConnPool::_listen(NetAddr listen_addr) {
     if ((listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
     if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
+        setsockopt(listen_fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&one, sizeof(one)) < 0 ||
         setsockopt(listen_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
         throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
     if (fcntl(listen_fd, F_SETFL, O_NONBLOCK) == -1)
@@ -393,6 +394,7 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
     if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
+        setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&one, sizeof(one)) < 0 ||
         setsockopt(fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
         throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
@@ -441,6 +443,7 @@ void ConnPool::del_conn(const conn_t &conn) {
 void ConnPool::release_conn(const conn_t &conn) {
     /* inform the upper layer the connection will be destroyed */
     conn->ev_connect.clear();
+    conn->ev_socket.clear();
     on_dispatcher_teardown(conn);
     ::close(conn->fd);
 }
