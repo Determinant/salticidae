@@ -311,7 +311,9 @@ void ConnPool::accept_client(int fd, int) {
         else
         {
             int one = 1;
-            if (setsockopt(client_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
+            if (setsockopt(client_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
+                setsockopt(client_fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&one, sizeof(one)) < 0 ||
+                setsockopt(client_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
                 throw ConnPoolError(SALTI_ERROR_ACCEPT, errno);
             if (fcntl(client_fd, F_SETFL, O_NONBLOCK) == -1)
                 throw ConnPoolError(SALTI_ERROR_ACCEPT, errno);

@@ -511,7 +511,6 @@ class ConnPool {
             if (!tls_ctx->check_privkey())
                 throw SalticidaeError(SALTI_ERROR_TLS_KEY_NOT_MATCH);
         }
-        signal(SIGPIPE, SIG_IGN);
         workers = new Worker[nworker];
         user_tcall = new ThreadCall(ec);
         disp_ec = workers[0].get_ec();
