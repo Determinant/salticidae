@@ -312,7 +312,7 @@ void ConnPool::accept_client(int fd, int) {
         {
             int one = 1;
             if (setsockopt(client_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
-                setsockopt(client_fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&one, sizeof(one)) < 0 ||
+                //setsockopt(client_fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&one, sizeof(one)) < 0 ||
                 setsockopt(client_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
                 throw ConnPoolError(SALTI_ERROR_ACCEPT, errno);
             if (fcntl(client_fd, F_SETFL, O_NONBLOCK) == -1)
@@ -368,7 +368,7 @@ void ConnPool::_listen(NetAddr listen_addr) {
     if ((listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
     if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
-        setsockopt(listen_fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&one, sizeof(one)) < 0 ||
+        //setsockopt(listen_fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&one, sizeof(one)) < 0 ||
         setsockopt(listen_fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
         throw ConnPoolError(SALTI_ERROR_LISTEN, errno);
     if (fcntl(listen_fd, F_SETFL, O_NONBLOCK) == -1)
@@ -396,7 +396,7 @@ ConnPool::conn_t ConnPool::_connect(const NetAddr &addr) {
     if ((fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&one, sizeof(one)) < 0 ||
-        setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&one, sizeof(one)) < 0 ||
+        //setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (const char *)&one, sizeof(one)) < 0 ||
         setsockopt(fd, SOL_TCP, TCP_NODELAY, (const char *)&one, sizeof(one)) < 0)
         throw ConnPoolError(SALTI_ERROR_CONNECT, errno);
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
