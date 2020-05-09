@@ -130,6 +130,7 @@ void install_proto(AppContext &app, const size_t &recv_chunk_size) {
         if (connected)
         {
             auto addr = conn->get_peer_addr();
+            if (addr.is_null()) return;
             auto &tc = app.tc[addr];
             tc.state = 1;
             send_rand(tc.state, conn, tc);
