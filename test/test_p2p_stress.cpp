@@ -114,7 +114,7 @@ void install_proto(AppContext &app, const size_t &recv_chunk_size) {
     auto &ec = app.ec;
     auto &net = *app.net;
     auto send_rand = [&](int size, const MyNet::conn_t &conn, TestContext &tc) {
-        MsgRand msg(tc.view, size);
+        MsgRand msg(++tc.view, size);
         tc.hash = msg.hash;
         net.send_msg(std::move(msg), conn);
     };
@@ -132,7 +132,6 @@ void install_proto(AppContext &app, const size_t &recv_chunk_size) {
             auto addr = conn->get_peer_addr();
             auto &tc = app.tc[addr];
             tc.state = 1;
-            tc.view++;
             send_rand(tc.state, conn, tc);
         }
     });
@@ -179,7 +178,7 @@ void install_proto(AppContext &app, const size_t &recv_chunk_size) {
                 SALTICIDAE_LOG_INFO("%s(%d) completed:%s", id_hex.c_str(), ntohs(app.addr.port), s.c_str());
                 SALTICIDAE_LOG_INFO("%s(%d) npending: %lu", id_hex.c_str(), ntohs(app.addr.port), net.get_npending());
             });
-            double t = salticidae::gen_rand_timeout(5);
+            double t = rand() / (double)RAND_MAX * 10;
             tc.timer.add(t);
             SALTICIDAE_LOG_INFO("rand-bomboard phase, ending in %.2f secs", t);
         }
