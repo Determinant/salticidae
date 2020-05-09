@@ -1021,6 +1021,7 @@ void PeerNetwork<O, _, __>::ping_handler(MsgPing &&msg, const conn_t &conn) {
                         // defer the handling of the inbound connection
                         p->inbound_preempt_ping = new MsgPing(std::move(msg));
                         p->inbound_conn = conn;
+                        p->nonce = passive_nonce;
                         this->disp_terminate(p->conn);
                         return;
                     }
