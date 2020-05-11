@@ -847,35 +847,35 @@ void PeerNetwork<O, _, __>::on_dispatcher_teardown(const ConnPool::conn_t &_conn
             tty_tertiary_color,
             std::string(*(p->conn)).c_str(),
             tty_reset_color);
-        if (p->inbound_preempt_ping)
-        {
-            this->user_tcall->async_call(
-                    [this, conn,
-                     iping=p->inbound_preempt_ping.unwrap(),
-                     iconn=p->inbound_conn](ThreadCall::Handle &) {
-                if (peer_cb) peer_cb(conn, false);
-                ping_handler(std::move(*iping), iconn);
-                delete iping;
-            });
-            p->inbound_conn = nullptr;
-            return;
-        }
-        this->user_tcall->async_call([this, conn](ThreadCall::Handle &) {
+    }
+    if (p->inbound_preempt_ping)
+    {
+        this->user_tcall->async_call(
+                [this, conn,
+                 iping=p->inbound_preempt_ping.unwrap(),
+                 iconn=p->inbound_conn](ThreadCall::Handle &) {
             if (peer_cb) peer_cb(conn, false);
+            ping_handler(std::move(*iping), iconn);
+            delete iping;
         });
         p->inbound_conn = nullptr;
-        /* auto retry the connection */
-        if (p->cur_ntry > 0) p->cur_ntry--;
-        if (p->cur_ntry)
-        {
-            p->nonce = 0;
-            p->ev_retry_timer.add(
-                p->state == Peer::State::RESET ?
-                0 : gen_rand_timeout(p->retry_delay));
-        }
-        else
-            p->nonce = passive_nonce;
+        return;
     }
+    this->user_tcall->async_call([this, conn](ThreadCall::Handle &) {
+        if (peer_cb) peer_cb(conn, false);
+    });
+    p->inbound_conn = nullptr;
+    /* auto retry the connection */
+    if (p->cur_ntry > 0) p->cur_ntry--;
+    if (p->cur_ntry)
+    {
+        p->nonce = 0;
+        p->ev_retry_timer.add(
+            p->state == Peer::State::RESET ?
+            0 : gen_rand_timeout(p->retry_delay));
+    }
+    else
+        p->nonce = passive_nonce;
 }
 
 template<typename O, O _, O __>

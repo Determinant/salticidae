@@ -693,7 +693,6 @@ class ThreadCall {
     public: class Handle;
     private:
     EventContext ec;
-    const size_t burst_size;
     using queue_t = MPSCQueueEventDriven<Handle *>;
     queue_t q;
     bool stopped;
@@ -757,10 +756,9 @@ class ThreadCall {
         }
     };
 
-    ThreadCall(size_t burst_size): burst_size(burst_size), stopped(false) {}
     ThreadCall(const ThreadCall &) = delete;
     ThreadCall(ThreadCall &&) = delete;
-    ThreadCall(EventContext ec, size_t burst_size = 128): ec(ec), burst_size(burst_size), stopped(false) {
+    ThreadCall(EventContext ec, size_t burst_size = 128): ec(ec), stopped(false) {
         q.reg_handler(ec, [this, burst_size=burst_size](queue_t &q) {
             size_t cnt = 0;
             Handle *h;
