@@ -25,6 +25,7 @@
 #ifndef _SALTICIDAE_UTIL_H
 #define _SALTICIDAE_UTIL_H
 
+#include <stdexcept>
 #include <getopt.h>
 #include <unistd.h>
 #include <fcntl.h>
