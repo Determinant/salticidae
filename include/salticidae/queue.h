@@ -97,7 +97,7 @@ class MPMCQueue {
         cacheline_pad _pad0;
         std::atomic<uint32_t> tail;
         T elem[MPMCQ_SIZE];
-        std::atomic<bool> avail[MPMCQ_SIZE];
+        std::atomic<bool> avail[MPMCQ_SIZE] = {};
         std::atomic<Block *> next;
     };
 
@@ -171,7 +171,6 @@ class MPMCQueue {
     MPMCQueue(): head(new Block()), tail(head.load()) {
         auto h = head.load();
         h->head = h->tail = 0;
-        memset(h->avail, 0, sizeof(h->avail));
         h->next = nullptr;
     }
 
