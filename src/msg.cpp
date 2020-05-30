@@ -16,9 +16,6 @@ datastream_t *msg_consume_payload(const msg_t *msg) {
 
 _opcode_t msg_get_opcode(const msg_t *self) { return self->get_opcode(); }
 
-uint32_t msg_get_magic(const msg_t *self) { return self->get_magic(); }
-
-void msg_set_magic(msg_t *self, uint32_t magic) { return self->set_magic(magic); }
 
 }
 

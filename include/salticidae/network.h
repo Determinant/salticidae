@@ -130,7 +130,6 @@ class MsgNetwork: public ConnPool {
     queue_t incoming_msgs;
 
     protected:
-    const uint32_t msg_magic;
     ConnPool::Conn *create_conn() override { return new Conn(); }
     void on_read(const ConnPool::conn_t &) override;
 
@@ -162,7 +161,6 @@ class MsgNetwork: public ConnPool {
         size_t _max_msg_size;
         size_t _max_msg_queue_size;
         size_t _burst_size;
-        uint32_t _msg_magic;
 
         public:
         Config(): Config(ConnPool::Config()) {}
@@ -170,8 +168,7 @@ class MsgNetwork: public ConnPool {
             ConnPool::Config(config),
             _max_msg_size(1024),
             _max_msg_queue_size(65536),
-            _burst_size(1000),
-            _msg_magic(0x0) {}
+            _burst_size(1000) {}
 
         Config &max_msg_size(size_t x) {
             _max_msg_size = x;
@@ -188,9 +185,6 @@ class MsgNetwork: public ConnPool {
             return *this;
         }
 
-        Config &msg_magic(uint32_t x) {
-            _msg_magic = x;
-        }
     };
 
     virtual ~MsgNetwork() { stop(); }
@@ -198,8 +192,7 @@ class MsgNetwork: public ConnPool {
     MsgNetwork(const EventContext &ec, const Config &config):
             ConnPool(ec, config),
             max_msg_size(config._max_msg_size),
-            max_msg_queue_size(config._max_msg_queue_size),
-            msg_magic(config._msg_magic) {
+            max_msg_queue_size(config._max_msg_queue_size) {
         incoming_msgs.set_capacity(max_msg_queue_size);
         incoming_msgs.reg_handler(ec, [this, burst_size=config._burst_size](queue_t &q) {
             std::pair<Msg, conn_t> item;
@@ -653,13 +646,15 @@ void MsgNetwork<OpcodeType>::on_read(const ConnPool::conn_t &_conn) {
     auto &recv_buffer = conn->recv_buffer;
     auto &msg = conn->msg;
     auto &msg_state = conn->msg_state;
+    bytearray_t data;
     while (true)
     {
         if (msg_state == Conn::HEADER)
         {
             if (recv_buffer.size() < Msg::header_size) break;
             /* new header available */
-            msg = Msg(recv_buffer.pop(Msg::header_size));
+            data = recv_buffer.pop(Msg::header_size);
+            msg = Msg(data);
             if (msg.get_length() > max_msg_size)
             {
                 SALTICIDAE_LOG_WARN(
@@ -704,7 +699,7 @@ void MsgNetwork<OpcodeType>::on_read(const ConnPool::conn_t &_conn) {
 template<typename OpcodeType>
 template<typename MsgType>
 inline int32_t MsgNetwork<OpcodeType>::send_msg_deferred(MsgType &&msg, const conn_t &conn) {
-    return _send_msg_deferred(Msg(std::move(msg), msg_magic), conn);
+    return _send_msg_deferred(Msg(std::move(msg)), conn);
 }
 
 template<typename OpcodeType>
@@ -723,7 +718,7 @@ inline int32_t MsgNetwork<OpcodeType>::_send_msg_deferred(Msg &&msg, const conn_
 template<typename OpcodeType>
 template<typename MsgType>
 inline bool MsgNetwork<OpcodeType>::send_msg(const MsgType &msg, const conn_t &conn) {
-    return _send_msg(Msg(msg, msg_magic), conn);
+    return _send_msg(Msg(msg), conn);
 }
 
 template<typename OpcodeType>
@@ -1311,7 +1306,7 @@ size_t PeerNetwork<O, _, __>::get_npending() const {
 template<typename O, O _, O __>
 template<typename MsgType>
 inline int32_t PeerNetwork<O, _, __>::send_msg_deferred(MsgType &&msg, const PeerId &pid) {
-    return _send_msg_deferred(Msg(std::move(msg), this->msg_magic), pid);
+    return _send_msg_deferred(Msg(std::move(msg)), pid);
 }
 
 template<typename O, O _, O __>
@@ -1330,7 +1325,7 @@ inline int32_t PeerNetwork<O, _, __>::_send_msg_deferred(Msg &&msg, const PeerId
 template<typename O, O _, O __>
 template<typename MsgType>
 inline bool PeerNetwork<O, _, __>::send_msg(const MsgType &msg, const PeerId &pid) {
-    return _send_msg(Msg(msg, this->msg_magic), pid);
+    return _send_msg(Msg(msg), pid);
 }
 
 template<typename O, O _, O __>
@@ -1342,7 +1337,7 @@ inline bool PeerNetwork<O, _, __>::_send_msg(const Msg &msg, const PeerId &pid) 
 template<typename O, O _, O __>
 template<typename MsgType>
 inline int32_t PeerNetwork<O, _, __>::multicast_msg(MsgType &&msg, const std::vector<PeerId> &pids) {
-    return _multicast_msg(Msg(std::move(msg), this->msg_magic), pids);
+    return _multicast_msg(Msg(std::move(msg)), pids);
 }
 
 template<typename O, O _, O __>
@@ -1384,7 +1379,7 @@ void ClientNetwork<OpcodeType>::on_dispatcher_teardown(const ConnPool::conn_t &_
 template<typename OpcodeType>
 template<typename MsgType>
 inline int32_t ClientNetwork<OpcodeType>::send_msg_deferred(MsgType &&msg, const NetAddr &addr) {
-    return _send_msg_deferred(Msg(std::move(msg), this->msg_magic), addr);
+    return _send_msg_deferred(Msg(std::move(msg)), addr);
 }
 
 template<typename OpcodeType>
@@ -1402,7 +1397,7 @@ inline int32_t ClientNetwork<OpcodeType>::_send_msg_deferred(Msg &&msg, const Ne
 template<typename OpcodeType>
 template<typename MsgType>
 inline bool ClientNetwork<OpcodeType>::send_msg(const MsgType &msg, const NetAddr &addr) {
-    return _send_msg(Msg(msg, this->msg_magic), addr);
+    return _send_msg(Msg(msg), addr);
 }
 
 template<typename OpcodeType>

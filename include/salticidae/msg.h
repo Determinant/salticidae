@@ -47,7 +47,6 @@ class MsgBase {
     private:
     /* header */
     /* all integers are encoded in little endian in the protocol */
-    uint32_t magic;
     opcode_t opcode;
     uint32_t length;
 #ifndef SALTICIDAE_NOCHECKSUM
@@ -58,17 +57,17 @@ class MsgBase {
     mutable bool no_payload;
 
     public:
-    MsgBase(uint32_t magic = 0x0): magic(magic), opcode(0xff), no_payload(true) {}
+    MsgBase(): opcode(0xff), no_payload(true) {}
 
     template<typename MsgType>
-    MsgBase(const MsgType &msg, uint32_t magic): magic(magic) {
+    MsgBase(const MsgType &msg) {
         set_opcode(MsgType::opcode);
         set_payload(std::move(msg.serialized));
         set_checksum();
     }
 
 #ifdef SALTICIDAE_CBINDINGS
-    MsgBase(const OpcodeType &opcode, bytearray_t &&payload): magic(0x0) {
+    MsgBase(const OpcodeType &opcode, bytearray_t &&payload) {
         set_opcode(opcode);
         set_payload(std::move(payload));
         set_checksum();
@@ -76,7 +75,6 @@ class MsgBase {
 #endif
 
     MsgBase(const MsgBase &other):
-            magic(other.magic),
             opcode(other.opcode),
             length(other.length),
 #ifndef SALTICIDAE_NOCHECKSUM
@@ -86,7 +84,6 @@ class MsgBase {
             no_payload(other.no_payload) {}
 
     MsgBase(MsgBase &&other):
-            magic(other.magic),
             opcode(std::move(other.opcode)),
             length(other.length),
 #ifndef SALTICIDAE_NOCHECKSUM
@@ -96,20 +93,37 @@ class MsgBase {
             no_payload(other.no_payload) {}
 
     MsgBase(DataStream &&s): no_payload(true) {
-        uint32_t _magic;
         opcode_t _opcode;
         uint32_t _length;
 #ifndef SALTICIDAE_NOCHECKSUM
         uint32_t _checksum;
 #endif
-        s >> _magic
-          >> _opcode
+        s >> _opcode
           >> _length
 #ifndef SALTICIDAE_NOCHECKSUM
           >> _checksum
 #endif
           ;
-        magic = letoh(_magic);
+        opcode = _opcode;
+        length = letoh(_length);
+#ifndef SALTICIDAE_NOCHECKSUM
+        checksum = letoh(_checksum);
+#endif
+    }
+
+    MsgBase(bytearray_t &data) {
+        opcode_t _opcode;
+        uint32_t _length;
+#ifndef SALTICIDAE_NOCHECKSUM
+        uint32_t _checksum;
+#endif
+        DataStream stream = DataStream(data);
+        stream >> _opcode
+               >> _length
+#ifndef SALTICIDAE_NOCHECKSUM
+               >> _checksum
+#endif
+               ;
         opcode = _opcode;
         length = letoh(_length);
 #ifndef SALTICIDAE_NOCHECKSUM
@@ -118,7 +132,6 @@ class MsgBase {
     }
 
     void swap(MsgBase &other) {
-        std::swap(magic, other.magic);
         std::swap(opcode, other.opcode);
         std::swap(length, other.length);
 #ifndef SALTICIDAE_NOCHECKSUM
@@ -150,13 +163,7 @@ class MsgBase {
 
     size_t get_length() const { return length; }
 
-    uint32_t get_magic() const { return magic; }
-
     const opcode_t &get_opcode() const { return opcode; }
-
-    void set_magic(uint32_t _magic) {
-        magic = _magic;
-    }
 
     void set_opcode(const opcode_t &_opcode) {
         opcode = _opcode;
@@ -192,7 +199,6 @@ class MsgBase {
     operator std::string() const {
         DataStream s;
         s << "<msg "
-          << "magic=" << get_hex(magic) << " "
           << "opcode=" << get_hex(opcode) << " "
           << "length=" << std::to_string(length) << " "
 #ifndef SALTICIDAE_NOCHECKSUM
@@ -228,8 +234,7 @@ class MsgBase {
 
     bytearray_t serialize() const {
         DataStream s;
-        s << htole(magic)
-          << opcode
+        s << opcode
           << htole(length)
 #ifndef SALTICIDAE_NOCHECKSUM
           << htole(checksum)
@@ -261,7 +266,6 @@ class MsgBase {
 
 template<typename OpcodeType>
 const size_t MsgBase<OpcodeType>::header_size =
-    sizeof(MsgBase<OpcodeType>::magic) +
     sizeof(MsgBase<OpcodeType>::opcode) +
     sizeof(MsgBase<OpcodeType>::length) +
 #ifndef SALTICIDAE_NOCHECKSUM
@@ -291,8 +295,6 @@ msg_t *msg_new_moved_from_bytearray(_opcode_t opcode, bytearray_t *_moved_payloa
 void msg_free(msg_t *msg);
 datastream_t *msg_consume_payload(const msg_t *msg);
 _opcode_t msg_get_opcode(const msg_t *msg);
-uint32_t msg_get_magic(const msg_t *msg);
-void msg_set_magic(msg_t *msg, uint32_t magic);
 
 #ifdef __cplusplus
 }

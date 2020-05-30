@@ -42,7 +42,7 @@ add_library(salticidae
     src/conn.cpp
     src/network.cpp)
 
-option(BUILD_SHARED "build shared library." OFF)
+option(BUILD_SHARED "build shared library." ON)
 if(BUILD_SHARED)
     set_property(TARGET salticidae PROPERTY POSITION_INDEPENDENT_CODE 1)
     add_library(salticidae_shared SHARED $<TARGET_OBJECTS:salticidae>)
@@ -55,7 +55,7 @@ set_target_properties(salticidae_static PROPERTIES OUTPUT_NAME "salticidae")
 target_link_libraries(salticidae_static uv crypto ssl pthread)
 install(TARGETS salticidae_static DESTINATION lib)
 
-option(BUILD_TEST "build test binaries." OFF)
+option(BUILD_TEST "build test binaries." ON)
 if(BUILD_TEST)
     add_subdirectory(test)
 endif()
@@ -68,7 +68,7 @@ option(SALTICIDAE_DEBUG_LOG "enable debug log" OFF)
 option(SALTICIDAE_NORMAL_LOG "enable regular log" ON)
 option(SALTICIDAE_MSG_STAT "enable message statistics" ON)
 option(SALTICIDAE_NOCHECK "disable the sanity check" OFF)
-option(SALTICIDAE_NOCHECKSUM " disable checksum in messages" OFF)
+option(SALTICIDAE_NOCHECKSUM " disable checksum in messages" ON)
 option(SALTICIDAE_CBINDINGS "enable C bindings" ON)
 
 configure_file(src/config.h.in include/salticidae/config.h @ONLY)
