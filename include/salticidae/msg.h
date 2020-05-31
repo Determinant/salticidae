@@ -118,8 +118,9 @@ class MsgBase {
         uint32_t _checksum;
 #endif
         DataStream stream = DataStream(data);
-        stream >> _opcode
-               >> _length
+        stream >> _length
+               >> _opcode
+
 #ifndef SALTICIDAE_NOCHECKSUM
                >> _checksum
 #endif
@@ -187,7 +188,7 @@ class MsgBase {
 #ifndef SALTICIDAE_NOCHECK
         no_payload = false;
 #endif
-        length = payload.size();
+        length = payload.size() + 1;
     }
 
     void set_checksum() {
@@ -234,8 +235,8 @@ class MsgBase {
 
     bytearray_t serialize() const {
         DataStream s;
-        s << opcode
-          << htole(length)
+        s << htole(length)
+          << opcode
 #ifndef SALTICIDAE_NOCHECKSUM
           << htole(checksum)
 #endif

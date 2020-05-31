@@ -666,7 +666,7 @@ void MsgNetwork<OpcodeType>::on_read(const ConnPool::conn_t &_conn) {
         }
         if (msg_state == Conn::PAYLOAD)
         {
-            size_t len = msg.get_length();
+            size_t len = msg.get_length() - 1;
             if (recv_buffer.size() < len) break;
             /* new payload available */
             msg.set_payload(recv_buffer.pop(len));
