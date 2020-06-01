@@ -453,11 +453,8 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
             nonce(passive_nonce),
             id_hex(get_hex10(id)),
             retry_delay(0), ntry(0), cur_ntry(0),
-            ev_ping_timer(
-                TimerEvent(pn->disp_ec, std::bind(&Peer::ping_timer, this, _1))),
-            ping_period(pn->ping_period),
-            inbound_preempt_ping(nullptr),
             state(DISCONNECTED) {}
+
 
         Peer &operator=(const Peer &) = delete;
         Peer(const Peer &) = delete;
@@ -517,6 +514,7 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     void _ping_msg_cb(const conn_t &conn, uint16_t port);
     void _pong_msg_cb(const conn_t &conn, uint16_t port);
     void finish_handshake(Peer *peer);
+    void finish_handshake_no_ping(Peer *p);
     void replace_pending_conn(const conn_t &conn);
     void start_active_conn(Peer *peer);
     static void tcall_reset_timeout(ConnPool::Worker *worker,
@@ -529,6 +527,9 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
     void on_worker_teardown(const ConnPool::conn_t &) override;
     void on_dispatcher_setup(const ConnPool::conn_t &) override;
     void on_dispatcher_teardown(const ConnPool::conn_t &) override;
+    void on_dispatcher_setup_with_handshake(const ConnPool::conn_t &_conn) override;
+    void update_active_connection(Peer *p, const ConnPool::conn_t &conn);
+    void update_passive_connection(Peer *p, const ConnPool::conn_t &conn);
 
     PeerId _get_peer_id(const X509 *cert, const NetAddr &addr) {
         if (!this->enable_tls || id_mode == ADDR_BASED)
@@ -539,6 +540,10 @@ class PeerNetwork: public MsgNetwork<OpcodeType> {
 
     PeerId get_peer_id(const conn_t &conn, const NetAddr &addr) {
         return _get_peer_id(conn->get_peer_cert(), addr);
+    }
+
+    PeerId get_peer_id(const conn_t &conn) {
+        return _get_peer_id(conn->get_peer_cert(), conn->get_addr());
     }
 
     public:
@@ -774,6 +779,97 @@ void PeerNetwork<O, _, __>::on_worker_teardown(const ConnPool::conn_t &_conn) {
 
 /* begin: functions invoked by the dispatcher */
 
+
+template<typename O, O _, O __>
+void PeerNetwork<O, _, __>::update_active_connection(Peer *p, const ConnPool::conn_t &conn) {
+    pinfo_slock_t _g(known_peers_lock);
+    if (p->state != Peer::State::DISCONNECTED) return;
+    SALTICIDAE_LOG_DEBUG("%s%s%s: outbound handshake to %s%s%s",
+                         tty_secondary_color, id_hex.c_str(), tty_reset_color,
+                         tty_secondary_color, p->id_hex.c_str(), tty_reset_color);
+    auto &old_conn = p->outbound_conn;
+    if (old_conn && old_conn != conn)
+    {
+        SALTICIDAE_LOG_DEBUG("%s%s%s: terminating stale handshake connection %s",
+                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
+                             std::string(*old_conn).c_str());
+        assert(old_conn->peer == nullptr);
+        this->disp_terminate(old_conn);
+    }
+    old_conn = conn;
+    SALTICIDAE_LOG_DEBUG("%s%s%s: choses connection %s",
+                         tty_secondary_color, id_hex.c_str(), tty_reset_color,
+                         std::string(*conn).c_str());
+    p->chosen_conn = conn;
+    finish_handshake_no_ping(p);
+}
+
+
+template<typename O, O _, O __>
+void PeerNetwork<O, _, __>::update_passive_connection(Peer *p, const ConnPool::conn_t &conn) {
+    if (p->state == Peer::State::CONNECTED)
+    {
+        // defer the handling of the inbound connection
+        p->inbound_conn = conn;
+        p->nonce = passive_nonce;
+        this->disp_terminate(p->conn);
+        return;
+    }
+    if (p->state != Peer::State::DISCONNECTED) return;
+    SALTICIDAE_LOG_DEBUG("%s%s%s: inbound handshake from %s%s%s",
+                         tty_secondary_color, id_hex.c_str(), tty_reset_color,
+                         tty_secondary_color, p->id_hex.c_str(), tty_reset_color);
+    auto &old_conn = p->inbound_conn;
+    if (old_conn && old_conn != conn)
+    {
+        SALTICIDAE_LOG_DEBUG("%s%s%s: terminating stale handshake connection %s",
+                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
+                             std::string(*old_conn).c_str());
+        assert(old_conn->peer == nullptr);
+        this->disp_terminate(old_conn);
+    }
+    old_conn = conn;
+    if (p->addr.is_null())
+    {
+        SALTICIDAE_LOG_DEBUG("%s%s%s: choses connection %s",
+                             tty_secondary_color, id_hex.c_str(), tty_reset_color,
+                             std::string(*conn).c_str());
+        p->chosen_conn = conn;
+        finish_handshake_no_ping(p);
+    }
+    else
+    {
+        SALTICIDAE_LOG_DEBUG("%s%s%s: terminates one side",
+                             tty_secondary_color, id_hex.c_str(), tty_reset_color);
+        this->disp_terminate(conn);
+    }
+}
+
+
+template<typename O, O _, O __>
+void PeerNetwork<O, _, __>::on_dispatcher_setup_with_handshake(const ConnPool::conn_t &_conn) {
+    MsgNet::on_dispatcher_setup(_conn);
+    auto conn = static_pointer_cast<Conn>(_conn);
+    SALTICIDAE_LOG_INFO("%s%s%s: setup connection %s",
+                        tty_secondary_color,
+                        id_hex.c_str(),
+                        tty_reset_color,
+                        std::string(*conn).c_str());
+    tcall_reset_timeout(conn->worker, conn, conn_timeout);
+    auto pid = get_peer_id(conn, conn->get_addr());
+    auto it = known_peers.find(pid);
+    if (it == known_peers.end())
+        throw PeerNetworkError(SALTI_ERROR_PEER_NOT_MATCH);
+    else {
+        Peer *p = it->second.get();
+        if (conn->get_mode() == Conn::ConnMode::ACTIVE) {
+            update_active_connection(p, _conn);
+        } else {
+            update_passive_connection(p, _conn);
+        }
+    }
+}
+
 /* the initial ping-pong to set up the connection */
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::on_dispatcher_setup(const ConnPool::conn_t &_conn) {
@@ -946,6 +1042,53 @@ void PeerNetwork<O, _, __>::finish_handshake(Peer *p) {
         std::string(*(p->conn)).c_str(),
         tty_reset_color);
 }
+
+template<typename O, O _, O __>
+void PeerNetwork<O, _, __>::finish_handshake_no_ping(Peer *p) {
+    assert(p->state == Peer::State::DISCONNECTED);
+    p->clear_all_events();
+    if (p->inbound_conn)
+        p->inbound_conn = nullptr;
+    if (p->outbound_conn)
+    {
+        p->outbound_conn->peer = nullptr;
+        p->outbound_conn = nullptr;
+    }
+    p->state = Peer::State::CONNECTED;
+    p->ev_retry_timer.del();
+    p->cur_ntry = p->ntry;
+    auto &old_conn = p->conn;
+    auto &new_conn = p->chosen_conn;
+    if (old_conn)
+    {
+        /* there is some previously terminated connection */
+        assert(p->conn->is_terminated());
+        for (;;)
+        {
+            bytearray_t buff_seg = old_conn->send_buffer.move_pop();
+            if (!buff_seg.size()) break;
+            new_conn->write(std::move(buff_seg));
+        }
+        old_conn->peer = nullptr;
+    }
+    old_conn = new_conn;
+    new_conn->peer = p;
+    this->user_tcall->async_call([this, conn=p->conn](ThreadCall::Handle &) {
+        if (peer_cb) peer_cb(conn, true);
+    });
+    pending_peers.erase(p->conn->get_addr());
+    SALTICIDAE_LOG_INFO("%sestablished %s%s%s <---> %s%s%s (via %s)%s",
+                        tty_primary_color,
+                        tty_secondary_color,
+                        id_hex.c_str(),
+                        tty_primary_color,
+                        tty_secondary_color,
+                        p->id_hex.c_str(),
+                        tty_primary_color,
+                        std::string(*(p->conn)).c_str(),
+                        tty_reset_color);
+}
+
 
 template<typename O, O _, O __>
 void PeerNetwork<O, _, __>::replace_pending_conn(const conn_t &conn) {

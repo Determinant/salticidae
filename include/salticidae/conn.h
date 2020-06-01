@@ -183,6 +183,8 @@ class ConnPool {
     virtual void on_worker_setup(const conn_t &) {}
     /** Called when the underlying connection is established. */
     virtual void on_dispatcher_setup(const conn_t &) {}
+    virtual void on_dispatcher_setup_with_handshake(const ConnPool::conn_t &_conn) {}
+
     /** Called when the underlying connection breaks. */
     virtual void on_worker_teardown(const conn_t &conn) {
         if (conn->worker) conn->worker->unfeed();
@@ -316,7 +318,7 @@ class ConnPool {
                         cpool->on_worker_setup(conn);
                         cpool->disp_tcall->async_call([cpool, conn](ThreadCall::Handle &) {
                             try {
-                                cpool->on_dispatcher_setup(conn);
+                                cpool->on_dispatcher_setup_with_handshake(conn);
                                 cpool->update_conn(conn, true);
                             } catch (...) {
                                 cpool->recoverable_error(std::current_exception(), -1);

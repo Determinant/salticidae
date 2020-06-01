@@ -254,7 +254,7 @@ void ConnPool::Conn::_recv_data_tls_handshake(const conn_t &conn, int, int) {
         cpool->on_worker_setup(conn);
         cpool->disp_tcall->async_call([cpool, conn](ThreadCall::Handle &) {
             try {
-                cpool->on_dispatcher_setup(conn);
+                cpool->on_dispatcher_setup_with_handshake(conn);
                 cpool->update_conn(conn, true);
             } catch (...) {
                 cpool->recoverable_error(std::current_exception(), -1);
