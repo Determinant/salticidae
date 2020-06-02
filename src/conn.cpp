@@ -137,8 +137,8 @@ void ConnPool::Conn::_recv_data(const conn_t &conn, int fd, int events) {
         if (ret == 0)
         {
             /* the remote closes the connection */
-            conn->cpool->worker_terminate(conn);
-            return;
+            //conn->cpool->worker_terminate(conn);
+            continue;
         }
         buff_seg.resize(ret);
         conn->recv_buffer.push(std::move(buff_seg));

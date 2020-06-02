@@ -372,6 +372,7 @@ bool clientnetwork_send_msg(clientnetwork_t *self, const msg_t * msg, const neta
     }
 }
 
+
 int32_t clientnetwork_send_msg_deferred_by_move(clientnetwork_t *self, msg_t *_moved_msg, const netaddr_t *addr) {
     return self->_send_msg_deferred(std::move(*_moved_msg), *addr);
 }
