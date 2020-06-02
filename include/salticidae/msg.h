@@ -98,8 +98,8 @@ class MsgBase {
 #ifndef SALTICIDAE_NOCHECKSUM
         uint32_t _checksum;
 #endif
-        s >> _opcode
-          >> _length
+        s >> _length
+          >> _opcode
 #ifndef SALTICIDAE_NOCHECKSUM
           >> _checksum
 #endif
