@@ -318,11 +318,13 @@ class ConnPool {
                         cpool->on_worker_setup(conn);
                         cpool->disp_tcall->async_call([cpool, conn](ThreadCall::Handle &) {
                             try {
+                                SALTICIDAE_LOG_DEBUG("Will dispatch with handshake");
                                 cpool->on_dispatcher_setup_with_handshake(conn);
                                 SALTICIDAE_LOG_DEBUG("Could add peers....");
                                 cpool->update_conn(conn, true);
                                 SALTICIDAE_LOG_DEBUG("Updated the connection");
                             } catch (...) {
+                                SALTICIDAE_LOG_DEBUG("Caught exception");
                                 cpool->recoverable_error(std::current_exception(), -1);
                                 cpool->disp_terminate(conn);
                             }
