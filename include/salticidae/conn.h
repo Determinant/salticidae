@@ -153,7 +153,6 @@ class ConnPool {
     EventContext disp_ec;
     ThreadCall* disp_tcall;
     BoxObj<ThreadCall> user_tcall;
-    const bool enable_tls;
     RcObj<const X509> tls_cert;
 
     using worker_error_callback_t = std::function<void(const std::exception_ptr err)>;
@@ -384,6 +383,7 @@ class ConnPool {
     }
 
     public:
+    const bool enable_tls;
 
     class Config {
         friend class ConnPool;
