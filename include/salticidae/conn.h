@@ -485,7 +485,6 @@ class ConnPool {
 
     ConnPool(const EventContext &ec, const Config &config):
             system_state(0), ec(ec),
-            enable_tls(config._enable_tls),
             async_id(0),
             max_listen_backlog(config._max_listen_backlog),
             conn_server_timeout(config._conn_server_timeout),
@@ -494,7 +493,8 @@ class ConnPool {
             max_send_buff_size(config._max_send_buff_size),
             tls_ctx(nullptr),
             listen_fd(-1),
-            nworker(config._nworker) {
+            nworker(config._nworker),
+            enable_tls(config._enable_tls) {
         if (enable_tls)
         {
             tls_ctx = new TLSContext();
