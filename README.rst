@@ -203,7 +203,7 @@ Using MsgNetwork class
                {
                    printf("[%s] disconnected, retrying.\n", this->name.c_str());
                    /* try to reconnect to the same address */
-                   connect(conn->get_addr(), false);
+                   connect(conn->get_addr());
                }
                return true;
            });
@@ -243,8 +243,8 @@ Using MsgNetwork class
        bob.listen(bob_addr);
    
        /* try to connect once */
-       alice.connect(bob_addr, false);
-       bob.connect(alice_addr, false);
+       alice.connect(bob_addr);
+       bob.connect(alice_addr);
    
        /* the main loop can be shutdown by ctrl-c or kill */
        auto shutdown = [&](int) {ec.stop();};
