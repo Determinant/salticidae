@@ -162,7 +162,7 @@ void ConnPool::Conn::_send_data_tls(const conn_t &conn, int fd, int events) {
         bytearray_t buff_seg = conn->send_buffer.move_pop();
         ssize_t size = buff_seg.size();
         if (!size) break;
-        ret = tls->send(buff_seg.data(), size);
+        ret = tls->send(buff_seg.data(), std::min(buff_seg.size(), conn->recv_chunk_size));
         SALTICIDAE_LOG_DEBUG("ssl(%d) sent %zd bytes", fd, ret);
         size -= ret;
         if (size > 0)
