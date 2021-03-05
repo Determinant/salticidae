@@ -75,6 +75,17 @@ Dependencies
 - libuv >= 1.10.0
 - openssl >= 1.1.0
 
+Installation
+------------
+
+```bash
+git clone https://github.com/Determinant/salticidae
+cd salticidae
+cmake .
+make
+make install
+```
+
 Minimal working P2P network
 ---------------------------
 .. code-block:: cpp
