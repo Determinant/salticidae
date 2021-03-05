@@ -77,14 +77,15 @@ Dependencies
 
 Installation
 ------------
+::
 
-```bash
-git clone https://github.com/Determinant/salticidae
-cd salticidae
-cmake .
-make
-make install
-```
+  bash
+  git clone https://github.com/Determinant/salticidae
+  cd salticidae
+  cmake .
+  make
+  make install
+
 
 Minimal working P2P network
 ---------------------------
