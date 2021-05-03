@@ -372,7 +372,7 @@ class TLS {
         else
             SSL_set_connect_state(ssl);
 
-        SSL_set_mode(ssl, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER | SSL_MODE_ENABLE_PARTIAL_WRITE);
+        SSL_set_mode(ssl, SSL_MODE_ENABLE_PARTIAL_WRITE);
     }
 
     TLS(const TLS &) = delete;
